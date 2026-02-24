@@ -5,12 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🤖 SolBot Pro — Dashboard</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
@@ -18,19 +13,15 @@
       min-height: 100vh;
       padding: 20px;
     }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
+    .container { max-width: 1400px; margin: 0 auto; }
+    
+    /* Header */
     header {
       text-align: center;
       padding: 30px 0;
       border-bottom: 2px solid #0f3460;
       margin-bottom: 30px;
     }
-
     header h1 {
       font-size: 2.5em;
       margin-bottom: 10px;
@@ -38,181 +29,227 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-
-    header p {
-      color: #a0a0a0;
-      font-size: 1.1em;
+    header p { color: #a0a0a0; font-size: 1.1em; }
+    #wallet-address {
+      margin-top: 10px;
+      font-family: monospace;
+      color: #00d9ff;
+      font-size: 0.95em;
     }
-
+    
+    /* Status badge */
+    .status {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.9em;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+    .status-live { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+    .status-offline { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
+    
+    /* Stats cards */
     .stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
       margin-bottom: 30px;
     }
-
     .stat-card {
       background: rgba(15, 52, 96, 0.5);
-      border-radius: 15px;
-      padding: 20px;
+      border-radius: 12px;
+      padding: 18px;
       text-align: center;
       border: 1px solid #0f3460;
+      transition: transform 0.2s;
     }
-
-    .stat-card h3 {
-      color: #a0a0a0;
-      font-size: 0.9em;
-      margin-bottom: 10px;
-    }
-
-    .stat-card .value {
-      font-size: 1.8em;
-      font-weight: bold;
-      color: #00d9ff;
-    }
-
+    .stat-card:hover { transform: translateY(-3px); }
+    .stat-card h3 { color: #a0a0a0; font-size: 0.85em; margin-bottom: 8px; }
+    .stat-card .value { font-size: 1.6em; font-weight: bold; color: #00d9ff; }
+    
+    /* Tokens table */
     .tokens-table {
       background: rgba(15, 52, 96, 0.3);
-      border-radius: 15px;
+      border-radius: 12px;
       padding: 20px;
       overflow-x: auto;
     }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    .tokens-table h2 {
+      margin-bottom: 20px;
+      color: #00d9ff;
+      font-size: 1.4em;
     }
-
+    table { width: 100%; border-collapse: collapse; }
     th {
       background: rgba(0, 217, 255, 0.2);
-      padding: 15px;
+      padding: 14px 10px;
       text-align: left;
       font-weight: 600;
       color: #00d9ff;
-      border-radius: 8px;
+      font-size: 0.9em;
+      text-transform: uppercase;
     }
-
     td {
-      padding: 15px;
+      padding: 14px 10px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.95em;
     }
-
-    tr:hover {
-      background: rgba(0, 217, 255, 0.1);
-    }
-
-    .token-name {
-      font-weight: bold;
-      color: #ffffff;
-    }
-
+    tr:hover { background: rgba(0, 217, 255, 0.1); }
+    
+    /* Token info */
+    .token-symbol { font-weight: bold; color: #ffffff; }
+    .token-name { color: #a0a0a0; font-size: 0.85em; margin-top: 3px; }
     .token-address {
       font-family: 'Courier New', monospace;
-      font-size: 0.85em;
-      color: #a0a0a0;
+      font-size: 0.8em;
+      color: #64b5f6;
       background: rgba(0, 0, 0, 0.3);
-      padding: 4px 8px;
+      padding: 3px 8px;
       border-radius: 4px;
       display: inline-block;
       margin-top: 5px;
+      cursor: pointer;
+      transition: background 0.2s;
     }
-
-    .pnl-positive {
-      color: #00ff88;
-      font-weight: bold;
-    }
-
-    .pnl-negative {
-      color: #ff4757;
-      font-weight: bold;
-    }
-
-    .status {
+    .token-address:hover { background: rgba(100, 181, 246, 0.2); }
+    .token-address.copied { background: rgba(0, 255, 136, 0.3); color: #00ff88; }
+    
+    /* PnL colors */
+    .pnl-positive { color: #00ff88; font-weight: 600; }
+    .pnl-negative { color: #ff4757; font-weight: 600; }
+    .pnl-neutral { color: #ffd93d; font-weight: 600; }
+    
+    /* Liquidity badge */
+    .liquidity-badge {
       display: inline-block;
-      padding: 5px 12px;
-      border-radius: 20px;
+      padding: 3px 10px;
+      border-radius: 12px;
       font-size: 0.85em;
-      font-weight: 600;
+      background: rgba(100, 181, 246, 0.2);
+      color: #64b5f6;
     }
-
-    .status-live {
-      background: rgba(0, 255, 136, 0.2);
-      color: #00ff88;
+    
+    /* Controls */
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      margin-top: 25px;
+      flex-wrap: wrap;
     }
-
-    .status-offline {
-      background: rgba(255, 71, 87, 0.2);
-      color: #ff4757;
-    }
-
     .refresh-btn {
       background: linear-gradient(90deg, #00d9ff, #00ff88);
       border: none;
-      padding: 12px 30px;
+      padding: 12px 28px;
       border-radius: 25px;
       color: #1a1a2e;
       font-weight: bold;
       cursor: pointer;
-      margin-top: 20px;
-      transition: transform 0.2s;
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-
     .refresh-btn:hover {
       transform: scale(1.05);
+      box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4);
     }
-
+    .refresh-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .last-update { color: #a0a0a0; font-size: 0.9em; }
+    
+    /* Loading */
     .loading {
       text-align: center;
-      padding: 50px;
+      padding: 50px 20px;
       color: #a0a0a0;
     }
-
     .loading-spinner {
       border: 4px solid rgba(0, 217, 255, 0.2);
       border-top: 4px solid #00d9ff;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
+      width: 45px;
+      height: 45px;
       animation: spin 1s linear infinite;
       margin: 0 auto 20px;
     }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    /* Error message */
+    .error-msg {
+      background: rgba(255, 71, 87, 0.2);
+      border: 1px solid #ff4757;
+      color: #ff4757;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      text-align: center;
     }
-
+    
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #a0a0a0;
+    }
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 15px;
+      opacity: 0.5;
+    }
+    
+    /* Responsive */
     @media (max-width: 768px) {
-      header h1 {
-        font-size: 1.8em;
-      }
-
-      .stats {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      table {
-        font-size: 0.85em;
-      }
-
-      th, td {
-        padding: 10px 5px;
-      }
+      header h1 { font-size: 1.8em; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      table { font-size: 0.85em; }
+      th, td { padding: 10px 5px; }
+      .token-address { font-size: 0.75em; }
+      .controls { flex-direction: column; }
+    }
+    
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1a1a2e;
+      border: 1px solid #00d9ff;
+      color: #ffffff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+      display: none;
+      animation: slideIn 0.3s ease;
+      z-index: 1000;
+    }
+    .toast.show { display: block; }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
     }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- Header -->
     <header>
       <h1>🤖 SolBot Pro Dashboard</h1>
       <p>Surveillance en temps réel de votre portefeuille Solana</p>
-      <p id="wallet-address" style="margin-top: 10px; font-family: monospace; color: #00d9ff;"></p>
-      <span id="bot-status" class="status status-offline">🔴 Bot hors ligne</span>
+      <p id="wallet-address">Wallet: Chargement...</p>
+      <span id="bot-status" class="status status-offline">🔴 Connexion...</span>
     </header>
 
+    <!-- Stats -->
     <div class="stats">
       <div class="stat-card">
-        <h3>📊 Tokens Surveillés</h3>
+        <h3>📊 Tokens</h3>
         <div class="value" id="total-tokens">-</div>
       </div>
       <div class="stat-card">
@@ -229,17 +266,35 @@
       </div>
     </div>
 
+    <!-- Tokens Table -->
     <div class="tokens-table">
-      <h2 style="margin-bottom: 20px; color: #00d9ff;">🪙 Vos Tokens</h2>
+      <h2>🪙 Vos Tokens</h2>
+      
+      <!-- Loading -->
       <div id="loading" class="loading">
         <div class="loading-spinner"></div>
-        <p>Chargement des données...</p>
+        <p>Chargement des données depuis le bot...</p>
       </div>
+      
+      <!-- Error -->
+      <div id="error" class="error-msg" style="display: none;">
+        ❌ Impossible de charger les données. Vérifiez que le bot est en ligne.
+      </div>
+      
+      <!-- Empty -->
+      <div id="empty" class="empty-state" style="display: none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
+        </svg>
+        <p>Aucun token trouvé dans votre portefeuille</p>
+      </div>
+      
+      <!-- Table -->
       <table id="tokens-table" style="display: none;">
         <thead>
           <tr>
             <th>Token</th>
-            <th>Adresse</th>
+            <th>Address</th>
             <th>Balance</th>
             <th>Prix</th>
             <th>Valeur</th>
@@ -247,170 +302,288 @@
             <th>Liquidité</th>
           </tr>
         </thead>
-        <tbody id="tokens-body">
-        </tbody>
+        <tbody id="tokens-body"></tbody>
       </table>
     </div>
 
-    <div style="text-align: center;">
-      <button class="refresh-btn" onclick="loadData()">🔄 Actualiser</button>
-      <p style="margin-top: 15px; color: #a0a0a0; font-size: 0.9em;">
-        Dernière mise à jour : <span id="last-update">-</span>
-      </p>
+    <!-- Controls -->
+    <div class="controls">
+      <button class="refresh-btn" id="refresh-btn" onclick="loadData()">
+        <span>🔄</span> Actualiser
+      </button>
+      <p class="last-update">Dernière mise à jour : <span id="last-update">-</span></p>
     </div>
   </div>
 
-  <script>
-    // ⚙️ CONFIGURATION
-    // Remplacez par l'URL de votre service Render si vous ajoutez une API
-    const RENDER_API_URL = ''; // Ex: 'https://solana-sniper.onrender.com/api/tokens'
-    
-    // 🧪 DONNÉES DE DÉMO (à remplacer par les données réelles du bot)
-    const DEMO_DATA = [
-      {
-        symbol: 'USDC',
-        name: 'USD Coin',
-        address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-        balance: 5.8810,
-        price: 0.001767,
-        value: 0.01,
-        pnl: 0.00,
-        liquidity: 13373373
-      },
-      {
-        symbol: 'SKRb',
-        name: 'Unknown',
-        address: 'SKRbvo6G...',
-        balance: 75.9751,
-        price: 0.02494,
-        value: 1.89,
-        pnl: 0.12,
-        liquidity: 658480
-      },
-      {
-        symbol: '???',
-        name: 'Unknown',
-        address: '67ezHLk8...',
-        balance: 830.3463,
-        price: 0.003597,
-        value: 2.99,
-        pnl: -1.80,
-        liquidity: 188471
-      }
-    ];
+  <!-- Toast notification -->
+  <div id="toast" class="toast">✅ Adresse copiée !</div>
 
-    // 🔄 Charger les données
+  <script>
+    // ════════════════════════════════════════════════════════════════
+    // ⚙️ CONFIGURATION
+    // ════════════════════════════════════════════════════════════════
+    
+    // 🎯 URL de l'API de votre bot sur Render
+    const API_BASE_URL = 'https://solana-sniper-7o8s.onrender.com';
+    
+    // 🔄 Intervalles (en millisecondes)
+    const AUTO_REFRESH_INTERVAL = 30000;  // 30 secondes
+    const REQUEST_TIMEOUT = 10000;          // 10 secondes timeout
+    
+    // ════════════════════════════════════════════════════════════════
+    // 🔄 CHARGEMENT DES DONNÉES
+    // ════════════════════════════════════════════════════════════════
+    
     async function loadData() {
       const loading = document.getElementById('loading');
+      const error = document.getElementById('error');
+      const empty = document.getElementById('empty');
       const table = document.getElementById('tokens-table');
-      const tbody = document.getElementById('tokens-body');
+      const refreshBtn = document.getElementById('refresh-btn');
       
+      // UI: État de chargement
       loading.style.display = 'block';
+      error.style.display = 'none';
+      empty.style.display = 'none';
       table.style.display = 'none';
-
+      refreshBtn.disabled = true;
+      
       try {
-        // Essayer de fetch depuis Render API (si configuré)
-        let data = DEMO_DATA;
+        // Fetch avec timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
         
-        if (RENDER_API_URL) {
-          try {
-            const response = await fetch(RENDER_API_URL);
-            if (response.ok) {
-              data = await response.json();
-              document.getElementById('bot-status').className = 'status status-live';
-              document.getElementById('bot-status').textContent = '🟢 Bot en ligne';
-            }
-          } catch (e) {
-            console.warn('API Render non disponible, utilisation des données démo');
-          }
+        // Récupérer les tokens
+        const response = await fetch(`${API_BASE_URL}/api/tokens`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-
-        // Afficher les données
-        displayData(data);
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.tokens) {
+          throw new Error('Format de réponse invalide');
+        }
+        
+        // Mettre à jour l'UI avec les données
+        updateUI(data);
         
         // Mettre à jour l'heure
-        document.getElementById('last-update').textContent = new Date().toLocaleTimeString('fr-FR');
+        document.getElementById('last-update').textContent = 
+          new Date().toLocaleTimeString('fr-FR');
         
-      } catch (error) {
-        console.error('Erreur de chargement:', error);
-        loading.innerHTML = '<p style="color: #ff4757;">❌ Erreur de chargement des données</p>';
+      } catch (err) {
+        console.error('Erreur de chargement:', err);
+        
+        // Afficher l'erreur
+        loading.style.display = 'none';
+        error.style.display = 'block';
+        error.textContent = `❌ ${err.message || 'Erreur de connexion au bot'}`;
+        
+        // Si c'est une erreur de réseau, suggérer de vérifier l'URL
+        if (err.name === 'AbortError' || err.message.includes('Failed to fetch')) {
+          error.textContent = '❌ Impossible de contacter le bot. Vérifiez qu\'il est en ligne sur Render.';
+        }
+        
+      } finally {
+        refreshBtn.disabled = false;
       }
     }
-
-    // 📊 Afficher les données
-    function displayData(data) {
+    
+    // ════════════════════════════════════════════════════════════════
+    // 📊 MISE À JOUR DE L'INTERFACE
+    // ════════════════════════════════════════════════════════════════
+    
+    function updateUI(data) {
       const loading = document.getElementById('loading');
+      const empty = document.getElementById('empty');
       const table = document.getElementById('tokens-table');
       const tbody = document.getElementById('tokens-body');
       
+      const tokens = data.tokens || [];
+      
+      // Masquer le loading
       loading.style.display = 'none';
+      
+      // Gérer le cas vide
+      if (tokens.length === 0) {
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        document.getElementById('bot-status').className = 'status status-live';
+        document.getElementById('bot-status').textContent = '🟢 Bot en ligne (aucun token)';
+        return;
+      }
+      
+      // Afficher le tableau
       table.style.display = 'table';
+      empty.style.display = 'none';
+      
+      // Mettre à jour le statut du bot
+      document.getElementById('bot-status').className = 'status status-live';
+      document.getElementById('bot-status').textContent = '🟢 Bot en ligne';
+      
+      // Mettre à jour l'adresse du wallet
+      if (data.wallet) {
+        const shortWallet = `${data.wallet.slice(0, 8)}...${data.wallet.slice(-6)}`;
+        document.getElementById('wallet-address').textContent = `Wallet: ${shortWallet}`;
+      }
+      
+      // Calculer les stats
+      const totalValue = tokens.reduce((sum, t) => sum + (t.value || 0), 0);
+      const validPnls = tokens.map(t => t.pnl).filter(pnl => pnl !== null && !isNaN(pnl));
+      const bestPnl = validPnls.length > 0 ? Math.max(...validPnls) : 0;
+      const worstPnl = validPnls.length > 0 ? Math.min(...validPnls) : 0;
+      
+      // Mettre à jour les cartes de stats
+      document.getElementById('total-tokens').textContent = tokens.length;
+      document.getElementById('total-value').textContent = `$${formatNumber(totalValue, 2)}`;
+      
+      const bestPnlEl = document.getElementById('best-pnl');
+      bestPnlEl.textContent = `${bestPnl >= 0 ? '+' : ''}${bestPnl.toFixed(2)}%`;
+      bestPnlEl.className = `value ${getPnlClass(bestPnl)}`;
+      
+      const worstPnlEl = document.getElementById('worst-pnl');
+      worstPnlEl.textContent = `${worstPnl >= 0 ? '+' : ''}${worstPnl.toFixed(2)}%`;
+      worstPnlEl.className = `value ${getPnlClass(worstPnl)}`;
+      
+      // Remplir le tableau
       tbody.innerHTML = '';
-
-      // Stats globales
-      const totalValue = data.reduce((sum, t) => sum + t.value, 0);
-      const bestPnl = Math.max(...data.map(t => t.pnl));
-      const worstPnl = Math.min(...data.map(t => t.pnl));
-
-      document.getElementById('total-tokens').textContent = data.length;
-      document.getElementById('total-value').textContent = `$${totalValue.toFixed(2)}`;
-      document.getElementById('best-pnl').textContent = `+${bestPnl.toFixed(2)}%`;
-      document.getElementById('best-pnl').className = 'value pnl-positive';
-      document.getElementById('worst-pnl').textContent = `${worstPnl.toFixed(2)}%`;
-      document.getElementById('worst-pnl').className = 'value pnl-negative';
-
-      // Wallet address (démo)
-      document.getElementById('wallet-address').textContent = 'Wallet: 9Xpa...qTsX';
-
-      // Lignes du tableau
-      data.forEach(token => {
-        const row = document.createElement('tr');
-        
-        const pnlClass = token.pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
-        const pnlSign = token.pnl >= 0 ? '+' : '';
-        
-        row.innerHTML = `
-          <td>
-            <div class="token-name">${token.symbol}</div>
-            <div style="color: #a0a0a0; font-size: 0.9em;">${token.name}</div>
-          </td>
-          <td>
-            <code class="token-address">${token.address}</code>
-          </td>
-          <td>${token.balance.toFixed(4)}</td>
-          <td>$${formatPrice(token.price)}</td>
-          <td>$${token.value.toFixed(2)}</td>
-          <td class="${pnlClass}">${pnlSign}${token.pnl.toFixed(2)}%</td>
-          <td>$${formatLiquidity(token.liquidity)}</td>
-        `;
-        
+      tokens.forEach(token => {
+        const row = createTokenRow(token);
         tbody.appendChild(row);
       });
     }
-
-    // 🔧 Formateurs
+    
+    // ════════════════════════════════════════════════════════════════
+    // 🧱 CRÉATION D'UNE LIGNE DE TOKEN
+    // ════════════════════════════════════════════════════════════════
+    
+    function createTokenRow(token) {
+      const row = document.createElement('tr');
+      
+      const pnlClass = getPnlClass(token.pnl);
+      const pnlSign = token.pnl >= 0 ? '+' : '';
+      const shortAddress = `${token.address.slice(0, 6)}...${token.address.slice(-4)}`;
+      
+      row.innerHTML = `
+        <td>
+          <div class="token-symbol">${escapeHtml(token.symbol || '???')}</div>
+          <div class="token-name">${escapeHtml(token.name || 'Unknown')}</div>
+        </td>
+        <td>
+          <code class="token-address" onclick="copyAddress('${token.address}', this)" title="Cliquez pour copier">
+            ${shortAddress}
+          </code>
+        </td>
+        <td>${formatNumber(token.balance, 4)}</td>
+        <td>$${formatPrice(token.price)}</td>
+        <td>$${formatNumber(token.value, 2)}</td>
+        <td class="${pnlClass}">${pnlSign}${token.pnl?.toFixed(2) || '0.00'}%</td>
+        <td><span class="liquidity-badge">$${formatLiquidity(token.liquidity)}</span></td>
+      `;
+      
+      return row;
+    }
+    
+    // ════════════════════════════════════════════════════════════════
+    // 🔧 FONCTIONS UTILITAIRES
+    // ════════════════════════════════════════════════════════════════
+    
+    function getPnlClass(pnl) {
+      if (pnl === null || isNaN(pnl)) return 'pnl-neutral';
+      if (pnl > 0.5) return 'pnl-positive';
+      if (pnl < -0.5) return 'pnl-negative';
+      return 'pnl-neutral';
+    }
+    
+    function formatNumber(num, decimals) {
+      if (num === null || num === undefined) return '-';
+      if (num === 0) return '0';
+      if (Math.abs(num) < 0.0001 && decimals >= 4) {
+        return num.toExponential(2);
+      }
+      return num.toLocaleString('fr-FR', { 
+        minimumFractionDigits: decimals, 
+        maximumFractionDigits: decimals 
+      });
+    }
+    
     function formatPrice(price) {
-      if (price < 0.0001) {
-        return price.toExponential(4);
-      }
-      return price.toFixed(6);
+      if (price === null || price === undefined) return '-';
+      if (price < 0.0001) return price.toExponential(4);
+      if (price < 0.01) return price.toFixed(6);
+      if (price < 1) return price.toFixed(4);
+      return price.toFixed(2);
     }
-
+    
     function formatLiquidity(liquidity) {
-      if (liquidity >= 1000000) {
-        return (liquidity / 1000000).toFixed(2) + 'M';
-      }
-      if (liquidity >= 1000) {
-        return (liquidity / 1000).toFixed(1) + 'K';
-      }
-      return liquidity.toFixed(0);
+      if (liquidity === null || liquidity === undefined) return '0';
+      if (liquidity >= 1000000) return (liquidity / 1000000).toFixed(2) + 'M';
+      if (liquidity >= 1000) return (liquidity / 1000).toFixed(1) + 'K';
+      return Math.round(liquidity).toLocaleString('fr-FR');
     }
-
-    // 🚀 Chargement initial
-    loadData();
-
-    // 🔄 Auto-refresh toutes les 30 secondes
-    setInterval(loadData, 30000);
+    
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function copyAddress(address, element) {
+      navigator.clipboard.writeText(address).then(() => {
+        // Feedback visuel
+        element.classList.add('copied');
+        element.textContent = '✓ Copié!';
+        
+        // Afficher toast
+        showToast('✅ Adresse copiée dans le presse-papiers');
+        
+        // Réinitialiser après 2 secondes
+        setTimeout(() => {
+          element.classList.remove('copied');
+          const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
+          element.textContent = shortAddress;
+        }, 2000);
+      }).catch(err => {
+        console.error('Erreur de copie:', err);
+        showToast('❌ Échec de la copie');
+      });
+    }
+    
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+    
+    // ════════════════════════════════════════════════════════════════
+    // 🚀 INITIALISATION
+    // ════════════════════════════════════════════════════════════════
+    
+    // Chargement initial
+    document.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      
+      // Auto-refresh toutes les 30 secondes
+      setInterval(loadData, AUTO_REFRESH_INTERVAL);
+      
+      // Rafraîchir quand la page redevient visible (onglet actif)
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          loadData();
+        }
+      });
+    });
   </script>
 </body>
 </html>
