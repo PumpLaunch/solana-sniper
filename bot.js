@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // SolBot Pro — Backend Node.js
-// Hébergement : Render (Background Worker)
+// Hébergement : Render (Background Worker + API Web)
 // ═══════════════════════════════════════════════════════════════
 
 "use strict";
@@ -18,7 +18,6 @@ const fetch = (...args) =>
 
 // ── Variables d'environnement ────────────────────────────────────
 const PRIVATE_KEY_RAW = process.env.PRIVATE_KEY;
-// ✅ CORRECTION : Suppression de l'espace en trop à la fin de l'URL
 const RPC_URL = process.env.RPC_URL || "https://mainnet.helius-rpc.com/?api-key=43caa0a0-33d2-420c-b00a-e7261bfecf78";
 
 // ── Configuration du bot ─────────────────────────────────────────
@@ -42,11 +41,14 @@ const CONFIG = {
 let keypair = null;
 let stopLossTriggered = false;
 
-// ════════════════════════════════════════════════════════════════
 // 🧠 STOCKAGE AUTO DES PRIX DE RÉFÉRENCE (par token)
-// Le premier prix détecté devient le prix d'achat de référence
-// ════════════════════════════════════════════════════════════════
 const autoBuyPrices = {};
+
+// 🧠 CACHE DES MÉTADONNÉES DE TOKENS (nom, symbole)
+const tokenMetadataCache = {};
+
+// 📦 Données pour l'API web
+let lastTokensData = [];
 
 // ════════════════════════════════════════════════════════════════
 // INITIALISATION DU WALLET
@@ -77,7 +79,6 @@ function getConnection() {
 
 async function fetchTokenPrice(mintAddress) {
   try {
-    // ✅ CORRECTION : Suppression de l'espace en trop dans l'URL
     const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
     const res = await fetch(url);
 
@@ -93,7 +94,6 @@ async function fetchTokenPrice(mintAddress) {
       return null;
     }
 
-    // Sélectionner la paire Solana avec la liquidité la plus élevée
     const bestPair = data.pairs
       .filter((p) => p.chainId === "solana")
       .sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
@@ -110,6 +110,39 @@ async function fetchTokenPrice(mintAddress) {
   } catch (err) {
     console.error("[PRIX] Erreur fetch DexScreener :", err.message);
     return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// RÉCUPÉRATION DES MÉTADONNÉES DU TOKEN (nom, symbole) via Jupiter
+// ════════════════════════════════════════════════════════════════
+
+async function fetchTokenMetadata(mintAddress) {
+  if (tokenMetadataCache[mintAddress]) {
+    return tokenMetadataCache[mintAddress];
+  }
+
+  try {
+    const response = await fetch('https://token.jup.ag/all');
+    if (!response.ok) return { symbol: '???', name: 'Unknown', logo: null };
+    
+    const tokens = await response.json();
+    const token = tokens.find(t => t.address === mintAddress);
+    
+    if (token) {
+      tokenMetadataCache[mintAddress] = {
+        symbol: token.symbol || '???',
+        name: token.name || 'Unknown',
+        logo: token.logoURI || null
+      };
+      return tokenMetadataCache[mintAddress];
+    }
+    
+    return { symbol: '???', name: 'Unknown', logo: null };
+    
+  } catch (err) {
+    console.warn(`[META] Erreur pour ${mintAddress.slice(0,8)}... : ${err.message}`);
+    return { symbol: '???', name: 'Unknown', logo: null };
   }
 }
 
@@ -150,8 +183,6 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
 
   console.log(`[JUPITER] Demande de quote : ${amountRaw} unités → SOL`);
 
-  // Étape 1 : Quote
-  // ✅ CORRECTION : Suppression de l'espace en trop dans l'URL
   const quoteUrl =
     `https://quote-api.jup.ag/v6/quote?` +
     `inputMint=${mintAddress}` +
@@ -166,8 +197,6 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
   const quote = await quoteRes.json();
   console.log(`[JUPITER] Quote reçu. SOL estimé : ${(quote.outAmount / 1e9).toFixed(6)}`);
 
-  // Étape 2 : Construction de la transaction
-  // ✅ CORRECTION : Suppression de l'espace en trop dans l'URL
   const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
@@ -186,7 +215,6 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
 
   const { swapTransaction } = await swapRes.json();
 
-  // Étape 3 : Signature et envoi
   const connection = getConnection();
   const txBuffer   = Buffer.from(swapTransaction, "base64");
   const tx         = VersionedTransaction.deserialize(txBuffer);
@@ -197,7 +225,6 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
     maxRetries:    3,
   });
 
-  // Étape 4 : Confirmation
   const latestBlockhash = await connection.getLatestBlockhash();
   await connection.confirmTransaction(
     { signature: txId, ...latestBlockhash },
@@ -217,7 +244,6 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
 
   const rawAmount = Math.floor(balance * Math.pow(10, decimals));
 
-  // Stop-loss
   if (CONFIG.STOP_LOSS_ENABLED && !stopLossTriggered && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
     stopLossTriggered = true;
     console.log(`[STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
@@ -225,7 +251,6 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
     return;
   }
 
-  // Paliers de prise de profits
   for (let i = 0; i < CONFIG.TIERS.length; i++) {
     const tier = CONFIG.TIERS[i];
     if (!tier.triggered && pnl >= tier.targetPnl) {
@@ -249,8 +274,8 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
 async function runCheck() {
   try {
     const connection = getConnection();
+    const tokenDataForAPI = [];  // Données locales pour ce cycle
 
-    // 1. Récupérer TOUS les tokens du wallet
     const allAccounts = await connection.getParsedTokenAccountsByOwner(
       keypair.publicKey,
       { programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
@@ -258,25 +283,21 @@ async function runCheck() {
 
     if (allAccounts.value.length === 0) {
       console.log("[BOT] Aucun token trouvé dans le wallet.");
+      lastTokensData = [];
       return;
     }
 
     console.log(`[BOT] Analyse de ${allAccounts.value.length} token(s)...`);
 
-    // 2. Boucler sur chaque token
     for (const account of allAccounts.value) {
       const info = account.account.data.parsed.info;
       const mintAddress = info.mint;
       const balance = parseFloat(info.tokenAmount.uiAmount) || 0;
       const decimals = info.tokenAmount.decimals;
 
-      // Ignorer si solde nul ou token sans valeur significative
       if (balance <= 0) continue;
-
-      // Ignorer le SOL natif (déjà géré séparément)
       if (mintAddress === "So11111111111111111111111111111111111111112") continue;
 
-      // 3. Récupérer le prix via DexScreener
       const priceData = await fetchTokenPrice(mintAddress);
       
       if (!priceData || priceData.priceUsd === 0) {
@@ -284,24 +305,26 @@ async function runCheck() {
         continue;
       }
 
-      // 4. 🧠 AUTO-DÉTECTION DU PRIX DE RÉFÉRENCE
-      // Si c'est la première fois qu'on voit ce token, enregistrer son prix actuel
+      // 🧠 Auto-détection du prix de référence
       if (!autoBuyPrices[mintAddress]) {
         autoBuyPrices[mintAddress] = priceData.priceUsd;
         console.log(`[PRIX REF] ${mintAddress.slice(0,8)}... enregistré à $${priceData.priceUsd.toExponential(4)}`);
       }
 
-      // Utiliser le prix auto-détecté pour calculer le PnL
       const buyPrice = autoBuyPrices[mintAddress];
       const pnl = ((priceData.priceUsd - buyPrice) / buyPrice) * 100;
-
-      // 5. Calculer la valeur et formater le PnL
       const valueUsd = balance * priceData.priceUsd;
       const pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%`;
 
-      // 6. Afficher le statut
+      // 🧠 Récupérer les métadonnées du token
+      const metadata = await fetchTokenMetadata(mintAddress);
+      const tokenSymbol = metadata.symbol !== '???' ? metadata.symbol : (info.symbol || '???');
+      const tokenName = metadata.name || 'Unknown';
+
+      // Afficher le statut avec nom et adresse complète
       console.log(
-        `[TOKEN] ${info.symbol || mintAddress.slice(0,8)}... | ` +
+        `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
+        `Address: ${mintAddress} | ` +
         `Balance: ${balance.toFixed(4)} | ` +
         `Prix: $${priceData.priceUsd.toExponential(4)} | ` +
         `Valeur: $${valueUsd.toFixed(2)} | ` +
@@ -309,13 +332,75 @@ async function runCheck() {
         `Liquidité: $${Math.round(priceData.liquidityUsd).toLocaleString()}`
       );
 
-      // 7. Appliquer la logique de vente (stop-loss / paliers)
+      // Appliquer la logique de vente
       await applySellLogic(mintAddress, balance, decimals, priceData.priceUsd, pnl);
+
+      // 📦 Stocker les données pour l'API web
+      tokenDataForAPI.push({
+        symbol: tokenSymbol,
+        name: tokenName,
+        address: mintAddress,
+        balance: balance,
+        price: priceData.priceUsd,
+        value: valueUsd,
+        pnl: pnl,
+        liquidity: priceData.liquidityUsd,
+        logo: metadata.logo
+      });
     }
+
+    // 🔄 Mettre à jour le stockage global pour l'API
+    lastTokensData = tokenDataForAPI;
 
   } catch (err) {
     console.error("[BOT] Erreur dans runCheck :", err.message);
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// 🌐 API HTTP POUR L'INTERFACE WEB
+// ════════════════════════════════════════════════════════════════
+
+if (process.env.RENDER) {
+  const http = require('http');
+  
+  const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
+    
+    if (req.url === '/api/tokens') {
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        success: true,
+        wallet: keypair?.publicKey?.toString() || 'N/A',
+        tokens: lastTokensData,
+        count: lastTokensData.length,
+        timestamp: new Date().toISOString()
+      }));
+    } else if (req.url === '/api/status') {
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        status: 'running',
+        wallet: keypair?.publicKey?.toString() || 'N/A',
+        tokensCount: lastTokensData.length,
+        uptime: process.uptime(),
+        autoSell: CONFIG.AUTO_SELL,
+        stopLoss: CONFIG.STOP_LOSS_ENABLED
+      }));
+    } else if (req.url === '/') {
+      res.writeHead(200, {'Content-Type': 'text/plain'});
+      res.end('🤖 SolBot Pro API is running!\nEndpoints: /api/tokens, /api/status');
+    } else {
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: 'Not found' }));
+    }
+  });
+  
+  const PORT = process.env.PORT || 10000;
+  server.listen(PORT, () => {
+    console.log(`[HTTP] ✅ API disponible sur le port ${PORT}`);
+    console.log(`[HTTP] 📡 Endpoints: /api/tokens | /api/status`);
+  });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -324,9 +409,9 @@ async function runCheck() {
 
 async function main() {
   console.log("═══════════════════════════════════════════");
-  console.log("  SolBot Pro — Backend Node.js démarré");
+  console.log("  🤖 SolBot Pro — Backend Node.js démarré");
   console.log(`  RPC        : ${RPC_URL}`);
-  console.log(`  Token      : ${CONFIG.TOKEN_MINT || "Non défini"}`);
+  console.log(`  Token      : ${CONFIG.TOKEN_MINT || "Multi-tokens"}`);
   console.log(`  Intervalle : ${CONFIG.INTERVAL_SEC}s`);
   console.log(`  Auto-sell  : ${CONFIG.AUTO_SELL}`);
   console.log(`  Stop-loss  : ${CONFIG.STOP_LOSS_ENABLED} (${CONFIG.STOP_LOSS_THRESHOLD}%)`);
@@ -334,10 +419,8 @@ async function main() {
 
   initWallet();
 
-  // Premier cycle immédiat au démarrage
   await runCheck();
 
-  // Boucle principale — maintient le processus actif sur Render
   setInterval(async () => {
     try {
       await runCheck();
@@ -346,7 +429,7 @@ async function main() {
     }
   }, CONFIG.INTERVAL_SEC * 1000);
 
-  console.log("[BOT] Surveillance active. Processus maintenu ouvert.");
+  console.log("[BOT] 🔄 Surveillance active. Processus maintenu ouvert.");
 }
 
 // ── Gestion des erreurs critiques ────────────────────────────────
@@ -358,42 +441,5 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[FATAL] Promesse rejetée non gérée :", reason);
 });
-
-// ════════════════════════════════════════════════════════════════
-// 🌐 API HTTP POUR L'INTERFACE WEB (optionnel)
-// ════════════════════════════════════════════════════════════════
-if (process.env.RENDER) {
-  const http = require('http');
-  
-  // Stockage des dernières données (à remplir dans runCheck)
-  let lastTokensData = [];
-  
-  const server = http.createServer((req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'application/json');
-    
-    if (req.url === '/api/tokens') {
-      res.writeHead(200);
-      res.end(JSON.stringify(lastTokensData));
-    } else if (req.url === '/api/status') {
-      res.writeHead(200);
-      res.end(JSON.stringify({
-        status: 'running',
-        wallet: keypair?.publicKey?.toString() || 'N/A',
-        tokensCount: lastTokensData.length,
-        uptime: process.uptime()
-      }));
-    } else {
-      res.writeHead(404);
-      res.end('Not found');
-    }
-  });
-  
-  const PORT = process.env.PORT || 10000;
-  server.listen(PORT, () => {
-    console.log(`[HTTP] API disponible sur le port ${PORT}`);
-    console.log(`[HTTP] Endpoint: /api/tokens`);
-  });
-}
 
 main();
