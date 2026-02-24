@@ -118,18 +118,21 @@ async function fetchTokenPrice(mintAddress) {
 // ════════════════════════════════════════════════════════════════
 
 async function fetchTokenMetadata(mintAddress) {
+  // Retourner depuis le cache si déjà chargé
   if (tokenMetadataCache[mintAddress]) {
     return tokenMetadataCache[mintAddress];
   }
 
   try {
-    const response = await fetch('https://token.jup.ag/all');
+    // ✅ CORRECTION : Nouvelle URL Jupiter (tokens.jup.ag au lieu de token.jup.ag)
+    const response = await fetch('https://tokens.jup.ag/tokens');
     if (!response.ok) return { symbol: '???', name: 'Unknown', logo: null };
     
     const tokens = await response.json();
     const token = tokens.find(t => t.address === mintAddress);
     
     if (token) {
+      // Sauvegarder dans le cache
       tokenMetadataCache[mintAddress] = {
         symbol: token.symbol || '???',
         name: token.name || 'Unknown',
@@ -138,10 +141,12 @@ async function fetchTokenMetadata(mintAddress) {
       return tokenMetadataCache[mintAddress];
     }
     
+    // Token non trouvé dans la liste Jupiter
     return { symbol: '???', name: 'Unknown', logo: null };
     
   } catch (err) {
-    console.warn(`[META] Erreur pour ${mintAddress.slice(0,8)}... : ${err.message}`);
+    // ✅ Gestion d'erreur silencieuse : ne pas spammer les logs
+    // Le token affichera "???" mais le bot continue de fonctionner
     return { symbol: '???', name: 'Unknown', logo: null };
   }
 }
