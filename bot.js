@@ -359,4 +359,41 @@ process.on("unhandledRejection", (reason) => {
   console.error("[FATAL] Promesse rejetée non gérée :", reason);
 });
 
+// ════════════════════════════════════════════════════════════════
+// 🌐 API HTTP POUR L'INTERFACE WEB (optionnel)
+// ════════════════════════════════════════════════════════════════
+if (process.env.RENDER) {
+  const http = require('http');
+  
+  // Stockage des dernières données (à remplir dans runCheck)
+  let lastTokensData = [];
+  
+  const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
+    
+    if (req.url === '/api/tokens') {
+      res.writeHead(200);
+      res.end(JSON.stringify(lastTokensData));
+    } else if (req.url === '/api/status') {
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        status: 'running',
+        wallet: keypair?.publicKey?.toString() || 'N/A',
+        tokensCount: lastTokensData.length,
+        uptime: process.uptime()
+      }));
+    } else {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+  });
+  
+  const PORT = process.env.PORT || 10000;
+  server.listen(PORT, () => {
+    console.log(`[HTTP] API disponible sur le port ${PORT}`);
+    console.log(`[HTTP] Endpoint: /api/tokens`);
+  });
+}
+
 main();
