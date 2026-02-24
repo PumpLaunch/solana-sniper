@@ -181,6 +181,40 @@ async function fetchTokenPrice(mintAddress) {
   } catch (err) {
     console.warn(`[PRIX] CoinGecko échec pour ${mintAddress.slice(0,8)}...`);
   }
+
+    // ── SOURCE 5: HELIUS TOKEN API (excellent pour Solana) ────────
+  try {
+    // Note: Nécessite une clé API Helius (gratuite sur helius.xyz)
+    const heliusApiKey = process.env.HELIUS_API_KEY || 'demo';
+    const heliusUrl = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${heliusApiKey}`;
+    
+    const res = await fetch(heliusUrl);
+    
+    if (res.ok) {
+      const data = await res.json();
+      
+      if (data.data && data.data[mintAddress]) {
+        const tokenData = data.data[mintAddress];
+        
+        // Helius retourne le prix en USD si disponible
+        if (tokenData.price_info && tokenData.price_info.price_per_token) {
+          return {
+            priceUsd:     tokenData.price_info.price_per_token || 0,
+            priceNative:  tokenData.price_info.price_per_token / 0.000001 || 0,
+            change24h:    tokenData.price_info?.percent_change_24h || 0,
+            liquidityUsd: tokenData.liquidity_info?.total_liquidity_usd || 0,
+            pairAddress:  null,
+            source: 'Helius'
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[PRIX] Helius échec pour ${mintAddress.slice(0,8)}...`);
+  }
+  
+  // ── AUCUNE SOURCE N'A TROUVÉ DE PRIX ──────────────────────────
+  return null;
   
   // ── AUCUNE SOURCE N'A TROUVÉ DE PRIX ──────────────────────────
   return null;
