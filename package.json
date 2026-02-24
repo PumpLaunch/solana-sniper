@@ -1,0 +1,11 @@
+{
+  "name": "solana-sniper",
+  "version": "1.0.0",
+  "description": "Solana Sniper Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+  }
+}
