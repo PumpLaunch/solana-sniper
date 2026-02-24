@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // SolBot Pro — Backend Node.js
 // Hébergement : Render (Background Worker + API Web)
+// Version : 2.0 — Multi-sources de prix + Affichage complet
 // ═══════════════════════════════════════════════════════════════
 
 "use strict";
@@ -130,7 +131,9 @@ async function fetchTokenPrice(mintAddress) {
   // ── SOURCE 3: BIRDEYE API ─────────────────────────────────────
   try {
     const url = `https://public-api.birdeye.so/defi/price?address=${mintAddress}`;
-    const res = await fetch(url, { headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo' } });
+    const res = await fetch(url, { 
+      headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo' } 
+    });
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.data && data.data.value) {
@@ -204,13 +207,11 @@ async function fetchTokenPrice(mintAddress) {
 // ════════════════════════════════════════════════════════════════
 
 async function fetchTokenMetadata(mintAddress) {
-  // Retourner depuis le cache si déjà chargé
   if (tokenMetadataCache[mintAddress]) {
     return tokenMetadataCache[mintAddress];
   }
 
   try {
-    // ✅ CORRECTION : Nouvelle URL Jupiter (tokens.jup.ag au lieu de token.jup.ag)
     const response = await fetch('https://tokens.jup.ag/tokens');
     if (!response.ok) return { symbol: '???', name: 'Unknown', logo: null };
     
@@ -218,7 +219,6 @@ async function fetchTokenMetadata(mintAddress) {
     const token = tokens.find(t => t.address === mintAddress);
     
     if (token) {
-      // Sauvegarder dans le cache
       tokenMetadataCache[mintAddress] = {
         symbol: token.symbol || '???',
         name: token.name || 'Unknown',
@@ -227,12 +227,9 @@ async function fetchTokenMetadata(mintAddress) {
       return tokenMetadataCache[mintAddress];
     }
     
-    // Token non trouvé dans la liste Jupiter
     return { symbol: '???', name: 'Unknown', logo: null };
     
   } catch (err) {
-    // ✅ Gestion d'erreur silencieuse : ne pas spammer les logs
-    // Le token affichera "???" mais le bot continue de fonctionner
     return { symbol: '???', name: 'Unknown', logo: null };
   }
 }
@@ -335,6 +332,7 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
 
   const rawAmount = Math.floor(balance * Math.pow(10, decimals));
 
+  // Stop-loss
   if (CONFIG.STOP_LOSS_ENABLED && !stopLossTriggered && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
     stopLossTriggered = true;
     console.log(`[STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
@@ -342,6 +340,7 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
     return;
   }
 
+  // Paliers de prise de profits
   for (let i = 0; i < CONFIG.TIERS.length; i++) {
     const tier = CONFIG.TIERS[i];
     if (!tier.triggered && pnl >= tier.targetPnl) {
@@ -380,74 +379,90 @@ async function runCheck() {
 
     console.log(`[BOT] Analyse de ${allAccounts.value.length} token(s)...`);
 
+    // 2. Boucler sur chaque token
     for (const account of allAccounts.value) {
       const info = account.account.data.parsed.info;
       const mintAddress = info.mint;
       const balance = parseFloat(info.tokenAmount.uiAmount) || 0;
       const decimals = info.tokenAmount.decimals;
 
+      // Ignorer si solde nul
       if (balance <= 0) continue;
+
+      // Ignorer le SOL natif
       if (mintAddress === "So11111111111111111111111111111111111111112") continue;
 
+      // 3. Récupérer le prix via multiples sources
       const priceData = await fetchTokenPrice(mintAddress);
       
-      if (!priceData || priceData.priceUsd === 0) {
-        console.log(`[TOKEN] ${mintAddress.slice(0,8)}... : Prix indisponible`);
-        continue;
+      // ✅ Définir les variables de prix (MÊME si pas de prix trouvé)
+      const hasPrice = priceData && priceData.priceUsd > 0;
+      const currentPrice = hasPrice ? priceData.priceUsd : 0;
+      const liquidity = hasPrice ? priceData.liquidityUsd : 0;
+      const priceSource = hasPrice ? priceData.source : null;
+
+      // Calculer la valeur (0 si pas de prix)
+      const valueUsd = balance * currentPrice;
+
+      // 🧠 Auto-détection du prix de référence (seulement si prix disponible)
+      if (hasPrice && !autoBuyPrices[mintAddress]) {
+        autoBuyPrices[mintAddress] = currentPrice;
+        console.log(`[PRIX REF] ${mintAddress.slice(0,8)}... enregistré à $${currentPrice.toExponential(4)}`);
       }
 
-      // 🧠 Auto-détection du prix de référence
-      if (!autoBuyPrices[mintAddress]) {
-        autoBuyPrices[mintAddress] = priceData.priceUsd;
-        console.log(`[PRIX REF] ${mintAddress.slice(0,8)}... enregistré à $${priceData.priceUsd.toExponential(4)}`);
+      // Calculer le PnL (seulement si prix disponible)
+      let pnl = null;
+      let pnlStr = "N/A";
+      if (hasPrice && autoBuyPrices[mintAddress]) {
+        const buyPrice = autoBuyPrices[mintAddress];
+        pnl = ((currentPrice - buyPrice) / buyPrice) * 100;
+        pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%`;
       }
-
-      const buyPrice = autoBuyPrices[mintAddress];
-      const pnl = ((priceData.priceUsd - buyPrice) / buyPrice) * 100;
-      const valueUsd = balance * priceData.priceUsd;
-      const pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%`;
 
       // 🧠 Récupérer les métadonnées du token
       const metadata = await fetchTokenMetadata(mintAddress);
       const tokenSymbol = metadata.symbol !== '???' ? metadata.symbol : (info.symbol || '???');
       const tokenName = metadata.name || 'Unknown';
 
-      // ✅ Afficher le token avec la source du prix
-if (hasPrice) {
-  console.log(
-    `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
-    `Address: ${mintAddress} | ` +
-    `Balance: ${balance.toFixed(4)} | ` +
-    `Prix: $${currentPrice.toExponential(4)} [${priceData.source}] | ` +
-    `Valeur: $${valueUsd.toFixed(2)} | ` +
-    `PnL: ${pnlStr} | ` +
-    `Liquidité: $${Math.round(liquidity).toLocaleString()}`
-  );
-} else {
-  console.log(
-    `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
-    `Address: ${mintAddress} | ` +
-    `Balance: ${balance.toFixed(4)} | ` +
-    `Prix: ❌ NON TROUVÉ | ` +
-    `Valeur: $?.?? | ` +
-    `PnL: N/A`
-  );
-}
+      // ✅ Afficher le token avec ou sans prix
+      if (hasPrice) {
+        console.log(
+          `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
+          `Address: ${mintAddress} | ` +
+          `Balance: ${balance.toFixed(4)} | ` +
+          `Prix: $${currentPrice.toExponential(4)} [${priceSource}] | ` +
+          `Valeur: $${valueUsd.toFixed(2)} | ` +
+          `PnL: ${pnlStr} | ` +
+          `Liquidité: $${Math.round(liquidity).toLocaleString()}`
+        );
+      } else {
+        console.log(
+          `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
+          `Address: ${mintAddress} | ` +
+          `Balance: ${balance.toFixed(4)} | ` +
+          `Prix: ❌ NON TROUVÉ | ` +
+          `Valeur: $?.?? | ` +
+          `PnL: N/A`
+        );
+      }
 
-      // Appliquer la logique de vente
-      await applySellLogic(mintAddress, balance, decimals, priceData.priceUsd, pnl);
+      // Appliquer la logique de vente (seulement si prix disponible)
+      if (hasPrice) {
+        await applySellLogic(mintAddress, balance, decimals, currentPrice, pnl);
+      }
 
-      // 📦 Stocker les données pour l'API web
+      // 📦 Stocker les données pour l'API web (TOUS les tokens)
       tokenDataForAPI.push({
         symbol: tokenSymbol,
         name: tokenName,
         address: mintAddress,
         balance: balance,
-        price: priceData.priceUsd,
+        price: currentPrice,
         value: valueUsd,
         pnl: pnl,
-        liquidity: priceData.liquidityUsd,
-        logo: metadata.logo
+        liquidity: liquidity,
+        logo: metadata.logo,
+        hasPrice: hasPrice
       });
     }
 
@@ -521,8 +536,10 @@ async function main() {
 
   initWallet();
 
+  // Premier cycle immédiat au démarrage
   await runCheck();
 
+  // Boucle principale — maintient le processus actif sur Render
   setInterval(async () => {
     try {
       await runCheck();
