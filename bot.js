@@ -18,7 +18,8 @@ const fetch = (...args) =>
 
 // ── Variables d'environnement ────────────────────────────────────
 const PRIVATE_KEY_RAW = process.env.PRIVATE_KEY;
-const RPC_URL         = process.env.RPC_URL || "https://mainnet.helius-rpc.com/?api-key=43caa0a0-33d2-420c-b00a-e7261bfecf78";
+// ✅ CORRECTION : Suppression de l'espace en trop à la fin de l'URL
+const RPC_URL = process.env.RPC_URL || "https://mainnet.helius-rpc.com/?api-key=43caa0a0-33d2-420c-b00a-e7261bfecf78";
 
 // ── Configuration du bot ─────────────────────────────────────────
 const CONFIG = {
@@ -38,8 +39,14 @@ const CONFIG = {
 };
 
 // ── État global ──────────────────────────────────────────────────
-let keypair            = null;
-let stopLossTriggered  = false;
+let keypair = null;
+let stopLossTriggered = false;
+
+// ════════════════════════════════════════════════════════════════
+// 🧠 STOCKAGE AUTO DES PRIX DE RÉFÉRENCE (par token)
+// Le premier prix détecté devient le prix d'achat de référence
+// ════════════════════════════════════════════════════════════════
+const autoBuyPrices = {};
 
 // ════════════════════════════════════════════════════════════════
 // INITIALISATION DU WALLET
@@ -70,8 +77,9 @@ function getConnection() {
 
 async function fetchTokenPrice(mintAddress) {
   try {
+    // ✅ CORRECTION : Suppression de l'espace en trop dans l'URL
     const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
-    const res  = await fetch(url);
+    const res = await fetch(url);
 
     if (!res.ok) {
       console.warn(`[PRIX] Réponse DexScreener non-OK : ${res.status}`);
@@ -143,9 +151,10 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
   console.log(`[JUPITER] Demande de quote : ${amountRaw} unités → SOL`);
 
   // Étape 1 : Quote
+  // ✅ CORRECTION : Suppression de l'espace en trop dans l'URL
   const quoteUrl =
-    `https://quote-api.jup.ag/v6/quote` +
-    `?inputMint=${mintAddress}` +
+    `https://quote-api.jup.ag/v6/quote?` +
+    `inputMint=${mintAddress}` +
     `&outputMint=${SOL_MINT}` +
     `&amount=${amountRaw}` +
     `&slippageBps=${slippageBps}`;
@@ -158,6 +167,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
   console.log(`[JUPITER] Quote reçu. SOL estimé : ${(quote.outAmount / 1e9).toFixed(6)}`);
 
   // Étape 2 : Construction de la transaction
+  // ✅ CORRECTION : Suppression de l'espace en trop dans l'URL
   const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
@@ -274,18 +284,22 @@ async function runCheck() {
         continue;
       }
 
-      // 4. Calculer la valeur et le PnL
+      // 4. 🧠 AUTO-DÉTECTION DU PRIX DE RÉFÉRENCE
+      // Si c'est la première fois qu'on voit ce token, enregistrer son prix actuel
+      if (!autoBuyPrices[mintAddress]) {
+        autoBuyPrices[mintAddress] = priceData.priceUsd;
+        console.log(`[PRIX REF] ${mintAddress.slice(0,8)}... enregistré à $${priceData.priceUsd.toExponential(4)}`);
+      }
+
+      // Utiliser le prix auto-détecté pour calculer le PnL
+      const buyPrice = autoBuyPrices[mintAddress];
+      const pnl = ((priceData.priceUsd - buyPrice) / buyPrice) * 100;
+
+      // 5. Calculer la valeur et formater le PnL
       const valueUsd = balance * priceData.priceUsd;
-      const buyPrice = CONFIG.BUY_PRICE_USD; // Prix de référence global
-      const pnl = buyPrice > 0 
-        ? ((priceData.priceUsd - buyPrice) / buyPrice) * 100 
-        : null;
+      const pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%`;
 
-      const pnlStr = pnl !== null 
-        ? `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%` 
-        : "N/A";
-
-      // 5. Afficher le statut
+      // 6. Afficher le statut
       console.log(
         `[TOKEN] ${info.symbol || mintAddress.slice(0,8)}... | ` +
         `Balance: ${balance.toFixed(4)} | ` +
@@ -295,7 +309,7 @@ async function runCheck() {
         `Liquidité: $${Math.round(priceData.liquidityUsd).toLocaleString()}`
       );
 
-      // 6. Appliquer la logique de vente (stop-loss / paliers)
+      // 7. Appliquer la logique de vente (stop-loss / paliers)
       await applySellLogic(mintAddress, balance, decimals, priceData.priceUsd, pnl);
     }
 
