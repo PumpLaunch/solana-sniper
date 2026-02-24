@@ -199,79 +199,74 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// BOUCLE DE SURVEILLANCE PRINCIPALE
+// BOUCLE DE SURVEILLANCE — TOUS LES TOKENS DU WALLET
 // ════════════════════════════════════════════════════════════════
 
 async function runCheck() {
-  if (!CONFIG.TOKEN_MINT) {
-    console.warn("[BOT] TOKEN_MINT non défini — surveillance suspendue.");
-    return;
-  }
+  try {
+    const connection = getConnection();
 
-  // 1. Récupérer le prix actuel
-  const priceData = await fetchTokenPrice(CONFIG.TOKEN_MINT);
-  if (!priceData) {
-    console.warn("[BOT] Prix indisponible, nouvelle tentative au prochain cycle.");
-    return;
-  }
+    // 1. Récupérer TOUS les tokens du wallet
+    const allAccounts = await connection.getParsedTokenAccountsByOwner(
+      keypair.publicKey,
+      { programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
+    );
 
-  // 2. Calculer le PnL
-  const pnl = CONFIG.BUY_PRICE_USD > 0
-    ? ((priceData.priceUsd - CONFIG.BUY_PRICE_USD) / CONFIG.BUY_PRICE_USD) * 100
-    : null;
-
-  const pnlStr = pnl !== null
-    ? `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%`
-    : "PnL inconnu (BUY_PRICE_USD non défini)";
-
-  console.log(
-    `[BOT] $${priceData.priceUsd} | PnL : ${pnlStr} | ` +
-    `Liquidité : $${Math.round(priceData.liquidityUsd).toLocaleString()}`
-  );
-
-  if (pnl === null) return;
-
-  // 3. Vérification du stop-loss
-  if (CONFIG.STOP_LOSS_ENABLED && !stopLossTriggered && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
-    stopLossTriggered = true;
-    console.log(`[STOP-LOSS] Seuil atteint (${pnl.toFixed(2)}%). Vente totale initiée.`);
-
-    if (CONFIG.AUTO_SELL) {
-      const balData = await getTokenBalance(CONFIG.TOKEN_MINT);
-      if (balData && balData.raw > 0) {
-        await jupiterSell(CONFIG.TOKEN_MINT, balData.raw, CONFIG.SLIPPAGE_BPS)
-          .catch((err) => console.error("[STOP-LOSS] Erreur vente :", err.message));
-      }
+    if (allAccounts.value.length === 0) {
+      console.log("[BOT] Aucun token trouvé dans le wallet.");
+      return;
     }
-    return;
-  }
 
-  // 4. Vérification des paliers de vente
-  for (let i = 0; i < CONFIG.TIERS.length; i++) {
-    const tier = CONFIG.TIERS[i];
+    console.log(`[BOT] Analyse de ${allAccounts.value.length} token(s)...`);
 
-    if (!tier.triggered && pnl >= tier.targetPnl) {
-      tier.triggered = true;
+    // 2. Boucler sur chaque token
+    for (const account of allAccounts.value) {
+      const info = account.account.data.parsed.info;
+      const mintAddress = info.mint;
+      const balance = parseFloat(info.tokenAmount.uiAmount) || 0;
+      const decimals = info.tokenAmount.decimals;
+
+      // Ignorer si solde nul ou token sans valeur significative
+      if (balance <= 0) continue;
+
+      // Ignorer le SOL natif (déjà géré séparément)
+      if (mintAddress === "So11111111111111111111111111111111111111112") continue;
+
+      // 3. Récupérer le prix via DexScreener
+      const priceData = await fetchTokenPrice(mintAddress);
+      
+      if (!priceData || priceData.priceUsd === 0) {
+        console.log(`[TOKEN] ${mintAddress.slice(0,8)}... : Prix indisponible`);
+        continue;
+      }
+
+      // 4. Calculer la valeur et le PnL
+      const valueUsd = balance * priceData.priceUsd;
+      const buyPrice = CONFIG.BUY_PRICE_USD; // Prix de référence global
+      const pnl = buyPrice > 0 
+        ? ((priceData.priceUsd - buyPrice) / buyPrice) * 100 
+        : null;
+
+      const pnlStr = pnl !== null 
+        ? `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%` 
+        : "N/A";
+
+      // 5. Afficher le statut
       console.log(
-        `[PALIER ${i + 1}] Atteint à ${pnlStr} → ` +
-        `Vente de ${tier.sellPercent}% de la position.`
+        `[TOKEN] ${info.symbol || mintAddress.slice(0,8)}... | ` +
+        `Balance: ${balance.toFixed(4)} | ` +
+        `Prix: $${priceData.priceUsd.toExponential(4)} | ` +
+        `Valeur: $${valueUsd.toFixed(2)} | ` +
+        `PnL: ${pnlStr} | ` +
+        `Liquidité: $${Math.round(priceData.liquidityUsd).toLocaleString()}`
       );
 
-      if (CONFIG.AUTO_SELL) {
-        const balData = await getTokenBalance(CONFIG.TOKEN_MINT);
-        if (balData && balData.raw > 0) {
-          const amountRaw = Math.floor(balData.raw * (tier.sellPercent / 100));
-          if (amountRaw > 0) {
-            await jupiterSell(CONFIG.TOKEN_MINT, amountRaw, CONFIG.SLIPPAGE_BPS)
-              .catch((err) =>
-                console.error(`[PALIER ${i + 1}] Erreur vente :`, err.message)
-              );
-          }
-        }
-      } else {
-        console.log(`[PALIER ${i + 1}] AUTO_SELL désactivé — palier enregistré uniquement.`);
-      }
+      // 6. Appliquer la logique de vente (stop-loss / paliers)
+      await applySellLogic(mintAddress, balance, decimals, priceData.priceUsd, pnl);
     }
+
+  } catch (err) {
+    console.error("[BOT] Erreur dans runCheck :", err.message);
   }
 }
 
