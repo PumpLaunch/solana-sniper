@@ -1,10 +1,17 @@
 {
-  "name": "solana-sniper",
+  "name": "solbot-pro-backend",
   "version": "1.0.0",
-  "description": "Solana Sniper Bot",
+  "description": "Bot de trading Solana - Backend Node.js pour Render",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
-  "dependencies": {}
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.91.8",
+    "node-fetch": "^3.3.2",
+    "bs58": "^5.0.0"
+  }
 }
