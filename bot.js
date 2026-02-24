@@ -74,31 +74,28 @@ function getConnection() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// FETCH DU PRIX VIA MULTIPLES SOURCES (DexScreener + Jupiter + Birdeye + CoinGecko)
+// FETCH DU PRIX VIA MULTIPLES SOURCES (5 APIs en cascade)
 // ════════════════════════════════════════════════════════════════
 
 async function fetchTokenPrice(mintAddress) {
   
-  // ── SOURCE 1: DEXSCREENER (priorité : paires DEX) ─────────────
+  // ── SOURCE 1: DEXSCREENER ─────────────────────────────────────
   try {
-    const dexScreenerUrl = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
-    const res = await fetch(dexScreenerUrl);
-    
+    const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
-      
       if (data.pairs && data.pairs.length > 0) {
         const bestPair = data.pairs
-          .filter((p) => p.chainId === "solana")
+          .filter(p => p.chainId === "solana")
           .sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-        
         if (bestPair && bestPair.priceUsd) {
           return {
-            priceUsd:     parseFloat(bestPair.priceUsd) || 0,
-            priceNative:  parseFloat(bestPair.priceNative) || 0,
-            change24h:    bestPair.priceChange?.h24 || 0,
+            priceUsd: parseFloat(bestPair.priceUsd) || 0,
+            priceNative: parseFloat(bestPair.priceNative) || 0,
+            change24h: bestPair.priceChange?.h24 || 0,
             liquidityUsd: bestPair.liquidity?.usd || 0,
-            pairAddress:  bestPair.pairAddress,
+            pairAddress: bestPair.pairAddress,
             source: 'DexScreener'
           };
         }
@@ -108,22 +105,20 @@ async function fetchTokenPrice(mintAddress) {
     console.warn(`[PRIX] DexScreener échec pour ${mintAddress.slice(0,8)}...`);
   }
   
-  // ── SOURCE 2: JUPITER PRICE API (excellent pour Solana) ───────
+  // ── SOURCE 2: JUPITER PRICE API ───────────────────────────────
   try {
-    const jupiterUrl = `https://price.jup.ag/v6/price?ids=${mintAddress}`;
-    const res = await fetch(jupiterUrl);
-    
+    const url = `https://price.jup.ag/v6/price?ids=${mintAddress}`;
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
-      
       if (data.data && data.data[mintAddress]) {
-        const priceData = data.data[mintAddress];
+        const p = data.data[mintAddress];
         return {
-          priceUsd:     priceData.price || 0,
-          priceNative:  priceData.price / 0.000001 || 0,  // Approximation SOL
-          change24h:    priceData.change24h || 0,
-          liquidityUsd: 0,  // Jupiter ne fournit pas la liquidité
-          pairAddress:  null,
+          priceUsd: p.price || 0,
+          priceNative: p.price / 1e-6 || 0,
+          change24h: p.change24h || 0,
+          liquidityUsd: 0,
+          pairAddress: null,
           source: 'Jupiter'
         };
       }
@@ -132,23 +127,19 @@ async function fetchTokenPrice(mintAddress) {
     console.warn(`[PRIX] Jupiter échec pour ${mintAddress.slice(0,8)}...`);
   }
   
-  // ── SOURCE 3: BIRDEYE API (bon pour Solana memecoins) ─────────
+  // ── SOURCE 3: BIRDEYE API ─────────────────────────────────────
   try {
-    const birdeyeUrl = `https://public-api.birdeye.so/defi/price?address=${mintAddress}`;
-    const res = await fetch(birdeyeUrl, {
-      headers: { 'X-API-KEY': 'demo' }  // Clé démo (limitée)
-    });
-    
+    const url = `https://public-api.birdeye.so/defi/price?address=${mintAddress}`;
+    const res = await fetch(url, { headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo' } });
     if (res.ok) {
       const data = await res.json();
-      
       if (data.success && data.data && data.data.value) {
         return {
-          priceUsd:     data.data.value || 0,
-          priceNative:  0,
-          change24h:    0,
+          priceUsd: data.data.value || 0,
+          priceNative: 0,
+          change24h: 0,
           liquidityUsd: 0,
-          pairAddress:  null,
+          pairAddress: null,
           source: 'Birdeye'
         };
       }
@@ -157,23 +148,20 @@ async function fetchTokenPrice(mintAddress) {
     console.warn(`[PRIX] Birdeye échec pour ${mintAddress.slice(0,8)}...`);
   }
   
-  // ── SOURCE 4: COINGECKO API (tokens listés) ───────────────────
+  // ── SOURCE 4: COINGECKO API ───────────────────────────────────
   try {
-    // Note: CoinGecko nécessite l'ID du token, pas l'adresse
-    // Cette source est limitée aux tokens majeurs
-    const coingeckoUrl = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress}&vs_currencies=usd`;
-    const res = await fetch(coingeckoUrl);
-    
+    const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress}&vs_currencies=usd`;
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
-      
-      if (data[mintAddress.toLowerCase()] && data[mintAddress.toLowerCase()].usd) {
+      const key = mintAddress.toLowerCase();
+      if (data[key] && data[key].usd) {
         return {
-          priceUsd:     data[mintAddress.toLowerCase()].usd || 0,
-          priceNative:  0,
-          change24h:    0,
+          priceUsd: data[key].usd || 0,
+          priceNative: 0,
+          change24h: 0,
           liquidityUsd: 0,
-          pairAddress:  null,
+          pairAddress: null,
           source: 'CoinGecko'
         };
       }
@@ -181,29 +169,23 @@ async function fetchTokenPrice(mintAddress) {
   } catch (err) {
     console.warn(`[PRIX] CoinGecko échec pour ${mintAddress.slice(0,8)}...`);
   }
-
-    // ── SOURCE 5: HELIUS TOKEN API (excellent pour Solana) ────────
+  
+  // ── SOURCE 5: HELIUS TOKEN API ────────────────────────────────
   try {
-    // Note: Nécessite une clé API Helius (gratuite sur helius.xyz)
-    const heliusApiKey = process.env.HELIUS_API_KEY || 'demo';
-    const heliusUrl = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${heliusApiKey}`;
-    
-    const res = await fetch(heliusUrl);
-    
+    const apiKey = process.env.HELIUS_API_KEY || 'demo';
+    const url = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${apiKey}`;
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
-      
       if (data.data && data.data[mintAddress]) {
-        const tokenData = data.data[mintAddress];
-        
-        // Helius retourne le prix en USD si disponible
-        if (tokenData.price_info && tokenData.price_info.price_per_token) {
+        const t = data.data[mintAddress];
+        if (t.price_info && t.price_info.price_per_token) {
           return {
-            priceUsd:     tokenData.price_info.price_per_token || 0,
-            priceNative:  tokenData.price_info.price_per_token / 0.000001 || 0,
-            change24h:    tokenData.price_info?.percent_change_24h || 0,
-            liquidityUsd: tokenData.liquidity_info?.total_liquidity_usd || 0,
-            pairAddress:  null,
+            priceUsd: t.price_info.price_per_token || 0,
+            priceNative: t.price_info.price_per_token / 1e-6 || 0,
+            change24h: t.price_info?.percent_change_24h || 0,
+            liquidityUsd: t.liquidity_info?.total_liquidity_usd || 0,
+            pairAddress: null,
             source: 'Helius'
           };
         }
@@ -215,9 +197,7 @@ async function fetchTokenPrice(mintAddress) {
   
   // ── AUCUNE SOURCE N'A TROUVÉ DE PRIX ──────────────────────────
   return null;
-  
-  // ── AUCUNE SOURCE N'A TROUVÉ DE PRIX ──────────────────────────
-  return null;
+}
 
 // ════════════════════════════════════════════════════════════════
 // RÉCUPÉRATION DES MÉTADONNÉES DU TOKEN (nom, symbole) via Jupiter
