@@ -1,1626 +1,416 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="theme-color" content="#060d1a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="SolBot Pro">
-<title>SolBot Pro</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{
-  --bg:#060d1a;
-  --s1:#0b1526;
-  --s2:#0f1d35;
-  --s3:#152545;
-  --b1:#1c2e50;
-  --b2:#243860;
-  --text:#dde8f8;
-  --t2:#7a98c2;
-  --t3:#3a5480;
-  --acc:#0ea5e9;
-  --acc2:#38bdf8;
-  --ok:#10d488;
-  --err:#f43f5e;
-  --warn:#f59e0b;
-  --sol:#9945ff;
-  --nav:64px;
-  --head:58px;
-  --mono:'JetBrains Mono',monospace;
-  --ui:'Manrope',sans-serif;
-  --r:10px;
-  --r2:16px;
-  --glow-acc:0 0 18px rgba(14,165,233,.35);
-  --glow-ok:0 0 14px rgba(16,212,136,.3);
-  --glow-err:0 0 14px rgba(244,63,94,.3);
-}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🤖 SolBot Pro — Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--ui)}
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #ffffff;
+      min-height: 100vh;
+      padding: 20px;
+    }
 
-/* ── App shell ─────────────────────────────────────────────────── */
-#app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;position:relative}
-#app::before{content:'';position:fixed;inset:0;background:
-  radial-gradient(ellipse 80% 40% at 20% -10%,rgba(153,69,255,.08) 0%,transparent 70%),
-  radial-gradient(ellipse 60% 40% at 85% 100%,rgba(14,165,233,.06) 0%,transparent 60%);
-  pointer-events:none;z-index:0}
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
 
-/* ── Header ────────────────────────────────────────────────────── */
-#hd{
-  height:var(--head);flex-shrink:0;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 16px;
-  background:rgba(6,13,26,.85);
-  backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--b1);
-  position:relative;z-index:10
-}
-#hd::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(14,165,233,.3),transparent)}
-.hd-logo{display:flex;align-items:center;gap:10px}
-.hd-icon{width:34px;height:34px;border-radius:8px;
-  background:linear-gradient(135deg,#9945ff,#14f195);
-  display:flex;align-items:center;justify-content:center;
-  font-size:18px;box-shadow:0 0 16px rgba(153,69,255,.4)}
-.hd-title{font-family:var(--mono);font-size:17px;font-weight:700;
-  background:linear-gradient(135deg,#a78bfa,#38bdf8);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hd-right{display:flex;align-items:center;gap:10px}
-#sw-dot{width:8px;height:8px;border-radius:50%;background:var(--t3);
-  transition:background .3s,box-shadow .3s}
-#sw-dot.on{background:var(--ok);box-shadow:var(--glow-ok);animation:pulse 2s infinite}
-#sw-dot.running{background:var(--acc);box-shadow:var(--glow-acc);animation:pulse 1.5s infinite}
-.hd-sol{font-family:var(--mono);font-size:13px;color:var(--acc2);font-weight:600}
-#btn-refresh{background:none;border:1px solid var(--b2);border-radius:6px;
-  padding:5px 8px;cursor:pointer;color:var(--t2);font-size:12px;transition:all .2s}
-#btn-refresh:hover{border-color:var(--acc);color:var(--acc)}
+    header {
+      text-align: center;
+      padding: 30px 0;
+      border-bottom: 2px solid #0f3460;
+      margin-bottom: 30px;
+    }
 
-/* ── Main panels ───────────────────────────────────────────────── */
-#main{flex:1;overflow:hidden;position:relative;z-index:1}
-.panel{position:absolute;inset:0;overflow-y:auto;padding:14px 14px calc(var(--nav)+14px);
-  opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .25s,transform .25s}
-.panel.active{opacity:1;pointer-events:auto;transform:none}
-.panel::-webkit-scrollbar{width:4px}
-.panel::-webkit-scrollbar-track{background:transparent}
-.panel::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+    header h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
 
-/* ── Nav ───────────────────────────────────────────────────────── */
-#nav{
-  height:var(--nav);flex-shrink:0;
-  display:flex;
-  background:rgba(6,13,26,.92);
-  backdrop-filter:blur(24px);
-  border-top:1px solid var(--b1);
-  position:relative;z-index:10;
-  safe-area-inset-bottom:env(safe-area-inset-bottom)
-}
-.nav-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:4px;background:none;border:none;cursor:pointer;
-  color:var(--t3);font-family:var(--ui);font-size:11px;font-weight:600;
-  letter-spacing:.3px;text-transform:uppercase;transition:color .2s;
-  padding-bottom:env(safe-area-inset-bottom)
-}
-.nav-btn svg{width:22px;height:22px;stroke-width:1.8;transition:stroke .2s}
-.nav-btn.active{color:var(--acc)}
-.nav-btn.active svg{filter:drop-shadow(0 0 6px rgba(14,165,233,.5))}
-.nav-btn .notif-dot{
-  position:absolute;top:8px;width:6px;height:6px;
-  border-radius:50%;background:var(--err);
-  animation:pulse 1.5s infinite;display:none
-}
-.nav-btn.has-notif .notif-dot{display:block}
+    header p {
+      color: #a0a0a0;
+      font-size: 1.1em;
+    }
 
-/* ── Cards ─────────────────────────────────────────────────────── */
-.card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);
-  padding:16px;margin-bottom:12px;position:relative;overflow:hidden}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--b2),transparent)}
-.card-title{font-size:12px;font-weight:700;color:var(--t2);
-  text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;
-  display:flex;align-items:center;gap:8px}
-.card-title svg{width:15px;height:15px;stroke:var(--acc);stroke-width:2}
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
 
-/* ── Buttons ───────────────────────────────────────────────────── */
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  padding:11px 20px;border-radius:var(--r);
-  font-family:var(--ui);font-size:14px;font-weight:600;
-  cursor:pointer;transition:all .2s;border:none;letter-spacing:.2px
-}
-.btn:disabled{opacity:.3;cursor:not-allowed;transform:none!important}
-.btn-primary{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;
-  box-shadow:0 0 20px rgba(14,165,233,.3)}
-.btn-primary:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 0 30px rgba(14,165,233,.45)}
-.btn-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--b1)}
-.btn-ghost:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
-.btn-ok{background:rgba(16,212,136,.12);color:var(--ok);border:1px solid rgba(16,212,136,.25)}
-.btn-ok:hover:not(:disabled){background:rgba(16,212,136,.2);box-shadow:var(--glow-ok)}
-.btn-err{background:rgba(244,63,94,.12);color:var(--err);border:1px solid rgba(244,63,94,.25)}
-.btn-err:hover:not(:disabled){background:rgba(244,63,94,.2);box-shadow:var(--glow-err)}
-.btn-sm{padding:7px 14px;font-size:12px}
-.btn-block{width:100%}
-.btn-row{display:flex;gap:10px}
+    .stat-card {
+      background: rgba(15, 52, 96, 0.5);
+      border-radius: 15px;
+      padding: 20px;
+      text-align: center;
+      border: 1px solid #0f3460;
+    }
 
-/* ── Form elements ─────────────────────────────────────────────── */
-.field{margin-bottom:14px}
-.field label{display:block;font-size:11px;font-weight:700;color:var(--t3);
-  text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px}
-.field input,.field select,.field textarea{
-  width:100%;padding:11px 14px;
-  background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);
-  font-family:var(--mono);font-size:13px;color:var(--text);
-  transition:border-color .2s,box-shadow .2s;appearance:none;-webkit-appearance:none
-}
-.field input:focus,.field select:focus,.field textarea:focus{
-  outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(14,165,233,.1)}
-.field input[type=password]{letter-spacing:3px}
-.field textarea{min-height:90px;resize:vertical;font-size:12px;line-height:1.7}
-.field select option{background:var(--s2)}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .stat-card h3 {
+      color: #a0a0a0;
+      font-size: 0.9em;
+      margin-bottom: 10px;
+    }
 
-/* ── Toggle ────────────────────────────────────────────────────── */
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;
-  border-bottom:1px solid var(--b1)}
-.toggle-row:last-child{border-bottom:none}
-.toggle-row span{font-size:13px;color:var(--t2)}
-.tog{position:relative;width:42px;height:24px;background:var(--s3);
-  border-radius:12px;cursor:pointer;transition:background .2s;
-  border:1px solid var(--b2);flex-shrink:0}
-.tog.on{background:var(--acc);border-color:var(--acc);box-shadow:var(--glow-acc)}
-.tog::after{content:'';position:absolute;top:2px;left:2px;
-  width:18px;height:18px;border-radius:50%;background:#fff;
-  transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-.tog.on::after{transform:translateX(18px)}
+    .stat-card .value {
+      font-size: 1.8em;
+      font-weight: bold;
+      color: #00d9ff;
+    }
 
-/* ── Chip selectors ────────────────────────────────────────────── */
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.chip{padding:7px 13px;background:var(--s2);border:1px solid var(--b1);
-  border-radius:20px;font-family:var(--mono);font-size:12px;
-  cursor:pointer;transition:all .2s;color:var(--t2);white-space:nowrap}
-.chip:hover{border-color:var(--acc);color:var(--text)}
-.chip.sel{background:rgba(14,165,233,.15);border-color:var(--acc);
-  color:var(--acc);font-weight:600}
+    .tokens-table {
+      background: rgba(15, 52, 96, 0.3);
+      border-radius: 15px;
+      padding: 20px;
+      overflow-x: auto;
+    }
 
-/* ── Status badges ─────────────────────────────────────────────── */
-.badge{display:inline-flex;align-items:center;gap:5px;
-  padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;
-  font-family:var(--mono);letter-spacing:.3px}
-.badge-ok{background:rgba(16,212,136,.1);color:var(--ok);border:1px solid rgba(16,212,136,.2)}
-.badge-err{background:rgba(244,63,94,.1);color:var(--err);border:1px solid rgba(244,63,94,.2)}
-.badge-warn{background:rgba(245,158,11,.1);color:var(--warn);border:1px solid rgba(245,158,11,.2)}
-.badge-acc{background:rgba(14,165,233,.1);color:var(--acc);border:1px solid rgba(14,165,233,.2)}
-.badge-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
 
-/* ── Wallet tab ────────────────────────────────────────────────── */
-.wallet-bar{
-  background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);
-  padding:14px 16px;margin-bottom:12px;
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px
-}
-.wallet-addr{font-family:var(--mono);font-size:12px;color:var(--t2);
-  cursor:pointer;transition:color .2s}
-.wallet-addr:hover{color:var(--acc)}
-.sol-bal{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--text)}
-.sol-label{font-size:11px;color:var(--t3);margin-left:4px}
+    th {
+      background: rgba(0, 217, 255, 0.2);
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #00d9ff;
+      border-radius: 8px;
+    }
 
-.chart-wrap{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);
-  height:300px;overflow:hidden;margin-bottom:12px;position:relative}
-.chart-wrap iframe{width:100%;height:100%;border:none}
-.chart-empty{position:absolute;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:8px;color:var(--t3)}
-.chart-empty .big{font-size:40px}
-.chart-empty p{font-size:13px}
-.chart-bar{display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:8px;gap:8px;flex-wrap:wrap}
-.chart-tf{display:flex;gap:4px}
+    td {
+      padding: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
 
-.token-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.token-search{
-  flex:1;padding:9px 12px 9px 34px;background:var(--s2);
-  border:1px solid var(--b1);border-radius:var(--r);
-  font-family:var(--ui);font-size:13px;color:var(--text);position:relative
-}
-.token-search:focus{outline:none;border-color:var(--acc)}
-.search-wrap{position:relative;flex:1}
-.search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);
-  color:var(--t3);pointer-events:none;width:15px;height:15px}
+    tr:hover {
+      background: rgba(0, 217, 255, 0.1);
+    }
 
-.token-list{display:flex;flex-direction:column;gap:8px}
-.tok-item{
-  display:grid;grid-template-columns:28px 36px 1fr auto auto;
-  gap:10px;align-items:center;
-  padding:12px 14px;background:var(--s2);
-  border:1px solid var(--b1);border-radius:var(--r);
-  cursor:pointer;transition:all .2s
-}
-.tok-item:hover{border-color:rgba(14,165,233,.3);background:var(--s3)}
-.tok-item.sel{border-color:var(--acc);background:rgba(14,165,233,.06)}
-.tok-rank{width:24px;height:24px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:10px;font-weight:700;font-family:var(--mono)}
-.tok-rank.gold{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000}
-.tok-rank.silver{background:linear-gradient(135deg,#cbd5e1,#94a3b8);color:#000}
-.tok-rank.bronze{background:linear-gradient(135deg,#fdba74,#ea580c);color:#fff}
-.tok-rank.def{background:var(--s3);color:var(--t3);border:1px solid var(--b1)}
-.tok-ico{width:32px;height:32px;border-radius:50%;background:var(--s3);
-  display:flex;align-items:center;justify-content:center;font-size:16px;
-  border:1px solid var(--b1);overflow:hidden}
-.tok-ico img{width:100%;height:100%;border-radius:50%;object-fit:cover}
-.tok-name{font-size:13px;font-weight:700;color:var(--text)}
-.tok-sym{font-size:11px;color:var(--t3);font-family:var(--mono)}
-.tok-price{font-family:var(--mono);font-size:12px;color:var(--t2);text-align:right}
-.tok-pnl{font-family:var(--mono);font-size:13px;font-weight:700;text-align:right;min-width:65px}
-.tok-pnl.pos{color:var(--ok)}
-.tok-pnl.neg{color:var(--err)}
+    .token-name {
+      font-weight: bold;
+      color: #ffffff;
+    }
 
-.tok-detail{
-  background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);
-  padding:14px;margin-bottom:12px;display:none
-}
-.tok-detail.vis{display:block}
-.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.dg-item{background:var(--s2);padding:10px 12px;border-radius:var(--r)}
-.dg-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
-.dg-val{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text)}
-.dg-val.pos{color:var(--ok)}.dg-val.neg{color:var(--err)}
-.detail-actions{display:flex;gap:8px;margin-top:12px}
+    .token-address {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      color: #a0a0a0;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 5px;
+    }
 
-/* ── Bot tab ───────────────────────────────────────────────────── */
-.bot-status-card{
-  background:var(--s1);border-radius:var(--r2);padding:18px;
-  margin-bottom:12px;text-align:center;border:1px solid var(--b1);
-  position:relative;overflow:hidden
-}
-.bot-status-card.running{border-color:rgba(14,165,233,.3);
-  box-shadow:0 0 30px rgba(14,165,233,.08)}
-.bot-status-card.running::before{content:'';position:absolute;inset:0;
-  background:radial-gradient(ellipse at top,rgba(14,165,233,.05),transparent 70%)}
-.bot-icon{font-size:44px;margin-bottom:10px;display:block}
-.bot-status-title{font-size:18px;font-weight:800;margin-bottom:4px}
-.bot-status-sub{font-size:13px;color:var(--t2)}
+    .pnl-positive {
+      color: #00ff88;
+      font-weight: bold;
+    }
 
-.live-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.live-card{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:12px;text-align:center}
-.live-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
-.live-val{font-family:var(--mono);font-size:20px;font-weight:700}
-.live-val.pos{color:var(--ok)}.live-val.neg{color:var(--err)}
-.live-val.acc{color:var(--acc)}
+    .pnl-negative {
+      color: #ff4757;
+      font-weight: bold;
+    }
 
-.tier-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
-.tier-item{
-  display:flex;align-items:center;gap:12px;
-  padding:12px 14px;background:var(--s2);
-  border:1px solid var(--b1);border-radius:var(--r);
-  border-left:3px solid var(--b2);transition:all .2s
-}
-.tier-item.hit{border-left-color:var(--ok);background:rgba(16,212,136,.04)}
-.tier-item.pending{border-left-color:var(--warn)}
-.tier-num{width:28px;height:28px;border-radius:50%;
-  background:var(--s3);border:1px solid var(--b2);
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--mono);font-size:12px;font-weight:700;flex-shrink:0}
-.tier-info{flex:1}
-.tier-name{font-size:13px;font-weight:700;font-family:var(--mono)}
-.tier-desc{font-size:11px;color:var(--t3);margin-top:2px}
-.tier-badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;
-  font-family:var(--mono);letter-spacing:.3px}
-.tier-badge.wait{background:rgba(245,158,11,.1);color:var(--warn)}
-.tier-badge.done{background:rgba(16,212,136,.1);color:var(--ok)}
+    .status {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      font-weight: 600;
+    }
 
-.pbar-wrap{margin-top:4px}
-.pbar-label{display:flex;justify-content:space-between;font-size:10px;
-  color:var(--t3);margin-bottom:4px}
-.pbar{height:4px;background:var(--s3);border-radius:2px;overflow:hidden}
-.pbar-fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--ok));
-  border-radius:2px;transition:width .4s ease;box-shadow:0 0 6px rgba(14,165,233,.4)}
+    .status-live {
+      background: rgba(0, 255, 136, 0.2);
+      color: #00ff88;
+    }
 
-.bot-log{
-  background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);
-  padding:12px;max-height:180px;overflow-y:auto;
-  font-family:var(--mono);font-size:11px;line-height:1.7
-}
-.bot-log::-webkit-scrollbar{width:3px}
-.bot-log::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
-.log-line{padding:1px 0;border-bottom:1px solid rgba(255,255,255,.03)}
-.log-line:last-child{border:none}
-.log-line.info{color:var(--t2)}
-.log-line.success{color:var(--ok)}
-.log-line.warning{color:var(--warn)}
-.log-line.error{color:var(--err)}
+    .status-offline {
+      background: rgba(255, 71, 87, 0.2);
+      color: #ff4757;
+    }
 
-/* ── Keys tab ──────────────────────────────────────────────────── */
-.pwa-card{
-  background:linear-gradient(135deg,rgba(153,69,255,.08),rgba(14,165,233,.08));
-  border:1px solid rgba(153,69,255,.25);border-radius:var(--r2);
-  padding:16px;margin-bottom:12px
-}
-.pwa-title{font-size:14px;font-weight:700;color:#a78bfa;margin-bottom:4px}
-.pwa-text{font-size:12px;color:var(--t2);line-height:1.7}
-.sec-card{background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.2);
-  border-radius:var(--r2);padding:14px;margin-bottom:12px}
-.sec-title{font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px;
-  display:flex;align-items:center;gap:6px}
-.sec-text{font-size:12px;color:var(--t2);line-height:1.8}
+    .refresh-btn {
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      border: none;
+      padding: 12px 30px;
+      border-radius: 25px;
+      color: #1a1a2e;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: transform 0.2s;
+    }
 
-/* ── Empty state ───────────────────────────────────────────────── */
-.empty{text-align:center;padding:40px 20px;color:var(--t3)}
-.empty-ico{font-size:44px;margin-bottom:12px;opacity:.5}
-.empty-title{font-size:14px;color:var(--t2);margin-bottom:6px}
-.empty-sub{font-size:12px}
+    .refresh-btn:hover {
+      transform: scale(1.05);
+    }
 
-/* ── Toasts ────────────────────────────────────────────────────── */
-#toast-wrap{position:fixed;top:70px;right:14px;z-index:1000;display:flex;flex-direction:column;gap:8px}
-.toast{
-  padding:10px 16px;border-radius:var(--r);font-size:13px;font-weight:600;
-  max-width:280px;opacity:0;transform:translateX(20px);
-  transition:all .3s;pointer-events:none
-}
-.toast.show{opacity:1;transform:none}
-.toast.ok{background:rgba(16,212,136,.15);color:var(--ok);border:1px solid rgba(16,212,136,.3)}
-.toast.err{background:rgba(244,63,94,.15);color:var(--err);border:1px solid rgba(244,63,94,.3)}
-.toast.info{background:rgba(14,165,233,.15);color:var(--acc);border:1px solid rgba(14,165,233,.3)}
-.toast.warn{background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.3)}
+    .loading {
+      text-align: center;
+      padding: 50px;
+      color: #a0a0a0;
+    }
 
-/* ── Animations ────────────────────────────────────────────────── */
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-@keyframes spin{to{transform:rotate(360deg)}}
-.spin{animation:spin .8s linear infinite}
+    .loading-spinner {
+      border: 4px solid rgba(0, 217, 255, 0.2);
+      border-top: 4px solid #00d9ff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
 
-/* ── Progress bar (pnl) ────────────────────────────────────────── */
-.global-pbar{margin-top:8px}
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
 
-/* ── Bot token selector ────────────────────────────────────────── */
-#bot-token-sel{width:100%;padding:11px 14px;background:var(--s2);border:1px solid var(--b1);
-  border-radius:var(--r);font-family:var(--mono);font-size:13px;color:var(--text);
-  appearance:none;-webkit-appearance:none;cursor:pointer}
-#bot-token-sel:focus{outline:none;border-color:var(--acc)}
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 1.8em;
+      }
 
-/* ── Tier input rows ───────────────────────────────────────────── */
-.tier-cfg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-.tier-cfg-item{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:10px}
-.tier-cfg-item label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
-.tier-cfg-item input{width:100%;background:none;border:none;font-family:var(--mono);font-size:14px;color:var(--text);font-weight:600;outline:none}
-</style>
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      table {
+        font-size: 0.85em;
+      }
+
+      th, td {
+        padding: 10px 5px;
+      }
+    }
+  </style>
 </head>
 <body>
-<div id="toast-wrap"></div>
-<div id="app">
+  <div class="container">
+    <header>
+      <h1>🤖 SolBot Pro Dashboard</h1>
+      <p>Surveillance en temps réel de votre portefeuille Solana</p>
+      <p id="wallet-address" style="margin-top: 10px; font-family: monospace; color: #00d9ff;"></p>
+      <span id="bot-status" class="status status-offline">🔴 Bot hors ligne</span>
+    </header>
 
-  <!-- Header -->
-  <header id="hd">
-    <div class="hd-logo">
-      <div class="hd-icon">⬡</div>
-      <span class="hd-title">SolBot Pro</span>
-    </div>
-    <div class="hd-right">
-      <span class="hd-sol" id="hd-sol" style="display:none"></span>
-      <button id="btn-refresh" onclick="refreshWallet()" title="Actualiser">↻</button>
-      <div id="sw-dot" title="Service Worker"></div>
-    </div>
-  </header>
-
-  <!-- Main content -->
-  <main id="main">
-
-    <!-- ══ WALLET PANEL ══════════════════════════════════════════ -->
-    <div class="panel active" id="panel-wallet">
-
-      <div class="wallet-bar" id="wallet-bar">
-        <div>
-          <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Wallet</div>
-          <div class="wallet-addr" id="wallet-addr" onclick="copyAddr()">Non connecté — configurer les clés</div>
-        </div>
-        <div style="text-align:right">
-          <div class="sol-bal" id="sol-bal">—</div>
-          <div class="sol-label">SOL</div>
-        </div>
+    <div class="stats">
+      <div class="stat-card">
+        <h3>📊 Tokens Surveillés</h3>
+        <div class="value" id="total-tokens">-</div>
       </div>
-
-      <!-- Chart -->
-      <div>
-        <div class="chart-bar">
-          <span style="font-size:12px;color:var(--t2);font-weight:600" id="chart-token-label">Graphique</span>
-          <div class="chart-tf" id="chart-tf">
-            <button class="chip sel" onclick="setTf(this,'5m')">5m</button>
-            <button class="chip" onclick="setTf(this,'15m')">15m</button>
-            <button class="chip" onclick="setTf(this,'1h')">1H</button>
-            <button class="chip" onclick="setTf(this,'4h')">4H</button>
-            <button class="chip" onclick="setTf(this,'1d')">1J</button>
-          </div>
-        </div>
-        <div class="chart-wrap" id="chart-wrap">
-          <div class="chart-empty" id="chart-empty">
-            <div class="big">📊</div>
-            <p>Sélectionnez un token</p>
-          </div>
-          <iframe id="chart-iframe" style="display:none" title="DexScreener"></iframe>
-        </div>
+      <div class="stat-card">
+        <h3>💰 Valeur Totale</h3>
+        <div class="value" id="total-value">-</div>
       </div>
-
-      <!-- Token detail -->
-      <div class="tok-detail" id="tok-detail">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-          <div class="tok-ico" id="detail-ico" style="width:40px;height:40px;font-size:20px"></div>
-          <div>
-            <div style="font-size:16px;font-weight:800" id="detail-name"></div>
-            <div style="font-size:12px;color:var(--t3);font-family:var(--mono)" id="detail-sym"></div>
-          </div>
-          <div style="margin-left:auto">
-            <button class="btn btn-ok btn-sm" onclick="useForBot()">Utiliser pour le bot →</button>
-          </div>
-        </div>
-        <div class="detail-grid">
-          <div class="dg-item"><div class="dg-label">Prix actuel</div><div class="dg-val" id="d-price"></div></div>
-          <div class="dg-item"><div class="dg-label">PnL non réalisé</div><div class="dg-val" id="d-pnl"></div></div>
-          <div class="dg-item"><div class="dg-label">Balance</div><div class="dg-val" id="d-bal"></div></div>
-          <div class="dg-item"><div class="dg-label">Valeur SOL</div><div class="dg-val" id="d-val"></div></div>
-          <div class="dg-item"><div class="dg-label">Variation 24H</div><div class="dg-val" id="d-24h"></div></div>
-          <div class="dg-item"><div class="dg-label">Liquidité USD</div><div class="dg-val" id="d-liq"></div></div>
-        </div>
+      <div class="stat-card">
+        <h3>📈 Meilleur PnL</h3>
+        <div class="value" id="best-pnl">-</div>
       </div>
-
-      <!-- Sort toolbar -->
-      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-        <button class="chip sel" onclick="sortToks('pnl',this)">Performance</button>
-        <button class="chip" onclick="sortToks('value',this)">Valeur</button>
-        <button class="chip" onclick="sortToks('name',this)">Nom</button>
-        <button class="chip" onclick="sortToks('balance',this)">Balance</button>
-      </div>
-
-      <!-- Search -->
-      <div class="token-toolbar" style="margin-bottom:10px">
-        <div class="search-wrap">
-          <svg class="search-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-          </svg>
-          <input class="token-search" id="tok-search" placeholder="Rechercher…" oninput="filterToks()">
-        </div>
-      </div>
-
-      <!-- Token list -->
-      <div class="token-list" id="tok-list">
-        <div class="empty">
-          <div class="empty-ico">💎</div>
-          <div class="empty-title">Aucun token</div>
-          <div class="empty-sub">Configurez vos clés dans l'onglet Clés</div>
-        </div>
+      <div class="stat-card">
+        <h3>📉 Pire PnL</h3>
+        <div class="value" id="worst-pnl">-</div>
       </div>
     </div>
 
-    <!-- ══ BOT PANEL ═════════════════════════════════════════════ -->
-    <div class="panel" id="panel-bot">
-
-      <!-- Bot status card -->
-      <div class="bot-status-card" id="bot-status-card">
-        <span class="bot-icon" id="bot-icon">🤖</span>
-        <div class="bot-status-title" id="bot-title">Bot en veille</div>
-        <div class="bot-status-sub" id="bot-sub">Sélectionnez un token et démarrez</div>
+    <div class="tokens-table">
+      <h2 style="margin-bottom: 20px; color: #00d9ff;">🪙 Vos Tokens</h2>
+      <div id="loading" class="loading">
+        <div class="loading-spinner"></div>
+        <p>Chargement des données...</p>
       </div>
-
-      <!-- Live metrics -->
-      <div class="live-grid" id="live-grid" style="display:none">
-        <div class="live-card">
-          <div class="live-label">PnL Actuel</div>
-          <div class="live-val" id="live-pnl">—</div>
-        </div>
-        <div class="live-card">
-          <div class="live-label">Prix USD</div>
-          <div class="live-val acc" id="live-price">—</div>
-        </div>
-      </div>
-
-      <!-- Progress to next tier -->
-      <div class="card" id="next-tier-card" style="display:none">
-        <div class="pbar-wrap">
-          <div class="pbar-label"><span id="next-tier-label">Prochain palier</span><span id="next-tier-pct">0%</span></div>
-          <div class="pbar"><div class="pbar-fill" id="next-tier-bar" style="width:0%"></div></div>
-        </div>
-      </div>
-
-      <!-- Token config -->
-      <div class="card">
-        <div class="card-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-          Token surveillé
-        </div>
-        <div class="field">
-          <label>Token à surveiller</label>
-          <select id="bot-token-sel" onchange="onBotTokenChange()">
-            <option value="">— Sélectionner un token —</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Prix d'achat (USD)</label>
-          <input type="number" id="buy-price-inp" placeholder="Ex: 0.00001250" step="any">
-        </div>
-      </div>
-
-      <!-- Tiers -->
-      <div class="card">
-        <div class="card-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-          Paliers de vente
-        </div>
-        <div class="tier-list" id="tier-list"></div>
-        <div style="font-size:11px;color:var(--t3);margin-top:8px">
-          Personnalisez les cibles PnL et les % à vendre pour chaque palier.
-        </div>
-      </div>
-
-      <!-- Settings -->
-      <div class="card">
-        <div class="card-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          Paramètres
-        </div>
-        <div class="toggle-row">
-          <span>Vente automatique (Jupiter)</span>
-          <div class="tog" id="tog-auto" onclick="toggleTog(this,'autoSell')"></div>
-        </div>
-        <div class="toggle-row">
-          <span>Stop-loss automatique</span>
-          <div class="tog" id="tog-sl" onclick="toggleTog(this,'stopLoss')"></div>
-        </div>
-        <div class="field" style="margin-top:12px" id="sl-field" style="display:none">
-          <label>Seuil stop-loss (%)</label>
-          <input type="number" id="sl-inp" value="20" min="1" max="99">
-        </div>
-        <div class="field" style="margin-top:12px">
-          <label>Intervalle de vérification</label>
-          <div class="chips" id="chips-interval">
-            <button class="chip" onclick="selChip(this,'interval',5)">5s</button>
-            <button class="chip sel" onclick="selChip(this,'interval',10)">10s</button>
-            <button class="chip" onclick="selChip(this,'interval',15)">15s</button>
-            <button class="chip" onclick="selChip(this,'interval',30)">30s</button>
-            <button class="chip" onclick="selChip(this,'interval',60)">60s</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Slippage maximum</label>
-          <div class="chips" id="chips-slippage">
-            <button class="chip" onclick="selChip(this,'slippage',50)">0.5%</button>
-            <button class="chip sel" onclick="selChip(this,'slippage',100)">1%</button>
-            <button class="chip" onclick="selChip(this,'slippage',150)">1.5%</button>
-            <button class="chip" onclick="selChip(this,'slippage',300)">3%</button>
-            <button class="chip" onclick="selChip(this,'slippage',500)">5%</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Start / stop -->
-      <div class="btn-row" style="margin-bottom:12px">
-        <button class="btn btn-ok btn-block" id="btn-start" onclick="startBot()">▶ Démarrer</button>
-        <button class="btn btn-err btn-block" id="btn-stop" onclick="stopBot()" disabled>■ Arrêter</button>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="resetTiers()" style="margin-bottom:12px">↺ Réinitialiser les paliers</button>
-
-      <!-- Log -->
-      <div class="card">
-        <div class="card-title" style="justify-content:space-between">
-          <span style="display:flex;align-items:center;gap:8px">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:15px;height:15px;stroke:var(--acc)"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Journal
-          </span>
-          <button class="btn btn-ghost btn-sm" onclick="clearLog()">Effacer</button>
-        </div>
-        <div class="bot-log" id="bot-log">
-          <div class="log-line info">Système prêt · Configurez vos clés puis démarrez le bot.</div>
-        </div>
-      </div>
+      <table id="tokens-table" style="display: none;">
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Adresse</th>
+            <th>Balance</th>
+            <th>Prix</th>
+            <th>Valeur</th>
+            <th>PnL</th>
+            <th>Liquidité</th>
+          </tr>
+        </thead>
+        <tbody id="tokens-body">
+        </tbody>
+      </table>
     </div>
 
-    <!-- ══ KEYS PANEL ════════════════════════════════════════════ -->
-    <div class="panel" id="panel-keys">
-
-      <!-- Connection status -->
-      <div class="card" id="conn-status-card">
-        <div class="card-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          Statut connexion
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap" id="status-badges">
-          <span class="badge badge-err">● RPC non configuré</span>
-        </div>
-      </div>
-
-      <!-- Keys form -->
-      <div class="card">
-        <div class="card-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-          Clé privée Solana
-        </div>
-        <div class="field">
-          <label>Clé privée (tableau JSON)</label>
-          <div style="position:relative">
-            <input type="password" id="inp-privkey" placeholder="[12,34,56,...]" autocomplete="new-password">
-            <button onclick="toggleVis('inp-privkey')"
-              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t2);font-size:16px">👁</button>
-          </div>
-        </div>
-        <div style="font-size:11px;color:var(--t3);margin-top:-8px;margin-bottom:12px">
-          Stockée uniquement en mémoire de session (sessionStorage). Non persistée si vous fermez le navigateur.
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          Helius & RPC
-        </div>
-        <div class="field">
-          <label>Clé API Helius</label>
-          <input type="text" id="inp-helius" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
-        </div>
-        <div class="field">
-          <label>Endpoint RPC</label>
-          <input type="text" id="inp-rpc" value="https://mainnet.helius-rpc.com" placeholder="https://mainnet.helius-rpc.com">
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary btn-block" onclick="saveKeys()">💾 Enregistrer</button>
-          <button class="btn btn-ghost" onclick="testConnection()">🔌 Tester</button>
-        </div>
-      </div>
-
-      <!-- Background mode info -->
-      <div class="pwa-card">
-        <div class="pwa-title">📱 Mode arrière-plan (PWA)</div>
-        <div class="pwa-text" style="margin-top:6px">
-          Pour que le bot continue à surveiller les prix même écran éteint, ajoutez cette page à l'écran d'accueil :
-          <br><br>
-          <strong>iOS Safari :</strong> Partager → Ajouter à l'écran d'accueil<br>
-          <strong>Android Chrome :</strong> Menu ⋮ → Installer l'application<br><br>
-          Sur Android, le Service Worker assure la surveillance en arrière-plan.
-          Sur iOS, gardez l'application ouverte pour une surveillance continue.
-        </div>
-        <button class="btn btn-ghost btn-sm" style="margin-top:10px" id="btn-install" onclick="installPWA()" style="display:none">
-          + Installer l'application
-        </button>
-      </div>
-
-      <!-- SW status -->
-      <div class="card" id="sw-info-card">
-        <div class="card-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-          Service Worker
-        </div>
-        <div id="sw-info-text" style="font-size:12px;color:var(--t2)">Vérification…</div>
-        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="requestNotifPerm()">🔔 Activer les notifications</button>
-      </div>
-
-      <!-- Security notice -->
-      <div class="sec-card">
-        <div class="sec-title">⚠️ Rappel de sécurité</div>
-        <div class="sec-text">
-          Utilisez un wallet dédié avec un solde limité. Ne partagez jamais votre clé privée. Régénérez régulièrement votre clé API Helius. Ce logiciel n'est pas affilié à Solana Foundation ou Jupiter.
-        </div>
-      </div>
+    <div style="text-align: center;">
+      <button class="refresh-btn" onclick="loadData()">🔄 Actualiser</button>
+      <p style="margin-top: 15px; color: #a0a0a0; font-size: 0.9em;">
+        Dernière mise à jour : <span id="last-update">-</span>
+      </p>
     </div>
+  </div>
 
-  </main>
-
-  <!-- Navigation -->
-  <nav id="nav">
-    <button class="nav-btn active" id="nb-wallet" onclick="switchTab('wallet')">
-      <div class="notif-dot"></div>
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-      </svg>
-      Wallet
-    </button>
-    <button class="nav-btn" id="nb-bot" onclick="switchTab('bot')">
-      <div class="notif-dot"></div>
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-      </svg>
-      Bot
-    </button>
-    <button class="nav-btn" id="nb-keys" onclick="switchTab('keys')">
-      <div class="notif-dot"></div>
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-      </svg>
-      Clés
-    </button>
-  </nav>
-</div>
-
-<script src="https://unpkg.com/@solana/web3.js@1.91.8/lib/index.iife.min.js"></script>
-<script>
-// ═══════════════════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════════════════
-const S = {
-  tab: 'wallet',
-  keypair: null,
-  walletAddr: null,
-  solBalance: 0,
-  tokens: [],             // { mint, symbol, name, balance, decimals, logoURI, priceUsd, priceSol, pnl, value, change24h, buyPrice, pairAddress }
-  selectedMint: null,
-  sortMode: 'pnl',
-  chartTf: '5m',
-  botRunning: false,
-  botConfig: {
-    tokenAddress: null,
-    tokenSymbol: null,
-    tokenName: null,
-    buyPrice: null,
-    autoSell: false,
-    stopLoss: false,
-    stopLossThreshold: 20,
-    interval: 10,
-    slippage: 100,
-    tiers: [
-      { targetPnl: 25,  sellPercent: 25, triggered: false },
-      { targetPnl: 50,  sellPercent: 25, triggered: false },
-      { targetPnl: 75,  sellPercent: 25, triggered: false },
-      { targetPnl: 100, sellPercent: 25, triggered: false },
-    ]
-  },
-  keys: { helius: '', rpc: 'https://mainnet.helius-rpc.com' },
-  livePrice: null,
-  livePnl: null,
-  swReg: null,
-  deferredPrompt: null,
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════════════════
-window.addEventListener('load', async () => {
-  loadPersistedKeys();
-  renderTierList();
-  renderTierCfg();
-  await registerSW();
-  updateSwDot();
-  await requestNotifPerm();
-  tryConnectWallet();
-  pingSW();
-
-  // PWA install
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault(); S.deferredPrompt = e;
-    document.getElementById('btn-install').style.display = 'inline-flex';
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════
-// TABS
-// ═══════════════════════════════════════════════════════════════════
-function switchTab(name) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('panel-'+name).classList.add('active');
-  document.getElementById('nb-'+name).classList.add('active');
-  S.tab = name;
-  if (name === 'bot') { renderBotUI(); renderTierList(); }
-  if (name === 'wallet') renderTokenList();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// SERVICE WORKER
-// ═══════════════════════════════════════════════════════════════════
-async function registerSW() {
-  if (!('serviceWorker' in navigator)) {
-    document.getElementById('sw-info-text').textContent = 'Service Worker non supporté par ce navigateur.';
-    return;
-  }
-  try {
-    S.swReg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
-    navigator.serviceWorker.addEventListener('message', onSWMessage);
-    document.getElementById('sw-info-text').textContent = 'Service Worker actif — surveillance en arrière-plan activée.';
-    document.getElementById('sw-dot').classList.add('on');
-  } catch(e) {
-    console.error('SW registration failed:', e);
-    document.getElementById('sw-info-text').textContent = 'Erreur Service Worker : ' + e.message;
-  }
-}
-
-function sendSW(type, data) {
-  if (navigator.serviceWorker?.controller) {
-    navigator.serviceWorker.controller.postMessage({ type, data });
-  }
-}
-
-function pingSW() {
-  sendSW('PING', {});
-  setInterval(() => sendSW('PING', {}), 25000); // keepalive
-}
-
-function onSWMessage(event) {
-  const { type } = event.data;
-  if (type === 'PRICE_UPDATE') {
-    S.livePrice = event.data.priceUsd;
-    S.livePnl   = event.data.pnl;
-    updateLiveUI(event.data);
-  }
-  if (type === 'LOG') addLog(event.data.level, event.data.text);
-  if (type === 'BOT_STARTED') { S.botRunning = true; updateBotStatusCard(); }
-  if (type === 'BOT_STOPPED')  { S.botRunning = false; updateBotStatusCard(); }
-  if (type === 'TIER_HIT') handleTierHit(event.data);
-  if (type === 'STOP_LOSS_HIT') handleStopLoss(event.data);
-  if (type === 'TIERS_RESET') { S.botConfig.tiers.forEach(t => t.triggered = false); renderTierList(); }
-  if (type === 'NOTIFICATION_ACTION') handleNotifAction(event.data.data);
-  if (type === 'PONG') {
-    if (event.data.config?.running) {
-      S.botRunning = true;
-      S.botConfig = { ...S.botConfig, ...event.data.config };
-      updateBotStatusCard();
-      renderTierList();
-    }
-    if (event.data.logs) syncLogs(event.data.logs);
-    updateSwDot();
-  }
-}
-
-function updateSwDot() {
-  const dot = document.getElementById('sw-dot');
-  if (S.botRunning) dot.className = 'running';
-  else if (S.swReg)  dot.className = 'on';
-  else               dot.className = '';
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// KEYS & WALLET
-// ═══════════════════════════════════════════════════════════════════
-function loadPersistedKeys() {
-  try {
-    const stored = localStorage.getItem('solbot-keys');
-    if (stored) {
-      const k = JSON.parse(stored);
-      S.keys.helius = k.helius || '';
-      S.keys.rpc    = k.rpc    || 'https://mainnet.helius-rpc.com';
-      document.getElementById('inp-helius').value = S.keys.helius;
-      document.getElementById('inp-rpc').value    = S.keys.rpc;
-    }
-    // Private key: only from sessionStorage
-    const pk = sessionStorage.getItem('solbot-pk');
-    if (pk) document.getElementById('inp-privkey').value = pk;
-  } catch(e) {}
-}
-
-function saveKeys() {
-  const pk      = document.getElementById('inp-privkey').value.trim();
-  const helius  = document.getElementById('inp-helius').value.trim();
-  const rpc     = document.getElementById('inp-rpc').value.trim() || 'https://mainnet.helius-rpc.com';
-  S.keys.helius = helius;
-  S.keys.rpc    = rpc;
-  // Persist non-sensitive keys
-  localStorage.setItem('solbot-keys', JSON.stringify({ helius, rpc }));
-  // Private key → sessionStorage only
-  if (pk) sessionStorage.setItem('solbot-pk', pk);
-  toast('ok', 'Clés enregistrées');
-  tryConnectWallet();
-}
-
-function tryConnectWallet() {
-  const pk = sessionStorage.getItem('solbot-pk') || document.getElementById('inp-privkey').value.trim();
-  if (!pk) { updateConnStatus(); return; }
-  try {
-    let arr;
-    if (pk.startsWith('[')) arr = JSON.parse(pk);
-    else { toast('err', 'Format invalide — utilisez un tableau JSON'); return; }
-    S.keypair    = solanaWeb3.Keypair.fromSecretKey(new Uint8Array(arr));
-    S.walletAddr = S.keypair.publicKey.toString();
-    document.getElementById('wallet-addr').textContent = S.walletAddr.slice(0,8) + '…' + S.walletAddr.slice(-8);
-    updateConnStatus();
-    refreshWallet();
-  } catch(e) {
-    toast('err', 'Clé privée invalide : ' + e.message);
-    updateConnStatus();
-  }
-}
-
-async function testConnection() {
-  if (!S.keys.rpc) { toast('warn', 'Configurez le RPC'); return; }
-  try {
-    const url = S.keys.helius
-      ? `${S.keys.rpc}/?api-key=${S.keys.helius}`
-      : S.keys.rpc;
-    const conn = new solanaWeb3.Connection(url, 'confirmed');
-    const slot = await conn.getSlot();
-    toast('ok', `RPC OK — slot ${slot}`);
-    updateConnStatus();
-  } catch(e) {
-    toast('err', 'Connexion échouée : ' + e.message);
-  }
-}
-
-function updateConnStatus() {
-  const badges = document.getElementById('status-badges');
-  const parts  = [];
-  if (S.keypair)     parts.push('<span class="badge badge-ok">● Wallet connecté</span>');
-  else               parts.push('<span class="badge badge-err">● Wallet non configuré</span>');
-  if (S.keys.helius) parts.push('<span class="badge badge-ok">● Helius configuré</span>');
-  else               parts.push('<span class="badge badge-warn">● Helius manquant</span>');
-  if (S.keys.rpc)    parts.push('<span class="badge badge-acc">● RPC : ' + S.keys.rpc.replace('https://','').slice(0,20) + '</span>');
-  badges.innerHTML = parts.join('');
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// WALLET FETCH
-// ═══════════════════════════════════════════════════════════════════
-async function refreshWallet() {
-  if (!S.keypair) { toast('warn','Configurez d\'abord vos clés'); switchTab('keys'); return; }
-  const btn = document.getElementById('btn-refresh');
-  btn.textContent = '⟳'; btn.classList.add('spin');
-  try {
-    const rpcUrl = S.keys.helius
-      ? `${S.keys.rpc}/?api-key=${S.keys.helius}`
-      : S.keys.rpc;
-    const conn = new solanaWeb3.Connection(rpcUrl, 'confirmed');
-
-    // SOL balance
-    const lamports = await conn.getBalance(S.keypair.publicKey);
-    S.solBalance = lamports / 1e9;
-    document.getElementById('sol-bal').textContent = S.solBalance.toFixed(4);
-    document.getElementById('hd-sol').textContent  = S.solBalance.toFixed(3) + ' SOL';
-    document.getElementById('hd-sol').style.display = '';
-
-    // Token accounts
-    const resp = await conn.getParsedTokenAccountsByOwner(
-      S.keypair.publicKey,
-      { programId: new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }
-    );
-
-    const rawTokens = resp.value
-      .map(a => ({
-        mint:     a.account.data.parsed.info.mint,
-        balance:  a.account.data.parsed.info.tokenAmount.uiAmount || 0,
-        decimals: a.account.data.parsed.info.tokenAmount.decimals,
-      }))
-      .filter(t => t.balance > 0);
-
-    // Fetch metadata + prices
-    await enrichTokens(rawTokens);
-    populateBotTokenSel();
-    renderTokenList();
-    toast('ok', `${S.tokens.length} token${S.tokens.length > 1 ? 's' : ''} trouvé${S.tokens.length > 1 ? 's' : ''}`);
-  } catch(e) {
-    toast('err', 'Erreur : ' + e.message);
-    console.error(e);
-  }
-  btn.textContent = '↻'; btn.classList.remove('spin');
-}
-
-async function enrichTokens(rawTokens) {
-  // Load Jupiter token list for metadata
-  let metaMap = {};
-  try {
-    const metaRes = await fetch('https://token.jup.ag/strict');
-    const metaList = await metaRes.json();
-    metaList.forEach(t => metaMap[t.address] = t);
-  } catch(e) { console.warn('Jupiter meta fetch failed', e); }
-
-  // Fetch prices in batch via DexScreener
-  const mints = rawTokens.map(t => t.mint);
-  const priceMap = {};
-
-  // DexScreener allows up to ~30 at a time
-  const CHUNK = 25;
-  for (let i = 0; i < mints.length; i += CHUNK) {
-    const chunk = mints.slice(i, i + CHUNK);
-    try {
-      const res  = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${chunk.join(',')}`);
-      const data = await res.json();
-      if (data.pairs) {
-        // Group by base token, pick best pair
-        const byMint = {};
-        data.pairs
-          .filter(p => p.chainId === 'solana')
-          .forEach(p => {
-            const m = p.baseToken?.address;
-            if (!m) return;
-            if (!byMint[m] || (p.liquidity?.usd || 0) > (byMint[m].liquidity?.usd || 0)) byMint[m] = p;
-          });
-        Object.entries(byMint).forEach(([mint, pair]) => {
-          priceMap[mint] = {
-            priceUsd:   parseFloat(pair.priceUsd) || 0,
-            priceSol:   parseFloat(pair.priceNative) || 0,
-            change24h:  pair.priceChange?.h24 || 0,
-            pairAddress: pair.pairAddress,
-            liquidityUsd: pair.liquidity?.usd || 0,
-            symbol:     pair.baseToken?.symbol || '',
-            name:       pair.baseToken?.name || '',
-          };
-        });
+  <script>
+    // ⚙️ CONFIGURATION
+    // Remplacez par l'URL de votre service Render si vous ajoutez une API
+    const RENDER_API_URL = ''; // Ex: 'https://solana-sniper.onrender.com/api/tokens'
+    
+    // 🧪 DONNÉES DE DÉMO (à remplacer par les données réelles du bot)
+    const DEMO_DATA = [
+      {
+        symbol: 'USDC',
+        name: 'USD Coin',
+        address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        balance: 5.8810,
+        price: 0.001767,
+        value: 0.01,
+        pnl: 0.00,
+        liquidity: 13373373
+      },
+      {
+        symbol: 'SKRb',
+        name: 'Unknown',
+        address: 'SKRbvo6G...',
+        balance: 75.9751,
+        price: 0.02494,
+        value: 1.89,
+        pnl: 0.12,
+        liquidity: 658480
+      },
+      {
+        symbol: '???',
+        name: 'Unknown',
+        address: '67ezHLk8...',
+        balance: 830.3463,
+        price: 0.003597,
+        value: 2.99,
+        pnl: -1.80,
+        liquidity: 188471
       }
-    } catch(e) { console.warn('DexScreener chunk failed', e); }
-  }
+    ];
 
-  // Get SOL price (for value calc)
-  let solPriceUsd = 0;
-  try {
-    const sr = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112');
-    const sd = await sr.json();
-    const sp = sd.pairs?.filter(p => p.chainId === 'solana' && p.quoteToken?.symbol === 'USDC')
-                      .sort((a,b) => (b.liquidity?.usd||0)-(a.liquidity?.usd||0))[0];
-    if (sp) solPriceUsd = parseFloat(sp.priceUsd) || 0;
-  } catch(e) {}
+    // 🔄 Charger les données
+    async function loadData() {
+      const loading = document.getElementById('loading');
+      const table = document.getElementById('tokens-table');
+      const tbody = document.getElementById('tokens-body');
+      
+      loading.style.display = 'block';
+      table.style.display = 'none';
 
-  S.tokens = rawTokens.map(t => {
-    const meta  = metaMap[t.mint] || {};
-    const price = priceMap[t.mint] || {};
-    const priceUsd = price.priceUsd || 0;
-    const valueSol = solPriceUsd ? (priceUsd * t.balance / solPriceUsd) : 0;
-    // Try to get stored buy price for PnL
-    const storedBuy = getBuyPrice(t.mint);
-    const pnl = storedBuy ? ((priceUsd - storedBuy) / storedBuy) * 100 : null;
-    return {
-      mint:         t.mint,
-      balance:      t.balance,
-      decimals:     t.decimals,
-      symbol:       price.symbol || meta.symbol || t.mint.slice(0,6),
-      name:         price.name   || meta.name   || 'Unknown',
-      logoURI:      meta.logoURI || null,
-      priceUsd,
-      priceSol:     price.priceSol || 0,
-      change24h:    price.change24h || 0,
-      pairAddress:  price.pairAddress || null,
-      liquidityUsd: price.liquidityUsd || 0,
-      valueSol,
-      buyPrice:     storedBuy,
-      pnl,
-    };
-  });
+      try {
+        // Essayer de fetch depuis Render API (si configuré)
+        let data = DEMO_DATA;
+        
+        if (RENDER_API_URL) {
+          try {
+            const response = await fetch(RENDER_API_URL);
+            if (response.ok) {
+              data = await response.json();
+              document.getElementById('bot-status').className = 'status status-live';
+              document.getElementById('bot-status').textContent = '🟢 Bot en ligne';
+            }
+          } catch (e) {
+            console.warn('API Render non disponible, utilisation des données démo');
+          }
+        }
 
-  // Sort
-  sortTokensBy(S.sortMode);
-}
+        // Afficher les données
+        displayData(data);
+        
+        // Mettre à jour l'heure
+        document.getElementById('last-update').textContent = new Date().toLocaleTimeString('fr-FR');
+        
+      } catch (error) {
+        console.error('Erreur de chargement:', error);
+        loading.innerHTML = '<p style="color: #ff4757;">❌ Erreur de chargement des données</p>';
+      }
+    }
 
-function getBuyPrice(mint) {
-  try {
-    const bp = JSON.parse(localStorage.getItem('solbot-buyprice') || '{}');
-    return bp[mint] || null;
-  } catch { return null; }
-}
-function setBuyPrice(mint, price) {
-  try {
-    const bp = JSON.parse(localStorage.getItem('solbot-buyprice') || '{}');
-    bp[mint] = price;
-    localStorage.setItem('solbot-buyprice', JSON.stringify(bp));
-  } catch {}
-}
+    // 📊 Afficher les données
+    function displayData(data) {
+      const loading = document.getElementById('loading');
+      const table = document.getElementById('tokens-table');
+      const tbody = document.getElementById('tokens-body');
+      
+      loading.style.display = 'none';
+      table.style.display = 'table';
+      tbody.innerHTML = '';
 
-// ═══════════════════════════════════════════════════════════════════
-// WALLET UI
-// ═══════════════════════════════════════════════════════════════════
-function copyAddr() {
-  if (!S.walletAddr) return;
-  navigator.clipboard?.writeText(S.walletAddr).then(() => toast('info','Adresse copiée'));
-}
+      // Stats globales
+      const totalValue = data.reduce((sum, t) => sum + t.value, 0);
+      const bestPnl = Math.max(...data.map(t => t.pnl));
+      const worstPnl = Math.min(...data.map(t => t.pnl));
 
-function sortTokensBy(mode) {
-  S.sortMode = mode;
-  if (mode === 'pnl')     S.tokens.sort((a,b) => (b.pnl ?? -999) - (a.pnl ?? -999));
-  if (mode === 'value')   S.tokens.sort((a,b) => b.valueSol - a.valueSol);
-  if (mode === 'name')    S.tokens.sort((a,b) => a.name.localeCompare(b.name));
-  if (mode === 'balance') S.tokens.sort((a,b) => b.balance - a.balance);
-}
+      document.getElementById('total-tokens').textContent = data.length;
+      document.getElementById('total-value').textContent = `$${totalValue.toFixed(2)}`;
+      document.getElementById('best-pnl').textContent = `+${bestPnl.toFixed(2)}%`;
+      document.getElementById('best-pnl').className = 'value pnl-positive';
+      document.getElementById('worst-pnl').textContent = `${worstPnl.toFixed(2)}%`;
+      document.getElementById('worst-pnl').className = 'value pnl-negative';
 
-function sortToks(mode, el) {
-  document.querySelectorAll('#panel-wallet .chips .chip, #panel-wallet > button.chip').forEach(c => c.classList.remove('sel'));
-  el.classList.add('sel');
-  sortTokensBy(mode);
-  renderTokenList();
-}
+      // Wallet address (démo)
+      document.getElementById('wallet-address').textContent = 'Wallet: 9Xpa...qTsX';
 
-function filterToks() {
-  renderTokenList();
-}
+      // Lignes du tableau
+      data.forEach(token => {
+        const row = document.createElement('tr');
+        
+        const pnlClass = token.pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+        const pnlSign = token.pnl >= 0 ? '+' : '';
+        
+        row.innerHTML = `
+          <td>
+            <div class="token-name">${token.symbol}</div>
+            <div style="color: #a0a0a0; font-size: 0.9em;">${token.name}</div>
+          </td>
+          <td>
+            <code class="token-address">${token.address}</code>
+          </td>
+          <td>${token.balance.toFixed(4)}</td>
+          <td>$${formatPrice(token.price)}</td>
+          <td>$${token.value.toFixed(2)}</td>
+          <td class="${pnlClass}">${pnlSign}${token.pnl.toFixed(2)}%</td>
+          <td>$${formatLiquidity(token.liquidity)}</td>
+        `;
+        
+        tbody.appendChild(row);
+      });
+    }
 
-function renderTokenList() {
-  const q    = (document.getElementById('tok-search').value || '').toLowerCase();
-  const list = document.getElementById('tok-list');
-  const data = S.tokens.filter(t =>
-    t.name.toLowerCase().includes(q) || t.symbol.toLowerCase().includes(q)
-  );
-  if (!data.length) {
-    list.innerHTML = `<div class="empty">
-      <div class="empty-ico">💎</div>
-      <div class="empty-title">Aucun token${S.keypair ? ' avec balance > 0' : ''}</div>
-      <div class="empty-sub">${S.keypair ? 'Actualisez pour mettre à jour' : 'Configurez vos clés dans l\'onglet Clés'}</div>
-    </div>`;
-    return;
-  }
-  list.innerHTML = data.map((t, i) => {
-    const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'def';
-    const pnlText  = t.pnl !== null ? `${t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(2)}%` : '—';
-    const pnlClass = t.pnl === null ? '' : t.pnl >= 0 ? 'pos' : 'neg';
-    const priceStr = fmtPrice(t.priceUsd);
-    const sel      = S.selectedMint === t.mint ? 'sel' : '';
-    const logo     = t.logoURI
-      ? `<img src="${t.logoURI}" onerror="this.style.display='none';this.parentNode.textContent='${t.symbol[0]||'?'}'">`
-      : t.symbol[0] || '?';
-    return `<div class="tok-item ${sel}" onclick="selectToken('${t.mint}')">
-      <div class="tok-rank ${rankClass}">${i+1}</div>
-      <div class="tok-ico">${logo}</div>
-      <div><div class="tok-name">${t.symbol}</div><div class="tok-sym">${t.name.length > 16 ? t.name.slice(0,15)+'…' : t.name}</div></div>
-      <div class="tok-price">$${priceStr}</div>
-      <div class="tok-pnl ${pnlClass}">${pnlText}</div>
-    </div>`;
-  }).join('');
-}
+    // 🔧 Formateurs
+    function formatPrice(price) {
+      if (price < 0.0001) {
+        return price.toExponential(4);
+      }
+      return price.toFixed(6);
+    }
 
-function selectToken(mint) {
-  S.selectedMint = mint;
-  renderTokenList();
-  const t = S.tokens.find(x => x.mint === mint);
-  if (!t) return;
-  // Show detail
-  const det = document.getElementById('tok-detail');
-  det.classList.add('vis');
-  document.getElementById('detail-ico').innerHTML = t.logoURI
-    ? `<img src="${t.logoURI}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.replaceWith(document.createTextNode('${t.symbol[0]||'?'}'))">`
-    : t.symbol[0] || '?';
-  document.getElementById('detail-name').textContent = t.name;
-  document.getElementById('detail-sym').textContent  = t.symbol + ' · ' + mint.slice(0,8) + '…';
-  document.getElementById('d-price').textContent = '$' + fmtPrice(t.priceUsd);
-  const pnlEl = document.getElementById('d-pnl');
-  pnlEl.textContent = t.pnl !== null ? `${t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(2)}%` : '— (prix achat non défini)';
-  pnlEl.className = 'dg-val ' + (t.pnl === null ? '' : t.pnl >= 0 ? 'pos' : 'neg');
-  document.getElementById('d-bal').textContent   = fmtNum(t.balance) + ' ' + t.symbol;
-  document.getElementById('d-val').textContent   = t.valueSol.toFixed(4) + ' SOL';
-  const c24 = document.getElementById('d-24h');
-  c24.textContent = (t.change24h >= 0 ? '+' : '') + t.change24h.toFixed(2) + '%';
-  c24.className = 'dg-val ' + (t.change24h >= 0 ? 'pos' : 'neg');
-  document.getElementById('d-liq').textContent   = t.liquidityUsd ? '$' + fmtNum(Math.round(t.liquidityUsd)) : '—';
-  // Update chart
-  updateChart(t);
-  document.getElementById('chart-token-label').textContent = t.symbol + ' / USD';
-}
+    function formatLiquidity(liquidity) {
+      if (liquidity >= 1000000) {
+        return (liquidity / 1000000).toFixed(2) + 'M';
+      }
+      if (liquidity >= 1000) {
+        return (liquidity / 1000).toFixed(1) + 'K';
+      }
+      return liquidity.toFixed(0);
+    }
 
-function updateChart(t) {
-  const iframe = document.getElementById('chart-iframe');
-  const empty  = document.getElementById('chart-empty');
-  if (t?.pairAddress) {
-    iframe.src = `https://dexscreener.com/solana/${t.pairAddress}?embed=1&theme=dark&chartOnly=1`;
-    iframe.style.display = '';
-    empty.style.display  = 'none';
-  } else {
-    iframe.style.display = 'none';
-    empty.style.display  = 'flex';
-  }
-}
+    // 🚀 Chargement initial
+    loadData();
 
-function setTf(el, tf) {
-  document.querySelectorAll('#chart-tf .chip').forEach(c => c.classList.remove('sel'));
-  el.classList.add('sel');
-  S.chartTf = tf;
-  // DexScreener embed doesn't support timeframe URL param directly, but changing src refreshes
-  const t = S.tokens.find(x => x.mint === S.selectedMint);
-  if (t) updateChart(t);
-}
-
-function useForBot() {
-  const t = S.tokens.find(x => x.mint === S.selectedMint);
-  if (!t) return;
-  S.botConfig.tokenAddress = t.mint;
-  S.botConfig.tokenSymbol  = t.symbol;
-  S.botConfig.tokenName    = t.name;
-  document.getElementById('bot-token-sel').value = t.mint;
-  onBotTokenChange();
-  switchTab('bot');
-  toast('info', `${t.symbol} sélectionné pour le bot`);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// BOT UI
-// ═══════════════════════════════════════════════════════════════════
-function populateBotTokenSel() {
-  const sel = document.getElementById('bot-token-sel');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">— Sélectionner un token —</option>' +
-    S.tokens.map(t => `<option value="${t.mint}" ${cur===t.mint?'selected':''}>${t.symbol} — ${t.name}</option>`).join('');
-  if (!sel.value && S.botConfig.tokenAddress) sel.value = S.botConfig.tokenAddress;
-}
-
-function onBotTokenChange() {
-  const mint = document.getElementById('bot-token-sel').value;
-  S.botConfig.tokenAddress = mint;
-  const t = S.tokens.find(x => x.mint === mint);
-  if (t) {
-    S.botConfig.tokenSymbol = t.symbol;
-    S.botConfig.tokenName   = t.name;
-    // Pre-fill buy price if stored
-    if (t.buyPrice) document.getElementById('buy-price-inp').value = t.buyPrice;
-  }
-}
-
-function renderBotUI() {
-  updateBotStatusCard();
-  populateBotTokenSel();
-}
-
-function updateBotStatusCard() {
-  const card  = document.getElementById('bot-status-card');
-  const icon  = document.getElementById('bot-icon');
-  const title = document.getElementById('bot-title');
-  const sub   = document.getElementById('bot-sub');
-  const lg    = document.getElementById('live-grid');
-  const ntc   = document.getElementById('next-tier-card');
-  const bstart= document.getElementById('btn-start');
-  const bstop = document.getElementById('btn-stop');
-  updateSwDot();
-  if (S.botRunning) {
-    card.classList.add('running');
-    icon.textContent  = '✅';
-    title.textContent = 'Bot actif';
-    title.style.color = 'var(--ok)';
-    sub.textContent   = `Surveillance : ${S.botConfig.tokenSymbol || '—'} · Intervalle ${S.botConfig.interval}s`;
-    lg.style.display  = 'grid';
-    ntc.style.display = '';
-    bstart.disabled   = true;
-    bstop.disabled    = false;
-  } else {
-    card.classList.remove('running');
-    icon.textContent  = '🤖';
-    title.textContent = 'Bot en veille';
-    title.style.color = '';
-    sub.textContent   = S.botConfig.tokenAddress
-      ? `Token : ${S.botConfig.tokenSymbol} — Appuyez sur Démarrer`
-      : 'Sélectionnez un token et démarrez';
-    lg.style.display  = 'none';
-    ntc.style.display = 'none';
-    bstart.disabled   = false;
-    bstop.disabled    = true;
-  }
-}
-
-function updateLiveUI(data) {
-  if (!S.botRunning) return;
-  const pnlEl = document.getElementById('live-pnl');
-  pnlEl.textContent = (data.pnl >= 0 ? '+' : '') + data.pnl.toFixed(2) + '%';
-  pnlEl.className   = 'live-val ' + (data.pnl >= 0 ? 'pos' : 'neg');
-  document.getElementById('live-price').textContent = '$' + fmtPrice(data.priceUsd);
-  // Progress bar
-  const tiers = S.botConfig.tiers;
-  const next  = tiers.find(t => !t.triggered);
-  if (next) {
-    const prev = tiers[tiers.indexOf(next) - 1];
-    const from = prev ? prev.targetPnl : 0;
-    const to   = next.targetPnl;
-    const pct  = Math.max(0, Math.min(100, ((data.pnl - from) / (to - from)) * 100));
-    document.getElementById('next-tier-bar').style.width = pct + '%';
-    document.getElementById('next-tier-label').textContent = `Palier ${tiers.indexOf(next)+1} (+${to}%)`;
-    document.getElementById('next-tier-pct').textContent   = pct.toFixed(0) + '%';
-  } else {
-    document.getElementById('next-tier-bar').style.width   = '100%';
-    document.getElementById('next-tier-label').textContent = 'Tous les paliers atteints';
-    document.getElementById('next-tier-pct').textContent   = '100%';
-  }
-  // Update tier list colors
-  renderTierList();
-}
-
-function renderTierList() {
-  const el = document.getElementById('tier-list');
-  el.innerHTML = S.botConfig.tiers.map((t, i) => {
-    const cls    = t.triggered ? 'hit' : '';
-    const badgeCls = t.triggered ? 'done' : 'wait';
-    const badgeTxt = t.triggered ? 'DÉCLENCHÉ' : 'ATTENTE';
-    const pct = S.livePnl !== null && !t.triggered
-      ? Math.max(0, Math.min(100, (S.livePnl / t.targetPnl) * 100)) : 0;
-    return `<div class="tier-item ${cls}">
-      <div class="tier-num">${i+1}</div>
-      <div class="tier-info">
-        <div class="tier-name">+${t.targetPnl}% → Vendre ${t.sellPercent}%</div>
-        <div class="tier-desc">Palier ${i+1} · ${t.sellPercent}% de la position</div>
-        ${!t.triggered && S.botRunning ? `<div class="pbar-wrap" style="margin-top:6px">
-          <div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div>
-        </div>` : ''}
-      </div>
-      <span class="tier-badge ${badgeCls}">${badgeTxt}</span>
-    </div>`;
-  }).join('');
-}
-
-function renderTierCfg() {
-  // Tier configuration is part of the bot config card
-  // Handled inline via renderTierList
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// BOT ACTIONS
-// ═══════════════════════════════════════════════════════════════════
-function startBot() {
-  const mint     = document.getElementById('bot-token-sel').value;
-  const buyPrice = parseFloat(document.getElementById('buy-price-inp').value);
-
-  if (!S.keypair)    { toast('err', 'Wallet non connecté'); switchTab('keys'); return; }
-  if (!mint)         { toast('warn', 'Sélectionnez un token'); return; }
-  if (!buyPrice || buyPrice <= 0) { toast('warn', 'Entrez un prix d\'achat valide'); return; }
-
-  const token = S.tokens.find(t => t.mint === mint);
-  // Store buy price for PnL persistence
-  setBuyPrice(mint, buyPrice);
-
-  S.botConfig.tokenAddress = mint;
-  S.botConfig.tokenSymbol  = token?.symbol || mint.slice(0,6);
-  S.botConfig.tokenName    = token?.name   || 'Unknown';
-  S.botConfig.buyPrice     = buyPrice;
-
-  const payload = {
-    tokenAddress:       S.botConfig.tokenAddress,
-    tokenSymbol:        S.botConfig.tokenSymbol,
-    buyPrice:           S.botConfig.buyPrice,
-    tiers:              S.botConfig.tiers.map(t => ({ ...t, triggered: false })),
-    stopLoss:           S.botConfig.stopLoss,
-    stopLossThreshold:  S.botConfig.stopLossThreshold,
-    autoSell:           S.botConfig.autoSell,
-    interval:           S.botConfig.interval,
-    slippage:           S.botConfig.slippage,
-  };
-
-  S.botConfig.tiers = payload.tiers;
-  sendSW('START_BOT', payload);
-  S.botRunning = true;
-  updateBotStatusCard();
-  renderTierList();
-  addLog('success', `Bot démarré · ${S.botConfig.tokenSymbol} · Achat $${buyPrice}`);
-  toast('ok', 'Bot démarré');
-}
-
-function stopBot() {
-  sendSW('STOP_BOT', {});
-  S.botRunning = false;
-  S.livePrice  = null;
-  S.livePnl    = null;
-  updateBotStatusCard();
-  addLog('info', 'Bot arrêté manuellement');
-  toast('info', 'Bot arrêté');
-}
-
-function resetTiers() {
-  S.botConfig.tiers.forEach(t => t.triggered = false);
-  sendSW('RESET_TIERS', {});
-  renderTierList();
-  toast('info', 'Paliers réinitialisés');
-}
-
-function handleTierHit(data) {
-  S.botConfig.tiers[data.tierId].triggered = true;
-  renderTierList();
-  document.getElementById('nb-bot').classList.add('has-notif');
-  if (S.botConfig.autoSell) executeSell(data.tierId, data.sellPercent);
-}
-
-function handleStopLoss(data) {
-  document.getElementById('nb-bot').classList.add('has-notif');
-  toast('err', `Stop Loss déclenché à ${data.pnl.toFixed(1)}%`);
-  if (S.botConfig.autoSell) executeSellAll();
-}
-
-function handleNotifAction(data) {
-  if (!data) return;
-  switchTab('bot');
-  document.getElementById('nb-bot').classList.remove('has-notif');
-  if (data.action === 'SELL_TIER') {
-    toast('warn', `Palier ${data.tierId + 1} — Vente ${data.sellPercent}% initiée`);
-    if (S.botConfig.autoSell) executeSell(data.tierId, data.sellPercent);
-  }
-  if (data.action === 'STOP_LOSS') {
-    toast('err', `Stop Loss — Vente totale initiée`);
-    if (S.botConfig.autoSell) executeSellAll();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// JUPITER SWAP
-// ═══════════════════════════════════════════════════════════════════
-async function executeSell(tierId, sellPercent) {
-  if (!S.keypair) { toast('err','Wallet non connecté'); return; }
-  const token = S.tokens.find(t => t.mint === S.botConfig.tokenAddress);
-  if (!token)    { toast('err','Token introuvable dans le wallet'); return; }
-
-  const amountTokens  = token.balance * (sellPercent / 100);
-  const amountRaw     = Math.floor(amountTokens * Math.pow(10, token.decimals));
-  if (amountRaw <= 0) { toast('warn','Balance insuffisante'); return; }
-
-  addLog('info', `Vente ${sellPercent}% de ${token.symbol} via Jupiter…`);
-  try {
-    const txId = await jupiterSwap(S.botConfig.tokenAddress, amountRaw, S.botConfig.slippage);
-    addLog('success', `✅ Vente exécutée · Palier ${tierId+1} · TX: ${txId.slice(0,12)}…`);
-    toast('ok', `Vente ${sellPercent}% exécutée !`);
-    // Refresh balance
-    setTimeout(refreshWallet, 5000);
-  } catch(e) {
-    addLog('error', `Erreur swap palier ${tierId+1} : ${e.message}`);
-    toast('err', 'Swap échoué : ' + e.message);
-  }
-}
-
-async function executeSellAll() {
-  if (!S.keypair) { toast('err','Wallet non connecté'); return; }
-  const token = S.tokens.find(t => t.mint === S.botConfig.tokenAddress);
-  if (!token) return;
-  const amountRaw = Math.floor(token.balance * Math.pow(10, token.decimals));
-  addLog('info', `Stop-loss : vente totale de ${token.symbol}…`);
-  try {
-    const txId = await jupiterSwap(S.botConfig.tokenAddress, amountRaw, S.botConfig.slippage);
-    addLog('success', `✅ Vente totale exécutée · TX: ${txId.slice(0,12)}…`);
-    toast('ok', 'Stop-loss exécuté !');
-    stopBot();
-    setTimeout(refreshWallet, 5000);
-  } catch(e) {
-    addLog('error', 'Erreur stop-loss : ' + e.message);
-    toast('err', 'Stop-loss échoué : ' + e.message);
-  }
-}
-
-async function jupiterSwap(inputMint, amountRaw, slippageBps) {
-  const SOL_MINT = 'So11111111111111111111111111111111111111112';
-  // 1. Quote
-  const qRes = await fetch(
-    `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${SOL_MINT}` +
-    `&amount=${amountRaw}&slippageBps=${slippageBps}`
-  );
-  if (!qRes.ok) throw new Error('Quote échouée : ' + await qRes.text());
-  const quote = await qRes.json();
-
-  // 2. Swap transaction
-  const sRes = await fetch('https://quote-api.jup.ag/v6/swap', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      quoteResponse:          quote,
-      userPublicKey:          S.keypair.publicKey.toString(),
-      wrapAndUnwrapSol:       true,
-      computeUnitPriceMicroLamports: 'auto',
-      dynamicComputeUnitLimit: true,
-    })
-  });
-  if (!sRes.ok) throw new Error('Swap tx échouée : ' + await sRes.text());
-  const { swapTransaction } = await sRes.json();
-
-  // 3. Deserialize, sign, send
-  const rpcUrl = S.keys.helius
-    ? `${S.keys.rpc}/?api-key=${S.keys.helius}`
-    : S.keys.rpc;
-  const conn = new solanaWeb3.Connection(rpcUrl, 'confirmed');
-  const buf  = Uint8Array.from(atob(swapTransaction), c => c.charCodeAt(0));
-  const tx   = solanaWeb3.VersionedTransaction.deserialize(buf);
-  tx.sign([S.keypair]);
-  const raw  = tx.serialize();
-  const txId = await conn.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
-
-  // 4. Confirm
-  const latest = await conn.getLatestBlockhash();
-  await conn.confirmTransaction({ signature: txId, ...latest }, 'confirmed');
-  return txId;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// SETTINGS (toggles, chips)
-// ═══════════════════════════════════════════════════════════════════
-function toggleTog(el, key) {
-  el.classList.toggle('on');
-  const val = el.classList.contains('on');
-  if (key === 'autoSell') S.botConfig.autoSell = val;
-  if (key === 'stopLoss') {
-    S.botConfig.stopLoss = val;
-    document.getElementById('sl-field').style.display = val ? '' : 'none';
-  }
-  if (S.botRunning) sendSW('UPDATE_TIERS', S.botConfig);
-}
-
-function selChip(el, group, val) {
-  document.querySelectorAll(`#chips-${group} .chip`).forEach(c => c.classList.remove('sel'));
-  el.classList.add('sel');
-  if (group === 'interval') S.botConfig.interval = val;
-  if (group === 'slippage') S.botConfig.slippage = val;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// NOTIFICATIONS & PWA
-// ═══════════════════════════════════════════════════════════════════
-async function requestNotifPerm() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    await Notification.requestPermission();
-  }
-}
-
-async function installPWA() {
-  if (S.deferredPrompt) {
-    S.deferredPrompt.prompt();
-    S.deferredPrompt = null;
-    document.getElementById('btn-install').style.display = 'none';
-  }
-}
-
-function toggleVis(id) {
-  const inp = document.getElementById(id);
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// LOGS
-// ═══════════════════════════════════════════════════════════════════
-function addLog(level, text) {
-  const log   = document.getElementById('bot-log');
-  const ts    = new Date().toLocaleTimeString('fr-FR');
-  const div   = document.createElement('div');
-  div.className = `log-line ${level}`;
-  div.textContent = `[${ts}] ${text}`;
-  log.insertBefore(div, log.firstChild);
-  while (log.children.length > 100) log.removeChild(log.lastChild);
-}
-
-function clearLog() {
-  document.getElementById('bot-log').innerHTML = '<div class="log-line info">Journal effacé</div>';
-}
-
-function syncLogs(logs) {
-  if (!logs?.length) return;
-  const log = document.getElementById('bot-log');
-  // Only sync if log is mostly empty
-  if (log.children.length <= 1) {
-    log.innerHTML = logs.slice(0, 50).map(l =>
-      `<div class="log-line ${l.level}">[${new Date(l.ts).toLocaleTimeString('fr-FR')}] ${l.text}</div>`
-    ).join('');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// TOASTS
-// ═══════════════════════════════════════════════════════════════════
-function toast(type, msg) {
-  const wrap = document.getElementById('toast-wrap');
-  const el   = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.textContent = msg;
-  wrap.appendChild(el);
-  setTimeout(() => el.classList.add('show'), 10);
-  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 3000);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// UTILITIES
-// ═══════════════════════════════════════════════════════════════════
-function fmtPrice(p) {
-  if (!p) return '0';
-  if (p < 0.000001) return p.toExponential(3);
-  if (p < 0.001)    return p.toFixed(8);
-  if (p < 1)        return p.toFixed(6);
-  return p.toFixed(4);
-}
-
-function fmtNum(n) {
-  if (n >= 1e9) return (n/1e9).toFixed(2) + 'B';
-  if (n >= 1e6) return (n/1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return (n/1e3).toFixed(2) + 'K';
-  return n.toLocaleString('fr-FR', { maximumFractionDigits: 4 });
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// PWA Manifest (inline)
-// ═══════════════════════════════════════════════════════════════════
-(function() {
-  const manifest = {
-    name: 'SolBot Pro', short_name: 'SolBot',
-    description: 'Trading automatique Solana',
-    start_url: './', scope: './', display: 'standalone',
-    orientation: 'portrait',
-    theme_color: '#060d1a', background_color: '#060d1a',
-    icons: [
-      { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%23060d1a'/%3E%3Ctext x='96' y='130' text-anchor='middle' font-size='100'%3E⬡%3C/text%3E%3C/svg%3E", sizes: '192x192', type: 'image/svg+xml' }
-    ]
-  };
-  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const link = document.createElement('link');
-  link.rel = 'manifest'; link.href = url;
-  document.head.appendChild(link);
-  // Apple touch icon
-  const ico = document.createElement('link');
-  ico.rel = 'apple-touch-icon';
-  ico.href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%23060d1a'/%3E%3Ctext x='96' y='130' text-anchor='middle' font-size='100'%3E⬡%3C/text%3E%3C/svg%3E";
-  document.head.appendChild(ico);
-})();
-</script>
+    // 🔄 Auto-refresh toutes les 30 secondes
+    setInterval(loadData, 30000);
+  </script>
 </body>
 </html>
