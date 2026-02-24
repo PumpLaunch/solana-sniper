@@ -398,16 +398,27 @@ async function runCheck() {
       const tokenSymbol = metadata.symbol !== '???' ? metadata.symbol : (info.symbol || '???');
       const tokenName = metadata.name || 'Unknown';
 
-      // Afficher le statut avec nom et adresse complète
-      console.log(
-        `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
-        `Address: ${mintAddress} | ` +
-        `Balance: ${balance.toFixed(4)} | ` +
-        `Prix: $${priceData.priceUsd.toExponential(4)} | ` +
-        `Valeur: $${valueUsd.toFixed(2)} | ` +
-        `PnL: ${pnlStr} | ` +
-        `Liquidité: $${Math.round(priceData.liquidityUsd).toLocaleString()}`
-      );
+      // ✅ Afficher le token avec la source du prix
+if (hasPrice) {
+  console.log(
+    `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
+    `Address: ${mintAddress} | ` +
+    `Balance: ${balance.toFixed(4)} | ` +
+    `Prix: $${currentPrice.toExponential(4)} [${priceData.source}] | ` +
+    `Valeur: $${valueUsd.toFixed(2)} | ` +
+    `PnL: ${pnlStr} | ` +
+    `Liquidité: $${Math.round(liquidity).toLocaleString()}`
+  );
+} else {
+  console.log(
+    `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
+    `Address: ${mintAddress} | ` +
+    `Balance: ${balance.toFixed(4)} | ` +
+    `Prix: ❌ NON TROUVÉ | ` +
+    `Valeur: $?.?? | ` +
+    `PnL: N/A`
+  );
+}
 
       // Appliquer la logique de vente
       await applySellLogic(mintAddress, balance, decimals, priceData.priceUsd, pnl);
