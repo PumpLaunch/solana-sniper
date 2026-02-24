@@ -18,13 +18,13 @@ const fetch = (...args) =>
 
 // ── Variables d'environnement ────────────────────────────────────
 const PRIVATE_KEY_RAW = process.env.PRIVATE_KEY;
-const RPC_URL         = process.env.RPC_URL || "https://api.mainnet-beta.solana.com";
+const RPC_URL         = process.env.RPC_URL || "https://mainnet.helius-rpc.com/?api-key=43caa0a0-33d2-420c-b00a-e7261bfecf78";
 
 // ── Configuration du bot ─────────────────────────────────────────
 const CONFIG = {
   TOKEN_MINT:           process.env.TOKEN_MINT || "",
   BUY_PRICE_USD:        parseFloat(process.env.BUY_PRICE_USD || "0"),
-  STOP_LOSS_ENABLED:    process.env.STOP_LOSS === "false",
+  STOP_LOSS_ENABLED:    process.env.STOP_LOSS === "true",
   STOP_LOSS_THRESHOLD:  parseFloat(process.env.STOP_LOSS_PCT || "-20"),
   SLIPPAGE_BPS:         parseInt(process.env.SLIPPAGE_BPS || "100"),
   AUTO_SELL:            process.env.AUTO_SELL === "true",
