@@ -199,6 +199,40 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// LOGIQUE DE VENTE — Réutilisable pour chaque token
+// ════════════════════════════════════════════════════════════════
+
+async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl) {
+  if (!CONFIG.AUTO_SELL || pnl === null) return;
+
+  const rawAmount = Math.floor(balance * Math.pow(10, decimals));
+
+  // Stop-loss
+  if (CONFIG.STOP_LOSS_ENABLED && !stopLossTriggered && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
+    stopLossTriggered = true;
+    console.log(`[STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
+    await jupiterSell(mintAddress, rawAmount, CONFIG.SLIPPAGE_BPS);
+    return;
+  }
+
+  // Paliers de prise de profits
+  for (let i = 0; i < CONFIG.TIERS.length; i++) {
+    const tier = CONFIG.TIERS[i];
+    if (!tier.triggered && pnl >= tier.targetPnl) {
+      tier.triggered = true;
+      const sellPercent = tier.sellPercent / 100;
+      const amountToSell = Math.floor(rawAmount * sellPercent);
+      
+      console.log(`[PALIER ${i+1}] ${mintAddress.slice(0,8)}... : +${pnl.toFixed(2)}% → Vente de ${tier.sellPercent}%`);
+      
+      if (amountToSell > 0) {
+        await jupiterSell(mintAddress, amountToSell, CONFIG.SLIPPAGE_BPS);
+      }
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 // BOUCLE DE SURVEILLANCE — TOUS LES TOKENS DU WALLET
 // ════════════════════════════════════════════════════════════════
 
