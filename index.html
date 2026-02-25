@@ -1,589 +1,553 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🤖 SolBot Pro — Dashboard</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #ffffff;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container { max-width: 1400px; margin: 0 auto; }
-    
-    /* Header */
-    header {
-      text-align: center;
-      padding: 30px 0;
-      border-bottom: 2px solid #0f3460;
-      margin-bottom: 30px;
-    }
-    header h1 {
-      font-size: 2.5em;
-      margin-bottom: 10px;
-      background: linear-gradient(90deg, #00d9ff, #00ff88);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    header p { color: #a0a0a0; font-size: 1.1em; }
-    #wallet-address {
-      margin-top: 10px;
-      font-family: monospace;
-      color: #00d9ff;
-      font-size: 0.95em;
-    }
-    
-    /* Status badge */
-    .status {
-      display: inline-block;
-      padding: 6px 16px;
-      border-radius: 20px;
-      font-size: 0.9em;
-      font-weight: 600;
-      margin-top: 10px;
-    }
-    .status-live { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
-    .status-offline { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
-    
-    /* Stats cards */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 15px;
-      margin-bottom: 30px;
-    }
-    .stat-card {
-      background: rgba(15, 52, 96, 0.5);
-      border-radius: 12px;
-      padding: 18px;
-      text-align: center;
-      border: 1px solid #0f3460;
-      transition: transform 0.2s;
-    }
-    .stat-card:hover { transform: translateY(-3px); }
-    .stat-card h3 { color: #a0a0a0; font-size: 0.85em; margin-bottom: 8px; }
-    .stat-card .value { font-size: 1.6em; font-weight: bold; color: #00d9ff; }
-    
-    /* Tokens table */
-    .tokens-table {
-      background: rgba(15, 52, 96, 0.3);
-      border-radius: 12px;
-      padding: 20px;
-      overflow-x: auto;
-    }
-    .tokens-table h2 {
-      margin-bottom: 20px;
-      color: #00d9ff;
-      font-size: 1.4em;
-    }
-    table { width: 100%; border-collapse: collapse; }
-    th {
-      background: rgba(0, 217, 255, 0.2);
-      padding: 14px 10px;
-      text-align: left;
-      font-weight: 600;
-      color: #00d9ff;
-      font-size: 0.9em;
-      text-transform: uppercase;
-    }
-    td {
-      padding: 14px 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      font-size: 0.95em;
-    }
-    tr:hover { background: rgba(0, 217, 255, 0.1); }
-    
-    /* Token info */
-    .token-symbol { font-weight: bold; color: #ffffff; }
-    .token-name { color: #a0a0a0; font-size: 0.85em; margin-top: 3px; }
-    .token-address {
-      font-family: 'Courier New', monospace;
-      font-size: 0.8em;
-      color: #64b5f6;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 3px 8px;
-      border-radius: 4px;
-      display: inline-block;
-      margin-top: 5px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .token-address:hover { background: rgba(100, 181, 246, 0.2); }
-    .token-address.copied { background: rgba(0, 255, 136, 0.3); color: #00ff88; }
-    
-    /* PnL colors */
-    .pnl-positive { color: #00ff88; font-weight: 600; }
-    .pnl-negative { color: #ff4757; font-weight: 600; }
-    .pnl-neutral { color: #ffd93d; font-weight: 600; }
-    
-    /* Liquidity badge */
-    .liquidity-badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 0.85em;
-      background: rgba(100, 181, 246, 0.2);
-      color: #64b5f6;
-    }
-    
-    /* Controls */
-    .controls {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 15px;
-      margin-top: 25px;
-      flex-wrap: wrap;
-    }
-    .refresh-btn {
-      background: linear-gradient(90deg, #00d9ff, #00ff88);
-      border: none;
-      padding: 12px 28px;
-      border-radius: 25px;
-      color: #1a1a2e;
-      font-weight: bold;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .refresh-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4);
-    }
-    .refresh-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-    .last-update { color: #a0a0a0; font-size: 0.9em; }
-    
-    /* Loading */
-    .loading {
-      text-align: center;
-      padding: 50px 20px;
-      color: #a0a0a0;
-    }
-    .loading-spinner {
-      border: 4px solid rgba(0, 217, 255, 0.2);
-      border-top: 4px solid #00d9ff;
-      border-radius: 50%;
-      width: 45px;
-      height: 45px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    
-    /* Error message */
-    .error-msg {
-      background: rgba(255, 71, 87, 0.2);
-      border: 1px solid #ff4757;
-      color: #ff4757;
-      padding: 15px;
-      border-radius: 8px;
-      margin: 20px 0;
-      text-align: center;
-    }
-    
-    /* Empty state */
-    .empty-state {
-      text-align: center;
-      padding: 40px 20px;
-      color: #a0a0a0;
-    }
-    .empty-state svg {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 15px;
-      opacity: 0.5;
-    }
-    
-    /* Responsive */
-    @media (max-width: 768px) {
-      header h1 { font-size: 1.8em; }
-      .stats { grid-template-columns: repeat(2, 1fr); }
-      table { font-size: 0.85em; }
-      th, td { padding: 10px 5px; }
-      .token-address { font-size: 0.75em; }
-      .controls { flex-direction: column; }
-    }
-    
-    /* Toast notification */
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: #1a1a2e;
-      border: 1px solid #00d9ff;
-      color: #ffffff;
-      padding: 12px 20px;
-      border-radius: 8px;
-      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-      display: none;
-      animation: slideIn 0.3s ease;
-      z-index: 1000;
-    }
-    .toast.show { display: block; }
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <!-- Header -->
-    <header>
-      <h1>🤖 SolBot Pro Dashboard</h1>
-      <p>Surveillance en temps réel de votre portefeuille Solana</p>
-      <p id="wallet-address">Wallet: Chargement...</p>
-      <span id="bot-status" class="status status-offline">🔴 Connexion...</span>
-    </header>
+// ═══════════════════════════════════════════════════════════════
+// SolBot Pro — Backend Node.js
+// Hébergement : Render (Background Worker + API Web)
+// Version : 3.0 — Stop-loss indépendant par token + Multi-sources
+// ═══════════════════════════════════════════════════════════════
 
-    <!-- Stats -->
-    <div class="stats">
-      <div class="stat-card">
-        <h3>📊 Tokens</h3>
-        <div class="value" id="total-tokens">-</div>
-      </div>
-      <div class="stat-card">
-        <h3>💰 Valeur Totale</h3>
-        <div class="value" id="total-value">-</div>
-      </div>
-      <div class="stat-card">
-        <h3>📈 Meilleur PnL</h3>
-        <div class="value" id="best-pnl">-</div>
-      </div>
-      <div class="stat-card">
-        <h3>📉 Pire PnL</h3>
-        <div class="value" id="worst-pnl">-</div>
-      </div>
-    </div>
+"use strict";
 
-    <!-- Tokens Table -->
-    <div class="tokens-table">
-      <h2>🪙 Vos Tokens</h2>
-      
-      <!-- Loading -->
-      <div id="loading" class="loading">
-        <div class="loading-spinner"></div>
-        <p>Chargement des données depuis le bot...</p>
-      </div>
-      
-      <!-- Error -->
-      <div id="error" class="error-msg" style="display: none;">
-        ❌ Impossible de charger les données. Vérifiez que le bot est en ligne.
-      </div>
-      
-      <!-- Empty -->
-      <div id="empty" class="empty-state" style="display: none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
-        </svg>
-        <p>Aucun token trouvé dans votre portefeuille</p>
-      </div>
-      
-      <!-- Table -->
-      <table id="tokens-table" style="display: none;">
-        <thead>
-          <tr>
-            <th>Token</th>
-            <th>Address</th>
-            <th>Balance</th>
-            <th>Prix</th>
-            <th>Valeur</th>
-            <th>PnL</th>
-            <th>Liquidité</th>
-          </tr>
-        </thead>
-        <tbody id="tokens-body"></tbody>
-      </table>
-    </div>
+const {
+  Connection,
+  Keypair,
+  PublicKey,
+  VersionedTransaction,
+} = require("@solana/web3.js");
 
-    <!-- Controls -->
-    <div class="controls">
-      <button class="refresh-btn" id="refresh-btn" onclick="loadData()">
-        <span>🔄</span> Actualiser
-      </button>
-      <p class="last-update">Dernière mise à jour : <span id="last-update">-</span></p>
-    </div>
-  </div>
+// node-fetch v3 est un module ESM — on l'importe dynamiquement
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: f }) => f(...args));
 
-  <!-- Toast notification -->
-  <div id="toast" class="toast">✅ Adresse copiée !</div>
+// ── Variables d'environnement ────────────────────────────────────
+const PRIVATE_KEY_RAW = process.env.PRIVATE_KEY;
+const RPC_URL = process.env.RPC_URL || "https://mainnet.helius-rpc.com/?api-key=43caa0a0-33d2-420c-b00a-e7261bfecf78";
 
-  <script>
-    // ════════════════════════════════════════════════════════════════
-    // ⚙️ CONFIGURATION
-    // ════════════════════════════════════════════════════════════════
-    
-    // 🎯 URL de l'API de votre bot sur Render
-    const API_BASE_URL = 'https://solana-sniper-7o8s.onrender.com';
-    
-    // 🔄 Intervalles (en millisecondes)
-    const AUTO_REFRESH_INTERVAL = 30000;  // 30 secondes
-    const REQUEST_TIMEOUT = 10000;          // 10 secondes timeout
-    
-    // ════════════════════════════════════════════════════════════════
-    // 🔄 CHARGEMENT DES DONNÉES
-    // ════════════════════════════════════════════════════════════════
-    
-    async function loadData() {
-      const loading = document.getElementById('loading');
-      const error = document.getElementById('error');
-      const empty = document.getElementById('empty');
-      const table = document.getElementById('tokens-table');
-      const refreshBtn = document.getElementById('refresh-btn');
-      
-      // UI: État de chargement
-      loading.style.display = 'block';
-      error.style.display = 'none';
-      empty.style.display = 'none';
-      table.style.display = 'none';
-      refreshBtn.disabled = true;
-      
-      try {
-        // Fetch avec timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-        
-        // Récupérer les tokens
-        const response = await fetch(`${API_BASE_URL}/api/tokens`, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+// ── Configuration du bot ─────────────────────────────────────────
+const CONFIG = {
+  TOKEN_MINT:           process.env.TOKEN_MINT || "",
+  BUY_PRICE_USD:        parseFloat(process.env.BUY_PRICE_USD || "0"),
+  STOP_LOSS_ENABLED:    process.env.STOP_LOSS === "true",
+  STOP_LOSS_THRESHOLD:  parseFloat(process.env.STOP_LOSS_PCT || "-20"),
+  SLIPPAGE_BPS:         parseInt(process.env.SLIPPAGE_BPS || "100"),
+  AUTO_SELL:            process.env.AUTO_SELL === "true",
+  INTERVAL_SEC:         parseInt(process.env.INTERVAL_SEC || "15"),
+  TIERS: [
+    { targetPnl: 25,  sellPercent: 25, triggered: false },
+    { targetPnl: 50,  sellPercent: 25, triggered: false },
+    { targetPnl: 75,  sellPercent: 25, triggered: false },
+    { targetPnl: 100, sellPercent: 25, triggered: false },
+  ],
+};
+
+// ── État global ──────────────────────────────────────────────────
+let keypair = null;
+
+// 🧠 STOCKAGE AUTO DES PRIX DE RÉFÉRENCE (par token)
+const autoBuyPrices = {};
+
+// 🧠 CACHE DES MÉTADONNÉES DE TOKENS (nom, symbole)
+const tokenMetadataCache = {};
+
+// 🧠 SUIVI DES PALIERS DÉCLENCHÉS (par token)
+const triggeredTiers = {};  // { "mintAddress_tierIndex": true }
+
+// 📦 Données pour l'API web
+let lastTokensData = [];
+
+// ════════════════════════════════════════════════════════════════
+// INITIALISATION DU WALLET
+// ════════════════════════════════════════════════════════════════
+
+function initWallet() {
+  if (!PRIVATE_KEY_RAW) {
+    console.error("[ERREUR] Variable d'environnement PRIVATE_KEY manquante.");
+    process.exit(1);
+  }
+  try {
+    const secretBytes = JSON.parse(PRIVATE_KEY_RAW);
+    keypair = Keypair.fromSecretKey(new Uint8Array(secretBytes));
+    console.log(`[WALLET] Connecté : ${keypair.publicKey.toString()}`);
+  } catch (err) {
+    console.error("[ERREUR] Impossible de lire PRIVATE_KEY :", err.message);
+    process.exit(1);
+  }
+}
+
+function getConnection() {
+  return new Connection(RPC_URL, "confirmed");
+}
+
+// ════════════════════════════════════════════════════════════════
+// FETCH DU PRIX VIA MULTIPLES SOURCES (5 APIs en cascade)
+// ════════════════════════════════════════════════════════════════
+
+async function fetchTokenPrice(mintAddress) {
+  
+  // ── SOURCE 1: DEXSCREENER ─────────────────────────────────────
+  try {
+    const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.pairs && data.pairs.length > 0) {
+        const bestPair = data.pairs
+          .filter(p => p.chainId === "solana")
+          .sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+        if (bestPair && bestPair.priceUsd) {
+          return {
+            priceUsd: parseFloat(bestPair.priceUsd) || 0,
+            priceNative: parseFloat(bestPair.priceNative) || 0,
+            change24h: bestPair.priceChange?.h24 || 0,
+            liquidityUsd: bestPair.liquidity?.usd || 0,
+            pairAddress: bestPair.pairAddress,
+            source: 'DexScreener'
+          };
         }
-        
-        const data = await response.json();
-        
-        if (!data.success || !data.tokens) {
-          throw new Error('Format de réponse invalide');
-        }
-        
-        // Mettre à jour l'UI avec les données
-        updateUI(data);
-        
-        // Mettre à jour l'heure
-        document.getElementById('last-update').textContent = 
-          new Date().toLocaleTimeString('fr-FR');
-        
-      } catch (err) {
-        console.error('Erreur de chargement:', err);
-        
-        // Afficher l'erreur
-        loading.style.display = 'none';
-        error.style.display = 'block';
-        error.textContent = `❌ ${err.message || 'Erreur de connexion au bot'}`;
-        
-        // Si c'est une erreur de réseau, suggérer de vérifier l'URL
-        if (err.name === 'AbortError' || err.message.includes('Failed to fetch')) {
-          error.textContent = '❌ Impossible de contacter le bot. Vérifiez qu\'il est en ligne sur Render.';
-        }
-        
-      } finally {
-        refreshBtn.disabled = false;
       }
     }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 📊 MISE À JOUR DE L'INTERFACE
-    // ════════════════════════════════════════════════════════════════
-    
-    function updateUI(data) {
-      const loading = document.getElementById('loading');
-      const empty = document.getElementById('empty');
-      const table = document.getElementById('tokens-table');
-      const tbody = document.getElementById('tokens-body');
-      
-      const tokens = data.tokens || [];
-      
-      // Masquer le loading
-      loading.style.display = 'none';
-      
-      // Gérer le cas vide
-      if (tokens.length === 0) {
-        table.style.display = 'none';
-        empty.style.display = 'block';
-        document.getElementById('bot-status').className = 'status status-live';
-        document.getElementById('bot-status').textContent = '🟢 Bot en ligne (aucun token)';
-        return;
+  } catch (err) {
+    console.warn(`[PRIX] DexScreener échec pour ${mintAddress.slice(0,8)}...`);
+  }
+  
+  // ── SOURCE 2: JUPITER PRICE API ───────────────────────────────
+  try {
+    const url = `https://price.jup.ag/v6/price?ids=${mintAddress}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.data && data.data[mintAddress]) {
+        const p = data.data[mintAddress];
+        return {
+          priceUsd: p.price || 0,
+          priceNative: p.price / 1e-6 || 0,
+          change24h: p.change24h || 0,
+          liquidityUsd: 0,
+          pairAddress: null,
+          source: 'Jupiter'
+        };
       }
-      
-      // Afficher le tableau
-      table.style.display = 'table';
-      empty.style.display = 'none';
-      
-      // Mettre à jour le statut du bot
-      document.getElementById('bot-status').className = 'status status-live';
-      document.getElementById('bot-status').textContent = '🟢 Bot en ligne';
-      
-      // Mettre à jour l'adresse du wallet
-      if (data.wallet) {
-        const shortWallet = `${data.wallet.slice(0, 8)}...${data.wallet.slice(-6)}`;
-        document.getElementById('wallet-address').textContent = `Wallet: ${shortWallet}`;
-      }
-      
-      // Calculer les stats
-      const totalValue = tokens.reduce((sum, t) => sum + (t.value || 0), 0);
-      const validPnls = tokens.map(t => t.pnl).filter(pnl => pnl !== null && !isNaN(pnl));
-      const bestPnl = validPnls.length > 0 ? Math.max(...validPnls) : 0;
-      const worstPnl = validPnls.length > 0 ? Math.min(...validPnls) : 0;
-      
-      // Mettre à jour les cartes de stats
-      document.getElementById('total-tokens').textContent = tokens.length;
-      document.getElementById('total-value').textContent = `$${formatNumber(totalValue, 2)}`;
-      
-      const bestPnlEl = document.getElementById('best-pnl');
-      bestPnlEl.textContent = `${bestPnl >= 0 ? '+' : ''}${bestPnl.toFixed(2)}%`;
-      bestPnlEl.className = `value ${getPnlClass(bestPnl)}`;
-      
-      const worstPnlEl = document.getElementById('worst-pnl');
-      worstPnlEl.textContent = `${worstPnl >= 0 ? '+' : ''}${worstPnl.toFixed(2)}%`;
-      worstPnlEl.className = `value ${getPnlClass(worstPnl)}`;
-      
-      // Remplir le tableau
-      tbody.innerHTML = '';
-      tokens.forEach(token => {
-        const row = createTokenRow(token);
-        tbody.appendChild(row);
-      });
     }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 🧱 CRÉATION D'UNE LIGNE DE TOKEN
-    // ════════════════════════════════════════════════════════════════
-    
-    function createTokenRow(token) {
-      const row = document.createElement('tr');
-      
-      const pnlClass = getPnlClass(token.pnl);
-      const pnlSign = token.pnl >= 0 ? '+' : '';
-      const shortAddress = `${token.address.slice(0, 6)}...${token.address.slice(-4)}`;
-      
-      row.innerHTML = `
-        <td>
-          <div class="token-symbol">${escapeHtml(token.symbol || '???')}</div>
-          <div class="token-name">${escapeHtml(token.name || 'Unknown')}</div>
-        </td>
-        <td>
-          <code class="token-address" onclick="copyAddress('${token.address}', this)" title="Cliquez pour copier">
-            ${shortAddress}
-          </code>
-        </td>
-        <td>${formatNumber(token.balance, 4)}</td>
-        <td>$${formatPrice(token.price)}</td>
-        <td>$${formatNumber(token.value, 2)}</td>
-        <td class="${pnlClass}">${pnlSign}${token.pnl?.toFixed(2) || '0.00'}%</td>
-        <td><span class="liquidity-badge">$${formatLiquidity(token.liquidity)}</span></td>
-      `;
-      
-      return row;
-    }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 🔧 FONCTIONS UTILITAIRES
-    // ════════════════════════════════════════════════════════════════
-    
-    function getPnlClass(pnl) {
-      if (pnl === null || isNaN(pnl)) return 'pnl-neutral';
-      if (pnl > 0.5) return 'pnl-positive';
-      if (pnl < -0.5) return 'pnl-negative';
-      return 'pnl-neutral';
-    }
-    
-    function formatNumber(num, decimals) {
-      if (num === null || num === undefined) return '-';
-      if (num === 0) return '0';
-      if (Math.abs(num) < 0.0001 && decimals >= 4) {
-        return num.toExponential(2);
-      }
-      return num.toLocaleString('fr-FR', { 
-        minimumFractionDigits: decimals, 
-        maximumFractionDigits: decimals 
-      });
-    }
-    
-    function formatPrice(price) {
-      if (price === null || price === undefined) return '-';
-      if (price < 0.0001) return price.toExponential(4);
-      if (price < 0.01) return price.toFixed(6);
-      if (price < 1) return price.toFixed(4);
-      return price.toFixed(2);
-    }
-    
-    function formatLiquidity(liquidity) {
-      if (liquidity === null || liquidity === undefined) return '0';
-      if (liquidity >= 1000000) return (liquidity / 1000000).toFixed(2) + 'M';
-      if (liquidity >= 1000) return (liquidity / 1000).toFixed(1) + 'K';
-      return Math.round(liquidity).toLocaleString('fr-FR');
-    }
-    
-    function escapeHtml(text) {
-      if (!text) return '';
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-    
-    function copyAddress(address, element) {
-      navigator.clipboard.writeText(address).then(() => {
-        // Feedback visuel
-        element.classList.add('copied');
-        element.textContent = '✓ Copié!';
-        
-        // Afficher toast
-        showToast('✅ Adresse copiée dans le presse-papiers');
-        
-        // Réinitialiser après 2 secondes
-        setTimeout(() => {
-          element.classList.remove('copied');
-          const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
-          element.textContent = shortAddress;
-        }, 2000);
-      }).catch(err => {
-        console.error('Erreur de copie:', err);
-        showToast('❌ Échec de la copie');
-      });
-    }
-    
-    function showToast(message) {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.classList.add('show');
-      
-      setTimeout(() => {
-        toast.classList.remove('show');
-      }, 3000);
-    }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 🚀 INITIALISATION
-    // ════════════════════════════════════════════════════════════════
-    
-    // Chargement initial
-    document.addEventListener('DOMContentLoaded', () => {
-      loadData();
-      
-      // Auto-refresh toutes les 30 secondes
-      setInterval(loadData, AUTO_REFRESH_INTERVAL);
-      
-      // Rafraîchir quand la page redevient visible (onglet actif)
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          loadData();
-        }
-      });
+  } catch (err) {
+    console.warn(`[PRIX] Jupiter échec pour ${mintAddress.slice(0,8)}...`);
+  }
+  
+  // ── SOURCE 3: BIRDEYE API ─────────────────────────────────────
+  try {
+    const url = `https://public-api.birdeye.so/defi/price?address=${mintAddress}`;
+    const res = await fetch(url, { 
+      headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo' } 
     });
-  </script>
-</body>
-</html>
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data && data.data.value) {
+        return {
+          priceUsd: data.data.value || 0,
+          priceNative: 0,
+          change24h: 0,
+          liquidityUsd: 0,
+          pairAddress: null,
+          source: 'Birdeye'
+        };
+      }
+    }
+  } catch (err) {
+    console.warn(`[PRIX] Birdeye échec pour ${mintAddress.slice(0,8)}...`);
+  }
+  
+  // ── SOURCE 4: COINGECKO API ───────────────────────────────────
+  try {
+    const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress}&vs_currencies=usd`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      const key = mintAddress.toLowerCase();
+      if (data[key] && data[key].usd) {
+        return {
+          priceUsd: data[key].usd || 0,
+          priceNative: 0,
+          change24h: 0,
+          liquidityUsd: 0,
+          pairAddress: null,
+          source: 'CoinGecko'
+        };
+      }
+    }
+  } catch (err) {
+    console.warn(`[PRIX] CoinGecko échec pour ${mintAddress.slice(0,8)}...`);
+  }
+  
+  // ── SOURCE 5: HELIUS TOKEN API ────────────────────────────────
+  try {
+    const apiKey = process.env.HELIUS_API_KEY || 'demo';
+    const url = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${apiKey}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.data && data.data[mintAddress]) {
+        const t = data.data[mintAddress];
+        if (t.price_info && t.price_info.price_per_token) {
+          return {
+            priceUsd: t.price_info.price_per_token || 0,
+            priceNative: t.price_info.price_per_token / 1e-6 || 0,
+            change24h: t.price_info?.percent_change_24h || 0,
+            liquidityUsd: t.liquidity_info?.total_liquidity_usd || 0,
+            pairAddress: null,
+            source: 'Helius'
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[PRIX] Helius échec pour ${mintAddress.slice(0,8)}...`);
+  }
+  
+  // ── AUCUNE SOURCE N'A TROUVÉ DE PRIX ──────────────────────────
+  return null;
+}
+
+// ════════════════════════════════════════════════════════════════
+// RÉCUPÉRATION DES MÉTADONNÉES DU TOKEN (nom, symbole) via Jupiter
+// ════════════════════════════════════════════════════════════════
+
+async function fetchTokenMetadata(mintAddress) {
+  if (tokenMetadataCache[mintAddress]) {
+    return tokenMetadataCache[mintAddress];
+  }
+
+  try {
+    const response = await fetch('https://tokens.jup.ag/tokens');
+    if (!response.ok) return { symbol: '???', name: 'Unknown', logo: null };
+    
+    const tokens = await response.json();
+    const token = tokens.find(t => t.address === mintAddress);
+    
+    if (token) {
+      tokenMetadataCache[mintAddress] = {
+        symbol: token.symbol || '???',
+        name: token.name || 'Unknown',
+        logo: token.logoURI || null
+      };
+      return tokenMetadataCache[mintAddress];
+    }
+    
+    return { symbol: '???', name: 'Unknown', logo: null };
+    
+  } catch (err) {
+    return { symbol: '???', name: 'Unknown', logo: null };
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// VENTE VIA JUPITER AGGREGATOR V6
+// ════════════════════════════════════════════════════════════════
+
+async function jupiterSell(mintAddress, amountRaw, slippageBps) {
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+  console.log(`[JUPITER] Demande de quote : ${amountRaw} unités → SOL`);
+
+  const quoteUrl =
+    `https://quote-api.jup.ag/v6/quote?` +
+    `inputMint=${mintAddress}` +
+    `&outputMint=${SOL_MINT}` +
+    `&amount=${amountRaw}` +
+    `&slippageBps=${slippageBps}`;
+
+  const quoteRes = await fetch(quoteUrl);
+  if (!quoteRes.ok) {
+    throw new Error(`Quote échouée (${quoteRes.status}) : ${await quoteRes.text()}`);
+  }
+  const quote = await quoteRes.json();
+  console.log(`[JUPITER] Quote reçu. SOL estimé : ${(quote.outAmount / 1e9).toFixed(6)}`);
+
+  const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quoteResponse:                 quote,
+      userPublicKey:                 keypair.publicKey.toString(),
+      wrapAndUnwrapSol:              true,
+      dynamicComputeUnitLimit:       true,
+      computeUnitPriceMicroLamports: "auto",
+    }),
+  });
+
+  if (!swapRes.ok) {
+    throw new Error(`Swap tx échouée (${swapRes.status}) : ${await swapRes.text()}`);
+  }
+
+  const { swapTransaction } = await swapRes.json();
+
+  const connection = getConnection();
+  const txBuffer   = Buffer.from(swapTransaction, "base64");
+  const tx         = VersionedTransaction.deserialize(txBuffer);
+  tx.sign([keypair]);
+
+  const txId = await connection.sendRawTransaction(tx.serialize(), {
+    skipPreflight: false,
+    maxRetries:    3,
+  });
+
+  const latestBlockhash = await connection.getLatestBlockhash();
+  await connection.confirmTransaction(
+    { signature: txId, ...latestBlockhash },
+    "confirmed"
+  );
+
+  console.log(`[JUPITER] ✅ Transaction confirmée : ${txId}`);
+  return txId;
+}
+
+// ════════════════════════════════════════════════════════════════
+// LOGIQUE DE VENTE — Stop-loss et paliers INDÉPENDANTS par token
+// ════════════════════════════════════════════════════════════════
+
+async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl) {
+  if (!CONFIG.AUTO_SELL || pnl === null) return;
+
+  const rawAmount = Math.floor(balance * Math.pow(10, decimals));
+
+  // 🛡️ STOP-LOSS : Vendre TOUT si le PnL atteint le seuil négatif
+  // (vérifié indépendamment pour CHAQUE token)
+  if (CONFIG.STOP_LOSS_ENABLED && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
+    console.log(`[🛡️ STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
+    
+    try {
+      await jupiterSell(mintAddress, rawAmount, CONFIG.SLIPPAGE_BPS);
+      console.log(`[✅ STOP-LOSS] Vente totale de ${mintAddress.slice(0,8)}... exécutée`);
+    } catch (err) {
+      console.error(`[❌ STOP-LOSS] Échec de la vente pour ${mintAddress.slice(0,8)}... : ${err.message}`);
+    }
+    return;  // Sortir après stop-loss (pas de paliers de profit)
+  }
+
+  // 🎯 PALIERS DE PROFITS : Vendre par tranches si PnL positif
+  // (chaque palier est indépendant par token)
+  for (let i = 0; i < CONFIG.TIERS.length; i++) {
+    const tierKey = `${mintAddress}_tier_${i}`;
+    const tier = CONFIG.TIERS[i];
+    
+    // Vérifier si ce palier spécifique a déjà été déclenché pour CE token
+    if (!triggeredTiers[tierKey] && pnl >= tier.targetPnl) {
+      triggeredTiers[tierKey] = true;  // Marque ce palier comme déclenché pour ce token
+      const sellPercent = tier.sellPercent / 100;
+      const amountToSell = Math.floor(rawAmount * sellPercent);
+      
+      if (amountToSell > 0) {
+        console.log(`[🎯 PALIER ${i+1}] ${mintAddress.slice(0,8)}... : +${pnl.toFixed(2)}% → Vente de ${tier.sellPercent}%`);
+        
+        try {
+          await jupiterSell(mintAddress, amountToSell, CONFIG.SLIPPAGE_BPS);
+          console.log(`[✅ PALIER ${i+1}] Vente de ${tier.sellPercent}% de ${mintAddress.slice(0,8)}... exécutée`);
+        } catch (err) {
+          console.error(`[❌ PALIER ${i+1}] Échec de la vente : ${err.message}`);
+        }
+      }
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// BOUCLE DE SURVEILLANCE — TOUS LES TOKENS DU WALLET
+// ════════════════════════════════════════════════════════════════
+
+async function runCheck() {
+  try {
+    const connection = getConnection();
+    const tokenDataForAPI = [];  // Données locales pour ce cycle
+
+    const allAccounts = await connection.getParsedTokenAccountsByOwner(
+      keypair.publicKey,
+      { programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
+    );
+
+    if (allAccounts.value.length === 0) {
+      console.log("[BOT] Aucun token trouvé dans le wallet.");
+      lastTokensData = [];
+      return;
+    }
+
+    console.log(`[BOT] Analyse de ${allAccounts.value.length} token(s)...`);
+
+    // 2. Boucler sur chaque token
+    for (const account of allAccounts.value) {
+      const info = account.account.data.parsed.info;
+      const mintAddress = info.mint;
+      const balance = parseFloat(info.tokenAmount.uiAmount) || 0;
+      const decimals = info.tokenAmount.decimals;
+
+      // Ignorer si solde nul
+      if (balance <= 0) continue;
+
+      // Ignorer le SOL natif
+      if (mintAddress === "So11111111111111111111111111111111111111112") continue;
+
+      // 3. Récupérer le prix via multiples sources
+      const priceData = await fetchTokenPrice(mintAddress);
+      
+      // ✅ Définir les variables de prix (MÊME si pas de prix trouvé)
+      const hasPrice = priceData && priceData.priceUsd > 0;
+      const currentPrice = hasPrice ? priceData.priceUsd : 0;
+      const liquidity = hasPrice ? priceData.liquidityUsd : 0;
+      const priceSource = hasPrice ? priceData.source : null;
+
+      // Calculer la valeur (0 si pas de prix)
+      const valueUsd = balance * currentPrice;
+
+      // 🧠 Auto-détection du prix de référence (seulement si prix disponible)
+      if (hasPrice && !autoBuyPrices[mintAddress]) {
+        autoBuyPrices[mintAddress] = currentPrice;
+        console.log(`[PRIX REF] ${mintAddress.slice(0,8)}... enregistré à $${currentPrice.toExponential(4)}`);
+      }
+
+      // Calculer le PnL (seulement si prix disponible)
+      let pnl = null;
+      let pnlStr = "N/A";
+      if (hasPrice && autoBuyPrices[mintAddress]) {
+        const buyPrice = autoBuyPrices[mintAddress];
+        pnl = ((currentPrice - buyPrice) / buyPrice) * 100;
+        pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%`;
+      }
+
+      // 🧠 Récupérer les métadonnées du token
+      const metadata = await fetchTokenMetadata(mintAddress);
+      const tokenSymbol = metadata.symbol !== '???' ? metadata.symbol : (info.symbol || '???');
+      const tokenName = metadata.name || 'Unknown';
+
+      // ✅ Afficher le token avec ou sans prix
+      if (hasPrice) {
+        console.log(
+          `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
+          `Address: ${mintAddress} | ` +
+          `Balance: ${balance.toFixed(4)} | ` +
+          `Prix: $${currentPrice.toExponential(4)} [${priceSource}] | ` +
+          `Valeur: $${valueUsd.toFixed(2)} | ` +
+          `PnL: ${pnlStr} | ` +
+          `Liquidité: $${Math.round(liquidity).toLocaleString()}`
+        );
+      } else {
+        console.log(
+          `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
+          `Address: ${mintAddress} | ` +
+          `Balance: ${balance.toFixed(4)} | ` +
+          `Prix: ❌ NON TROUVÉ | ` +
+          `Valeur: $?.?? | ` +
+          `PnL: N/A`
+        );
+      }
+
+      // Appliquer la logique de vente (seulement si prix disponible)
+      if (hasPrice) {
+        await applySellLogic(mintAddress, balance, decimals, currentPrice, pnl);
+      }
+
+      // 📦 Stocker les données pour l'API web (TOUS les tokens)
+      tokenDataForAPI.push({
+        symbol: tokenSymbol,
+        name: tokenName,
+        address: mintAddress,
+        balance: balance,
+        price: currentPrice,
+        value: valueUsd,
+        pnl: pnl,
+        liquidity: liquidity,
+        logo: metadata.logo,
+        hasPrice: hasPrice
+      });
+    }
+
+    // 🔄 Mettre à jour le stockage global pour l'API
+    lastTokensData = tokenDataForAPI;
+
+  } catch (err) {
+    console.error("[BOT] Erreur dans runCheck :", err.message);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// 🌐 API HTTP POUR L'INTERFACE WEB
+// ════════════════════════════════════════════════════════════════
+
+if (process.env.RENDER) {
+  const http = require('http');
+  
+  const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
+    
+    if (req.url === '/api/tokens') {
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        success: true,
+        wallet: keypair?.publicKey?.toString() || 'N/A',
+        tokens: lastTokensData,
+        count: lastTokensData.length,
+        timestamp: new Date().toISOString()
+      }));
+    } else if (req.url === '/api/status') {
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        status: 'running',
+        wallet: keypair?.publicKey?.toString() || 'N/A',
+        tokensCount: lastTokensData.length,
+        uptime: process.uptime(),
+        autoSell: CONFIG.AUTO_SELL,
+        stopLoss: CONFIG.STOP_LOSS_ENABLED
+      }));
+    } else if (req.url === '/') {
+      res.writeHead(200, {'Content-Type': 'text/plain'});
+      res.end('🤖 SolBot Pro API is running!\nEndpoints: /api/tokens, /api/status');
+    } else {
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: 'Not found' }));
+    }
+  });
+  
+  const PORT = process.env.PORT || 10000;
+  server.listen(PORT, () => {
+    console.log(`[HTTP] ✅ API disponible sur le port ${PORT}`);
+    console.log(`[HTTP] 📡 Endpoints: /api/tokens | /api/status`);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// POINT D'ENTRÉE
+// ════════════════════════════════════════════════════════════════
+
+async function main() {
+  console.log("═══════════════════════════════════════════");
+  console.log("  🤖 SolBot Pro — Backend Node.js démarré");
+  console.log(`  RPC        : ${RPC_URL}`);
+  console.log(`  Token      : ${CONFIG.TOKEN_MINT || "Multi-tokens"}`);
+  console.log(`  Intervalle : ${CONFIG.INTERVAL_SEC}s`);
+  console.log(`  Auto-sell  : ${CONFIG.AUTO_SELL}`);
+  console.log(`  Stop-loss  : ${CONFIG.STOP_LOSS_ENABLED} (${CONFIG.STOP_LOSS_THRESHOLD}%)`);
+  console.log("═══════════════════════════════════════════");
+
+  initWallet();
+
+  // Premier cycle immédiat au démarrage
+  await runCheck();
+
+  // Boucle principale — maintient le processus actif sur Render
+  setInterval(async () => {
+    try {
+      await runCheck();
+    } catch (err) {
+      console.error("[BOT] Erreur non gérée dans runCheck :", err.message);
+    }
+  }, CONFIG.INTERVAL_SEC * 1000);
+
+  console.log("[BOT] 🔄 Surveillance active. Processus maintenu ouvert.");
+}
+
+// ── Gestion des erreurs critiques ────────────────────────────────
+
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Exception non capturée :", err.message);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Promesse rejetée non gérée :", reason);
+});
+
+main();
