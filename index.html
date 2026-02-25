@@ -3,867 +3,121 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="SolBot Pro — Dashboard de trading Solana automatique">
-  <meta name="theme-color" content="#0f172a">
-  <title>SolBot Pro • Trading Automatique Solana</title>
-  
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <title>SolBot Pro • Dashboard Trading Solana</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  
   <style>
-    /* ════════════════════════════════════════════════════════════════
-       CORNIX-STYLE THEME VARIABLES
-       ════════════════════════════════════════════════════════════════ */
     :root {
-      /* Base colors - Cornix dark theme */
-      --bg-primary: #0f172a;
-      --bg-secondary: #1e293b;
-      --bg-tertiary: #334155;
-      --bg-card: #1e293b;
-      --bg-hover: #334155;
-      --bg-active: #0ea5e9;
-      
-      /* Text colors */
-      --text-primary: #f8fafc;
-      --text-secondary: #94a3b8;
-      --text-muted: #64748b;
-      --text-accent: #0ea5e9;
-      
-      /* Status colors */
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --info: #3b82f6;
-      
-      /* PnL colors */
-      --pnl-positive: #10b981;
-      --pnl-negative: #ef4444;
-      --pnl-neutral: #94a3b8;
-      
-      /* Borders & shadows */
-      --border-color: #334155;
-      --border-radius: 12px;
-      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-      --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-      --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
-      
-      /* Transitions */
-      --transition: all 0.2s ease-in-out;
-      
-      /* Layout */
-      --sidebar-width: 240px;
-      --header-height: 64px;
+      --bg-primary: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155;
+      --text-primary: #f8fafc; --text-secondary: #94a3b8; --text-muted: #64748b;
+      --text-accent: #0ea5e9; --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+      --pnl-positive: #10b981; --pnl-negative: #ef4444; --border-color: #334155;
+      --border-radius: 12px; --transition: all 0.2s ease;
     }
-
-    /* ════════════════════════════════════════════════════════════════
-       RESET & BASE STYLES
-       ════════════════════════════════════════════════════════════════ */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      line-height: 1.5;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* ════════════════════════════════════════════════════════════════
-       LAYOUT
-       ════════════════════════════════════════════════════════════════ */
-    .app-container {
-      display: flex;
-      min-height: 100vh;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+    .app-container { display: flex; min-height: 100vh; }
+    
     /* Sidebar */
-    .sidebar {
-      width: var(--sidebar-width);
-      background: var(--bg-secondary);
-      border-right: 1px solid var(--border-color);
-      padding: 20px 0;
-      position: fixed;
-      height: 100vh;
-      overflow-y: auto;
-      z-index: 100;
-      transition: var(--transition);
-    }
-
-    .sidebar-header {
-      padding: 0 20px 20px;
-      border-bottom: 1px solid var(--border-color);
-      margin-bottom: 20px;
-    }
-
-    .sidebar-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-accent);
-    }
-
-    .sidebar-logo svg {
-      width: 24px;
-      height: 24px;
-    }
-
-    .sidebar-nav {
-      list-style: none;
-      padding: 0 10px;
-    }
-
-    .sidebar-nav li {
-      margin-bottom: 4px;
-    }
-
-    .sidebar-nav a {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      color: var(--text-secondary);
-      text-decoration: none;
-      border-radius: var(--border-radius);
-      transition: var(--transition);
-      font-weight: 500;
-      font-size: 0.9rem;
-    }
-
-    .sidebar-nav a:hover,
-    .sidebar-nav a.active {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-    }
-
-    .sidebar-nav a.active {
-      background: var(--bg-active);
-      color: white;
-    }
-
-    .sidebar-nav svg {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-
-    /* Main Content */
-    .main-content {
-      flex: 1;
-      margin-left: var(--sidebar-width);
-      padding: 20px;
-    }
-
-    /* Header */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 24px;
-      background: var(--bg-secondary);
-      border-radius: var(--border-radius);
-      margin-bottom: 24px;
-      border: 1px solid var(--border-color);
-    }
-
-    .header-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .status-indicator {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      background: var(--bg-tertiary);
-      border-radius: 20px;
-      font-size: 0.85rem;
-      font-weight: 500;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--success);
-      animation: pulse 2s infinite;
-    }
-
-    .status-dot.offline {
-      background: var(--danger);
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 20px;
-      background: var(--bg-active);
-      color: white;
-      border: none;
-      border-radius: var(--border-radius);
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: var(--transition);
-      text-decoration: none;
-    }
-
-    .btn:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-
-    .btn-outline {
-      background: transparent;
-      border: 1px solid var(--border-color);
-      color: var(--text-secondary);
-    }
-
-    .btn-outline:hover {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-    }
-
-    .btn-danger {
-      background: var(--danger);
-    }
-
-    .btn-success {
-      background: var(--success);
-    }
-
-    /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .stat-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      padding: 20px;
-      transition: var(--transition);
-    }
-
-    .stat-card:hover {
-      border-color: var(--text-accent);
-      transform: translateY(-2px);
-    }
-
-    .stat-label {
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .stat-value {
-      font-size: 1.75rem;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .stat-value.positive {
-      color: var(--pnl-positive);
-    }
-
-    .stat-value.negative {
-      color: var(--pnl-negative);
-    }
-
-    .stat-subtext {
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      margin-top: 4px;
-    }
-
-    /* Content Grid */
-    .content-grid {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 24px;
-    }
-
-    @media (max-width: 1024px) {
-      .content-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
+    .sidebar { width: 240px; background: var(--bg-secondary); border-right: 1px solid var(--border-color); padding: 20px 0; position: fixed; height: 100vh; }
+    .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 0 20px 20px; font-size: 1.25rem; font-weight: 700; color: var(--text-accent); border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
+    .sidebar-nav { list-style: none; padding: 0 10px; }
+    .sidebar-nav a { display: flex; align-items: center; gap: 12px; padding: 12px 16px; color: var(--text-secondary); text-decoration: none; border-radius: var(--border-radius); transition: var(--transition); }
+    .sidebar-nav a:hover, .sidebar-nav a.active { background: var(--bg-tertiary); color: var(--text-primary); }
+    
+    /* Main */
+    .main-content { flex: 1; margin-left: 240px; padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: var(--bg-secondary); border-radius: var(--border-radius); margin-bottom: 24px; border: 1px solid var(--border-color); }
+    .header-title { font-size: 1.5rem; font-weight: 700; }
+    
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 20px; }
+    .stat-label { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .stat-value.positive { color: var(--pnl-positive); }
+    .stat-value.negative { color: var(--pnl-negative); }
+    
     /* Cards */
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      margin-bottom: 24px;
-      overflow: hidden;
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border-color);
-      background: var(--bg-secondary);
-    }
-
-    .card-title {
-      font-size: 1.1rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-body {
-      padding: 20px;
-    }
-
-    /* Table Styles */
-    .table-container {
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
-
-    thead {
-      background: var(--bg-secondary);
-    }
-
-    th {
-      padding: 14px 16px;
-      text-align: left;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      font-size: 0.75rem;
-      letter-spacing: 0.5px;
-      white-space: nowrap;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    th:hover {
-      color: var(--text-accent);
-    }
-
-    td {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border-color);
-      vertical-align: middle;
-    }
-
-    tbody tr:hover {
-      background: var(--bg-hover);
-    }
-
-    tbody tr:last-child td {
-      border-bottom: none;
-    }
-
+    .card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius); margin-bottom: 24px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border-color); }
+    .card-title { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .card-body { padding: 20px; }
+    
+    /* Table */
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 14px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.75rem; cursor: pointer; }
+    th:hover { color: var(--text-accent); }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--border-color); }
+    tbody tr:hover { background: var(--bg-tertiary); }
+    
     /* Token Row */
-    .token-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .token-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: var(--bg-tertiary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      flex-shrink: 0;
-    }
-
-    .token-icon img {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-
-    .token-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .token-symbol {
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .token-name {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .token-address {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--text-accent);
-      background: rgba(14, 165, 233, 0.1);
-      padding: 2px 6px;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .token-address:hover {
-      background: rgba(14, 165, 233, 0.2);
-    }
-
-    .token-address.copied {
-      background: rgba(16, 185, 129, 0.2);
-      color: var(--success);
-    }
-
-    /* PnL Badges */
-    .pnl-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .pnl-positive {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--pnl-positive);
-    }
-
-    .pnl-negative {
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--pnl-negative);
-    }
-
-    .pnl-neutral {
-      background: rgba(148, 163, 184, 0.15);
-      color: var(--pnl-neutral);
-    }
-
-    /* Source Badge */
-    .source-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 3px 8px;
-      border-radius: 8px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      background: var(--bg-tertiary);
-      color: var(--text-secondary);
-    }
-
-    .source-dexscreener { color: #0ea5e9; }
-    .source-jupiter { color: #a78bfa; }
-    .source-birdeye { color: #f59e0b; }
-    .source-helius { color: #3b82f6; }
-
-    /* Liquidity Badge */
-    .liquidity-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.8rem;
-      background: rgba(59, 130, 246, 0.1);
-      color: var(--info);
-      font-weight: 500;
-    }
-
-    /* No Price */
-    .no-price {
-      color: var(--text-muted);
-      font-style: italic;
-      font-size: 0.85rem;
-    }
-
-    /* Activity Log */
-    .activity-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      max-height: 400px;
-      overflow-y: auto;
-    }
-
-    .activity-item {
-      display: flex;
-      gap: 12px;
-      padding: 12px;
-      background: var(--bg-secondary);
-      border-radius: var(--border-radius);
-      border-left: 3px solid var(--border-color);
-    }
-
-    .activity-item.success {
-      border-left-color: var(--success);
-    }
-
-    .activity-item.warning {
-      border-left-color: var(--warning);
-    }
-
-    .activity-item.danger {
-      border-left-color: var(--danger);
-    }
-
-    .activity-time {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      white-space: nowrap;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .activity-content {
-      flex: 1;
-    }
-
-    .activity-title {
-      font-weight: 500;
-      margin-bottom: 2px;
-    }
-
-    .activity-desc {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-
-    .activity-token {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      color: var(--text-accent);
-      background: rgba(14, 165, 233, 0.1);
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    /* Settings Panel */
-    .settings-grid {
-      display: grid;
-      gap: 16px;
-    }
-
-    .setting-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .setting-item:last-child {
-      border-bottom: none;
-    }
-
-    .setting-label {
-      font-weight: 500;
-    }
-
-    .setting-desc {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .toggle {
-      position: relative;
-      display: inline-block;
-      width: 48px;
-      height: 26px;
-    }
-
-    .toggle input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .toggle-slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: var(--bg-tertiary);
-      border-radius: 26px;
-      transition: var(--transition);
-    }
-
-    .toggle-slider:before {
-      position: absolute;
-      content: "";
-      height: 20px;
-      width: 20px;
-      left: 3px;
-      bottom: 3px;
-      background: white;
-      border-radius: 50%;
-      transition: var(--transition);
-    }
-
-    input:checked + .toggle-slider {
-      background: var(--success);
-    }
-
-    input:checked + .toggle-slider:before {
-      transform: translateX(22px);
-    }
-
-    /* Search & Filters */
-    .controls {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-
-    .search-box {
-      flex: 1;
-      min-width: 200px;
-      position: relative;
-    }
-
-    .search-box input {
-      width: 100%;
-      padding: 10px 16px 10px 40px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      color: var(--text-primary);
-      font-size: 0.9rem;
-      transition: var(--transition);
-    }
-
-    .search-box input:focus {
-      outline: none;
-      border-color: var(--text-accent);
-      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
-    }
-
-    .search-box::before {
-      content: "🔍";
-      position: absolute;
-      left: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 1rem;
-    }
-
-    .filter-group {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .filter-btn {
-      padding: 8px 16px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .filter-btn:hover,
-    .filter-btn.active {
-      background: var(--bg-active);
-      border-color: var(--bg-active);
-      color: white;
-    }
-
-    /* Loading & Empty States */
-    .loading-state,
-    .empty-state,
-    .error-state {
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--text-secondary);
-    }
-
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--bg-tertiary);
-      border-top-color: var(--text-accent);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 16px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .empty-state svg {
-      width: 60px;
-      height: 60px;
-      margin-bottom: 16px;
-      opacity: 0.5;
-      color: var(--text-muted);
-    }
-
-    /* Toast Notifications */
-    .toast-container {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .toast {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      box-shadow: var(--shadow-lg);
-      animation: slideIn 0.3s ease;
-      min-width: 300px;
-      max-width: 400px;
-    }
-
-    .toast.success {
-      border-left: 4px solid var(--success);
-    }
-
-    .toast.error {
-      border-left: 4px solid var(--danger);
-    }
-
-    .toast.info {
-      border-left: 4px solid var(--info);
-    }
-
-    @keyframes slideIn {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-
+    .token-row { display: flex; align-items: center; gap: 12px; }
+    .token-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid var(--border-color); }
+    .token-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .token-symbol { font-weight: 600; }
+    .token-name { font-size: 0.8rem; color: var(--text-muted); }
+    .token-address { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-accent); background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; cursor: pointer; }
+    .token-address.copied { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+    
+    /* Badges */
+    .pnl-badge { display: inline-flex; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+    .pnl-positive { background: rgba(16, 185, 129, 0.15); color: var(--pnl-positive); }
+    .pnl-negative { background: rgba(239, 68, 68, 0.15); color: var(--pnl-negative); }
+    .pnl-neutral { background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); }
+    .source-badge { display: inline-flex; padding: 3px 8px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; background: var(--bg-tertiary); color: var(--text-secondary); }
+    .liquidity-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+    
+    /* Controls */
+    .controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .search-box { flex: 1; min-width: 200px; position: relative; }
+    .search-box input { width: 100%; padding: 10px 16px 10px 40px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--border-radius); color: var(--text-primary); }
+    .search-box::before { content: "🔍"; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); }
+    .filter-btn { padding: 8px 16px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--border-radius); color: var(--text-secondary); cursor: pointer; }
+    .filter-btn:hover, .filter-btn.active { background: var(--text-accent); border-color: var(--text-accent); color: white; }
+    
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--text-accent); color: white; border: none; border-radius: var(--border-radius); font-weight: 600; cursor: pointer; transition: var(--transition); }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
+    .btn-success { background: var(--success); }
+    .btn-danger { background: var(--danger); }
+    
+    /* Status */
+    .status-indicator { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--bg-tertiary); border-radius: 20px; font-size: 0.85rem; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+    .status-dot.offline { background: var(--danger); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    
+    /* Loading */
+    .loading-state, .empty-state, .error-state { text-align: center; padding: 40px; color: var(--text-secondary); }
+    .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--bg-tertiary); border-top-color: var(--text-accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+    
+    /* Toast */
+    .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+    .toast { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 14px 20px; margin-top: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); animation: slideIn 0.3s ease; min-width: 300px; }
+    .toast.success { border-left: 4px solid var(--success); }
+    .toast.error { border-left: 4px solid var(--danger); }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    
+    /* Manual Tokens */
+    .manual-token-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px; }
+    
     /* Responsive */
     @media (max-width: 768px) {
-      .sidebar {
-        transform: translateX(-100%);
-      }
-
-      .sidebar.open {
-        transform: translateX(0);
-      }
-
-      .main-content {
-        margin-left: 0;
-      }
-
-      .menu-toggle {
-        display: block;
-      }
-
-      .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .header {
-        flex-wrap: wrap;
-        gap: 12px;
-      }
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
     }
-
-    .menu-toggle {
-      display: none;
-      background: none;
-      border: none;
-      color: var(--text-primary);
-      font-size: 1.5rem;
-      cursor: pointer;
-      padding: 8px;
-    }
-
-    /* Footer */
-    .footer {
-      text-align: center;
-      padding: 24px;
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      border-top: 1px solid var(--border-color);
-      margin-top: 40px;
-    }
-
-    .footer a {
-      color: var(--text-accent);
-      text-decoration: none;
-    }
-
-    .footer a:hover {
-      text-decoration: underline;
-    }
-
-    /* Utility Classes */
+    
     .text-right { text-align: right; }
-    .text-center { text-align: center; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
-    .hidden { display: none !important; }
     .mt-2 { margin-top: 8px; }
-    .mb-2 { margin-bottom: 8px; }
     .flex { display: flex; }
     .items-center { align-items: center; }
-    .justify-between { justify-content: space-between; }
     .gap-2 { gap: 8px; }
   </style>
 </head>
@@ -871,51 +125,18 @@
   <div class="app-container">
     <!-- Sidebar -->
     <aside class="sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-          </svg>
-          <span>SolBot Pro</span>
-        </div>
-      </div>
-      
+      <div class="sidebar-logo">🤖 SolBot Pro</div>
       <nav>
         <ul class="sidebar-nav">
-          <li><a href="#" class="active">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-            </svg>
-            Dashboard
-          </a></li>
-          <li><a href="#">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
-            Tokens
-          </a></li>
-          <li><a href="#">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            Activité
-          </a></li>
-          <li><a href="#">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-            Paramètres
-          </a></li>
+          <li><a href="#" class="active">📊 Dashboard</a></li>
+          <li><a href="#">🪙 Tokens</a></li>
+          <li><a href="#">📋 Manuels</a></li>
+          <li><a href="#">⚙️ Paramètres</a></li>
         </ul>
       </nav>
-      
       <div style="padding: 20px; border-top: 1px solid var(--border-color); margin-top: auto;">
         <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Wallet</div>
-        <code id="wallet-display" class="token-address" style="font-size: 0.75rem; cursor: pointer;" onclick="copyWallet()">
-          9Xpa...qTsX
-        </code>
+        <code id="wallet-display" class="token-address" onclick="copyWallet()">9Xpa...qTsX</code>
       </div>
     </aside>
 
@@ -923,19 +144,13 @@
     <main class="main-content">
       <!-- Header -->
       <header class="header">
+        <h1 class="header-title">Dashboard</h1>
         <div class="flex items-center gap-2">
-          <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-          <h1 class="header-title">Dashboard</h1>
-        </div>
-        
-        <div class="header-actions">
           <div class="status-indicator">
             <span class="status-dot" id="status-dot"></span>
             <span id="status-text">Connexion...</span>
           </div>
-          <button class="btn" id="refresh-btn" onclick="loadData()">
-            <span>🔄</span> Actualiser
-          </button>
+          <button class="btn" id="refresh-btn" onclick="loadData()">🔄 Actualiser</button>
         </div>
       </header>
 
@@ -944,218 +159,108 @@
         <div class="stat-card">
           <div class="stat-label">Tokens Suivis</div>
           <div class="stat-value" id="total-tokens">-</div>
-          <div class="stat-subtext">Actifs dans le wallet</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Valeur Totale</div>
           <div class="stat-value" id="total-value">-</div>
-          <div class="stat-subtext">Estimation USD</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Meilleur PnL</div>
           <div class="stat-value positive" id="best-pnl">-</div>
-          <div class="stat-subtext">Performance max</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Pire PnL</div>
           <div class="stat-value negative" id="worst-pnl">-</div>
-          <div class="stat-subtext">Performance min</div>
         </div>
       </div>
 
-      <!-- Content Grid -->
-      <div class="content-grid">
-        <!-- Tokens Table -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
-              Tokens en Surveillance
-            </div>
-            <button class="btn btn-outline" onclick="exportData()">📥 Export CSV</button>
-          </div>
-          
-          <div class="card-body">
-            <!-- Controls -->
-            <div class="controls">
-              <div class="search-box">
-                <input type="text" id="search-input" placeholder="Rechercher un token..." oninput="filterTokens()">
-              </div>
-              <div class="filter-group">
-                <button class="filter-btn active" onclick="setFilter('all', this)">Tous</button>
-                <button class="filter-btn" onclick="setFilter('profit', this)">📈 Profit</button>
-                <button class="filter-btn" onclick="setFilter('loss', this)">📉 Perte</button>
-              </div>
-            </div>
-
-            <!-- Table -->
-            <div class="table-container">
-              <table id="tokens-table">
-                <thead>
-                  <tr>
-                    <th onclick="sortTable('symbol')">Token ↕</th>
-                    <th>Address</th>
-                    <th class="text-right" onclick="sortTable('balance')">Balance ↕</th>
-                    <th class="text-right" onclick="sortTable('price')">Prix ↕</th>
-                    <th class="text-right" onclick="sortTable('value')">Valeur ↕</th>
-                    <th class="text-right" onclick="sortTable('pnl')">PnL ↕</th>
-                    <th>Liquidité</th>
-                    <th>Source</th>
-                  </tr>
-                </thead>
-                <tbody id="tokens-body">
-                  <!-- Rows will be inserted here -->
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Loading State -->
-            <div id="loading" class="loading-state">
-              <div class="loading-spinner"></div>
-              <p>Chargement des données...</p>
-            </div>
-
-            <!-- Empty State -->
-            <div id="empty" class="empty-state hidden">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
-              </svg>
-              <p>Aucun token trouvé</p>
-            </div>
-
-            <!-- Error State -->
-            <div id="error" class="error-state hidden">
-              <p style="color: var(--danger); margin-bottom: 12px;">❌ Erreur de connexion</p>
-              <p style="color: var(--text-secondary); margin-bottom: 16px;">Impossible de charger les données. Vérifiez que le bot est en ligne.</p>
-              <button class="btn" onclick="loadData()">🔄 Réessayer</button>
-            </div>
-          </div>
+      <!-- Manual Tokens -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📋 Tokens Manuels</div>
         </div>
-
-        <!-- Right Column: Activity + Settings -->
-        <div>
-          <!-- Activity Log -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                Activité Récente
-              </div>
+        <div class="card-body">
+          <div class="controls">
+            <div class="search-box" style="flex: 2;">
+              <input type="text" id="manual-token-address" placeholder="Adresse du token (ex: EPjFWdd5...)">
             </div>
-            <div class="card-body">
-              <div class="activity-list" id="activity-list">
-                <div class="activity-item info">
-                  <span class="activity-time">10:05</span>
-                  <div class="activity-content">
-                    <div class="activity-title">Bot démarré</div>
-                    <div class="activity-desc">Surveillance active de <span class="activity-token">33 tokens</span></div>
-                  </div>
-                </div>
-                <div class="activity-item success">
-                  <span class="activity-time">10:04</span>
-                  <div class="activity-content">
-                    <div class="activity-title">Prix enregistré</div>
-                    <div class="activity-desc"><span class="activity-token">739dnZEG...</span> à $0.001723</div>
-                  </div>
-                </div>
-                <div class="activity-item warning">
-                  <span class="activity-time">10:03</span>
-                  <div class="activity-content">
-                    <div class="activity-title">Prix non trouvé</div>
-                    <div class="activity-desc"><span class="activity-token">2FS3Aidh...</span> - Aucune source disponible</div>
-                  </div>
-                </div>
-              </div>
+            <div class="search-box" style="flex: 1;">
+              <input type="text" id="manual-token-symbol" placeholder="Symbole (ex: USDC)">
+            </div>
+            <div class="search-box" style="flex: 1;">
+              <input type="text" id="manual-token-name" placeholder="Nom (ex: USD Coin)">
+            </div>
+            <button class="btn btn-success" onclick="addManualToken()">➕ Ajouter</button>
+          </div>
+          <div id="manual-tokens-list" style="margin-top: 16px;"></div>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 12px;">ℹ️ Les tokens manuels sont surveillés. Vente auto activée si dans le wallet.</p>
+        </div>
+      </div>
+
+      <!-- Tokens Table -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🪙 Tokens en Surveillance</div>
+          <button class="btn btn-outline" onclick="exportData()">📥 Export CSV</button>
+        </div>
+        <div class="card-body">
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="search-input" placeholder="Rechercher un token..." oninput="filterTokens()">
+            </div>
+            <div class="filter-group flex gap-2">
+              <button class="filter-btn active" onclick="setFilter('all', this)">Tous</button>
+              <button class="filter-btn" onclick="setFilter('profit', this)">📈 Profit</button>
+              <button class="filter-btn" onclick="setFilter('loss', this)">📉 Perte</button>
             </div>
           </div>
-
-          <!-- Settings -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-                Configuration
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="settings-grid">
-                <div class="setting-item">
-                  <div>
-                    <div class="setting-label">Auto-Sell</div>
-                    <div class="setting-desc">Ventes automatiques aux paliers</div>
-                  </div>
-                  <label class="toggle">
-                    <input type="checkbox" id="auto-sell-toggle" checked>
-                    <span class="toggle-slider"></span>
-                  </label>
-                </div>
-                <div class="setting-item">
-                  <div>
-                    <div class="setting-label">Stop-Loss</div>
-                    <div class="setting-desc">Protection à -20%</div>
-                  </div>
-                  <label class="toggle">
-                    <input type="checkbox" id="stop-loss-toggle" checked>
-                    <span class="toggle-slider"></span>
-                  </label>
-                </div>
-                <div class="setting-item">
-                  <div>
-                    <div class="setting-label">Intervalle</div>
-                    <div class="setting-desc">Fréquence d'analyse</div>
-                  </div>
-                  <select style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: 8px; font-size: 0.85rem;">
-                    <option>15s</option>
-                    <option>30s</option>
-                    <option>60s</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+          <div class="table-container">
+            <table id="tokens-table">
+              <thead>
+                <tr>
+                  <th onclick="sortTable('symbol')">Token ↕</th>
+                  <th>Address</th>
+                  <th class="text-right" onclick="sortTable('balance')">Balance ↕</th>
+                  <th class="text-right" onclick="sortTable('price')">Prix ↕</th>
+                  <th class="text-right" onclick="sortTable('value')">Valeur ↕</th>
+                  <th class="text-right" onclick="sortTable('pnl')">PnL ↕</th>
+                  <th>Liquidité</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="tokens-body"></tbody>
+            </table>
+          </div>
+          <div id="loading" class="loading-state">
+            <div class="loading-spinner"></div>
+            <p>Chargement des données...</p>
+          </div>
+          <div id="empty" class="empty-state hidden">
+            <p>Aucun token trouvé</p>
+          </div>
+          <div id="error" class="error-state hidden">
+            <p style="color: var(--danger); margin-bottom: 12px;">❌ Erreur de connexion</p>
+            <button class="btn" onclick="loadData()">🔄 Réessayer</button>
           </div>
         </div>
       </div>
 
       <!-- Footer -->
-      <footer class="footer">
-        <p>
-          🤖 SolBot Pro v3.0 • <a href="https://solscan.io" target="_blank">Solscan</a> • <a href="https://jup.ag" target="_blank">Jupiter</a> • <a href="https://dexscreener.com" target="_blank">DexScreener</a>
-        </p>
-        <p class="mt-2" style="font-size: 0.8rem;">
-          Dernière mise à jour: <span id="last-update" style="color: var(--text-accent);">-</span>
-        </p>
+      <footer style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.85rem; border-top: 1px solid var(--border-color); margin-top: 40px;">
+        <p>🤖 SolBot Pro v3.2 • <a href="https://solscan.io" target="_blank" style="color: var(--text-accent);">Solscan</a> • <a href="https://jup.ag" target="_blank" style="color: var(--text-accent);">Jupiter</a></p>
+        <p class="mt-2">Dernière mise à jour: <span id="last-update" style="color: var(--text-accent);">-</span></p>
       </footer>
     </main>
   </div>
 
-  <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
 
   <script>
-    // ════════════════════════════════════════════════════════════════
-    // ⚙️ CONFIGURATION
-    // ════════════════════════════════════════════════════════════════
-    
     const API_BASE_URL = 'https://solana-sniper-7o8s.onrender.com';
     const AUTO_REFRESH_INTERVAL = 30000;
     const REQUEST_TIMEOUT = 15000;
-    
-    let allTokens = [];
-    let filteredTokens = [];
-    let currentFilter = 'all';
-    let sortColumn = null;
-    let sortAscending = false;
+    let allTokens = [], filteredTokens = [], currentFilter = 'all', sortColumn = null, sortAscending = false;
 
-    // ════════════════════════════════════════════════════════════════
-    // 🔄 CHARGEMENT DES DONNÉES
-    // ════════════════════════════════════════════════════════════════
-    
     async function loadData() {
       const loading = document.getElementById('loading');
       const error = document.getElementById('error');
@@ -1164,88 +269,68 @@
       const refreshBtn = document.getElementById('refresh-btn');
       const statusDot = document.getElementById('status-dot');
       const statusText = document.getElementById('status-text');
-      
+
       loading.classList.remove('hidden');
       error.classList.add('hidden');
       empty.classList.add('hidden');
       table.classList.add('hidden');
       refreshBtn.disabled = true;
-      
+
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-        
-        const response = await fetch(`${API_BASE_URL}/api/tokens`, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        });
+        const response = await fetch(`${API_BASE_URL}/api/tokens`, { signal: controller.signal });
         clearTimeout(timeoutId);
-        
+
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
         const data = await response.json();
-        if (!data.success || !data.tokens) throw new Error('Format invalide');
-        
+        if (!data.success) throw new Error('Format invalide');
+
         allTokens = data.tokens || [];
         filteredTokens = [...allTokens];
-        
-        // Update UI
         statusDot.classList.remove('offline');
         statusText.textContent = 'Bot en ligne';
-        
+
         if (data.wallet) {
           const short = `${data.wallet.slice(0, 6)}...${data.wallet.slice(-4)}`;
           document.getElementById('wallet-display').textContent = short;
           document.getElementById('wallet-display').dataset.full = data.wallet;
         }
-        
-        document.getElementById('last-update').textContent = 
-          new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        
+
+        document.getElementById('last-update').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         applyFilter();
         updateStats();
-        
+        loadManualTokens();
       } catch (err) {
-        console.error('Erreur:', err);
         loading.classList.add('hidden');
         error.classList.remove('hidden');
         statusDot.classList.add('offline');
         statusText.textContent = 'Hors ligne';
-        showToast('❌ Erreur de connexion au bot', 'error');
+        showToast('❌ Erreur de connexion', 'error');
       } finally {
         refreshBtn.disabled = false;
       }
     }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 🎯 FILTRES & TRI
-    // ════════════════════════════════════════════════════════════════
-    
+
     function setFilter(filter, btn) {
       currentFilter = filter;
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       if (btn) btn.classList.add('active');
       applyFilter();
     }
-    
+
     function applyFilter() {
       switch (currentFilter) {
-        case 'profit':
-          filteredTokens = allTokens.filter(t => t.pnl !== null && t.pnl > 0.5);
-          break;
-        case 'loss':
-          filteredTokens = allTokens.filter(t => t.pnl !== null && t.pnl < -0.5);
-          break;
-        default:
-          filteredTokens = [...allTokens];
+        case 'profit': filteredTokens = allTokens.filter(t => t.pnl !== null && t.pnl > 0.5); break;
+        case 'loss': filteredTokens = allTokens.filter(t => t.pnl !== null && t.pnl < -0.5); break;
+        default: filteredTokens = [...allTokens];
       }
       filterTokens();
     }
-    
+
     function filterTokens() {
       const search = document.getElementById('search-input').value.toLowerCase().trim();
       if (!search) { renderTable(); return; }
-      
       filteredTokens = allTokens.filter(t => {
         const s = (t.symbol || '').toLowerCase();
         const n = (t.name || '').toLowerCase();
@@ -1254,11 +339,10 @@
       });
       renderTable();
     }
-    
+
     function sortTable(column) {
       if (sortColumn === column) sortAscending = !sortAscending;
       else { sortColumn = column; sortAscending = true; }
-      
       filteredTokens.sort((a, b) => {
         let av = a[column] ?? 0, bv = b[column] ?? 0;
         if (column === 'symbol') { av = String(av).toLowerCase(); bv = String(bv).toLowerCase(); }
@@ -1268,50 +352,44 @@
       });
       renderTable();
     }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 🧱 AFFICHAGE
-    // ════════════════════════════════════════════════════════════════
-    
+
     function renderTable() {
       const loading = document.getElementById('loading');
       const empty = document.getElementById('empty');
       const table = document.getElementById('tokens-table');
       const tbody = document.getElementById('tokens-body');
-      
       loading.classList.add('hidden');
-      
+
       if (filteredTokens.length === 0) {
         table.classList.add('hidden');
         empty.classList.remove('hidden');
         return;
       }
-      
+
       table.classList.remove('hidden');
       empty.classList.add('hidden');
       updateStats();
-      
       tbody.innerHTML = '';
-      filteredTokens.forEach(token => {
-        const row = createTokenRow(token);
-        tbody.appendChild(row);
-      });
+      filteredTokens.forEach(token => tbody.appendChild(createTokenRow(token)));
     }
-    
+
     function createTokenRow(token) {
       const row = document.createElement('tr');
-      const pnlClass = getPnlClass(token.pnl);
+      const pnlClass = token.pnl !== null ? (token.pnl > 0.5 ? 'pnl-positive' : token.pnl < -0.5 ? 'pnl-negative' : 'pnl-neutral') : 'pnl-neutral';
       const pnlSign = token.pnl !== null && token.pnl >= 0 ? '+' : '';
       const shortAddr = `${token.address.slice(0, 6)}...${token.address.slice(-4)}`;
-      const sourceClass = getSourceClass(token.priceSource);
-      
+      const logoHtml = token.logo ? `<img src="${token.logo}" alt="${token.symbol}" onerror="this.onerror=null; this.parentElement.innerHTML='🪙';">` : '🪙';
+      const confBadge = token.priceConfidence !== null ? (token.priceConfidence >= 0.8 ? '✅' : token.priceConfidence >= 0.5 ? '⚠️' : '❓') : '';
+      const manualBadge = token.isManual ? '📋' : '';
+      const walletBadge = token.isInWallet ? '✅' : '❌';
+
       row.innerHTML = `
         <td>
           <div class="token-row">
-            <div class="token-icon">🪙</div>
-            <div class="token-info">
-              <span class="token-symbol">${escapeHtml(token.symbol || '???')}</span>
-              <span class="token-name">${escapeHtml(token.name || 'Unknown')}</span>
+            <div class="token-icon">${logoHtml}</div>
+            <div>
+              <div class="token-symbol">${escapeHtml(token.symbol || '???')} ${confBadge} ${manualBadge}${walletBadge}</div>
+              <div class="token-name">${escapeHtml(token.name || 'Unknown')}</div>
             </div>
           </div>
         </td>
@@ -1321,44 +399,90 @@
         <td class="text-right font-mono">${token.hasPrice ? '$' + formatNumber(token.value, 2) : '<span class="no-price">N/A</span>'}</td>
         <td class="text-right"><span class="pnl-badge ${pnlClass}">${token.pnl !== null ? `${pnlSign}${token.pnl.toFixed(2)}%` : 'N/A'}</span></td>
         <td>${token.hasPrice ? `<span class="liquidity-badge">💧 $${formatLiquidity(token.liquidity)}</span>` : '-'}</td>
-        <td>${token.hasPrice ? `<span class="source-badge source-${sourceClass}">${token.priceSource || 'Inconnu'}</span>` : '-'}</td>
+        <td>${token.hasPrice ? `<span class="source-badge">${token.priceSource || 'Inconnu'}</span>` : '-'}</td>
       `;
       return row;
     }
-    
+
     function updateStats() {
       const totalValue = allTokens.reduce((s, t) => s + (t.value || 0), 0);
       const validPnls = allTokens.map(t => t.pnl).filter(p => p !== null && !isNaN(p));
       const best = validPnls.length ? Math.max(...validPnls) : 0;
       const worst = validPnls.length ? Math.min(...validPnls) : 0;
-      
       document.getElementById('total-tokens').textContent = allTokens.length;
       document.getElementById('total-value').textContent = '$' + formatNumber(totalValue, 2);
-      
       const bestEl = document.getElementById('best-pnl');
       bestEl.textContent = `${best >= 0 ? '+' : ''}${best.toFixed(2)}%`;
       bestEl.className = 'stat-value ' + (best > 0 ? 'positive' : 'negative');
-      
       const worstEl = document.getElementById('worst-pnl');
       worstEl.textContent = `${worst >= 0 ? '+' : ''}${worst.toFixed(2)}%`;
       worstEl.className = 'stat-value ' + (worst < 0 ? 'negative' : 'positive');
     }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 📥 EXPORT CSV
-    // ════════════════════════════════════════════════════════════════
-    
+
+    async function addManualToken() {
+      const address = document.getElementById('manual-token-address').value.trim();
+      const symbol = document.getElementById('manual-token-symbol').value.trim();
+      const name = document.getElementById('manual-token-name').value.trim();
+      if (!address || address.length < 32) { showToast('❌ Adresse invalide', 'error'); return; }
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/tokens/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address, symbol, name })
+        });
+        const result = await response.json();
+        if (result.success) {
+          showToast('✅ Token ajouté', 'success');
+          document.getElementById('manual-token-address').value = '';
+          document.getElementById('manual-token-symbol').value = '';
+          document.getElementById('manual-token-name').value = '';
+          loadManualTokens();
+        } else {
+          showToast(`❌ ${result.error}`, 'error');
+        }
+      } catch { showToast('❌ Erreur de connexion', 'error'); }
+    }
+
+    async function removeManualToken(address) {
+      if (!confirm('Supprimer ce token ?')) return;
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/tokens/remove`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address })
+        });
+        const result = await response.json();
+        if (result.success) { showToast('✅ Token supprimé', 'success'); loadManualTokens(); }
+        else { showToast(`❌ ${result.error}`, 'error'); }
+      } catch { showToast('❌ Erreur de connexion', 'error'); }
+    }
+
+    async function loadManualTokens() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/tokens`);
+        const data = await response.json();
+        const listEl = document.getElementById('manual-tokens-list');
+        const allTokens = [...(data.manualTokens || []), ...(data.dynamicTokens || [])];
+        if (allTokens.length === 0) {
+          listEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Aucun token manuel</p>';
+          return;
+        }
+        listEl.innerHTML = allTokens.map(addr => `
+          <div class="manual-token-item">
+            <div class="flex items-center gap-2">
+              <span class="token-address">${addr.slice(0,8)}...${addr.slice(-6)}</span>
+              <span style="color: var(--text-muted); font-size: 0.8rem;">📋 Manuel</span>
+            </div>
+            <button class="btn btn-danger" onclick="removeManualToken('${addr}')" style="padding: 6px 12px; font-size: 0.85rem;">🗑️</button>
+          </div>
+        `).join('');
+      } catch (err) { console.error('Erreur:', err); }
+    }
+
     function exportData() {
       if (!allTokens.length) { showToast('⚠️ Aucune donnée', 'info'); return; }
-      
       const headers = ['Symbol','Name','Address','Balance','Price','Value','PnL','Liquidity','Source'];
-      const rows = allTokens.map(t => [
-        t.symbol||'???', t.name||'Unknown', t.address,
-        t.balance.toFixed(4), t.price?.toFixed(8)||'0', t.value?.toFixed(2)||'0',
-        t.pnl!==null ? t.pnl.toFixed(2)+'%' : 'N/A',
-        t.liquidity?.toFixed(2)||'0', t.priceSource||'N/A'
-      ]);
-      
+      const rows = allTokens.map(t => [t.symbol||'???', t.name||'Unknown', t.address, t.balance.toFixed(4), t.price?.toFixed(8)||'0', t.value?.toFixed(2)||'0', t.pnl!==null ? t.pnl.toFixed(2)+'%' : 'N/A', t.liquidity?.toFixed(2)||'0', t.priceSource||'N/A']);
       const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
       const blob = new Blob([csv], {type:'text/csv'});
       const link = document.createElement('a');
@@ -1367,95 +491,35 @@
       link.click();
       showToast('✅ Export téléchargé', 'success');
     }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 🔧 UTILITAIRES
-    // ════════════════════════════════════════════════════════════════
-    
-    function getPnlClass(pnl) {
-      if (pnl === null || isNaN(pnl)) return 'pnl-neutral';
-      return pnl > 0.5 ? 'pnl-positive' : pnl < -0.5 ? 'pnl-negative' : 'pnl-neutral';
-    }
-    
-    function getSourceClass(src) {
-      const s = (src||'').toLowerCase();
-      if (s.includes('dexscreener')) return 'dexscreener';
-      if (s.includes('jupiter')) return 'jupiter';
-      if (s.includes('birdeye')) return 'birdeye';
-      if (s.includes('helius')) return 'helius';
-      return '';
-    }
-    
-    function formatNumber(n, d) {
-      if (n == null) return '-';
-      if (n === 0) return '0';
-      if (Math.abs(n) < 0.0001 && d >= 4) return n.toExponential(2);
-      return n.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
-    }
-    
-    function formatPrice(p) {
-      if (p == null) return '-';
-      if (p < 0.0001) return p.toExponential(4);
-      if (p < 0.01) return p.toFixed(6);
-      if (p < 1) return p.toFixed(4);
-      return p.toFixed(2);
-    }
-    
-    function formatLiquidity(l) {
-      if (l == null) return '0';
-      if (l >= 1e6) return (l/1e6).toFixed(2) + 'M';
-      if (l >= 1e3) return (l/1e3).toFixed(1) + 'K';
-      return Math.round(l).toLocaleString('fr-FR');
-    }
-    
-    function escapeHtml(t) {
-      if (!t) return '';
-      const d = document.createElement('div');
-      d.textContent = t;
-      return d.innerHTML;
-    }
-    
+
+    function getPnlClass(pnl) { if (pnl === null || isNaN(pnl)) return 'pnl-neutral'; return pnl > 0.5 ? 'pnl-positive' : pnl < -0.5 ? 'pnl-negative' : 'pnl-neutral'; }
+    function formatNumber(n, d) { if (n == null) return '-'; if (n === 0) return '0'; if (Math.abs(n) < 0.0001 && d >= 4) return n.toExponential(2); return n.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+    function formatPrice(p) { if (p == null) return '-'; if (p < 0.0001) return p.toExponential(4); if (p < 0.01) return p.toFixed(6); if (p < 1) return p.toFixed(4); return p.toFixed(2); }
+    function formatLiquidity(l) { if (l == null) return '0'; if (l >= 1e6) return (l/1e6).toFixed(2) + 'M'; if (l >= 1e3) return (l/1e3).toFixed(1) + 'K'; return Math.round(l).toLocaleString('fr-FR'); }
+    function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
     function copyAddress(addr, el) {
       navigator.clipboard.writeText(addr).then(() => {
-        el.classList.add('copied');
-        el.textContent = '✓ Copié';
+        el.classList.add('copied'); el.textContent = '✓ Copié';
         showToast('✅ Adresse copiée', 'success');
-        setTimeout(() => {
-          el.classList.remove('copied');
-          el.textContent = `${addr.slice(0,6)}...${addr.slice(-4)}`;
-        }, 2000);
+        setTimeout(() => { el.classList.remove('copied'); el.textContent = `${addr.slice(0,6)}...${addr.slice(-4)}`; }, 2000);
       });
     }
-    
+
     function copyWallet() {
       const el = document.getElementById('wallet-display');
-      const full = el.dataset.full;
-      if (full) {
-        navigator.clipboard.writeText(full);
-        showToast('✅ Wallet copié', 'success');
-      }
+      if (el.dataset.full) { navigator.clipboard.writeText(el.dataset.full); showToast('✅ Wallet copié', 'success'); }
     }
-    
+
     function showToast(msg, type='info') {
       const c = document.getElementById('toast-container');
       const t = document.createElement('div');
       t.className = `toast ${type}`;
       t.innerHTML = `<span>${msg}</span>`;
       c.appendChild(t);
-      setTimeout(() => {
-        t.style.animation = 'slideIn 0.3s ease reverse';
-        setTimeout(() => t.remove(), 300);
-      }, 3000);
+      setTimeout(() => { t.style.animation = 'slideIn 0.3s ease reverse'; setTimeout(() => t.remove(), 300); }, 3000);
     }
-    
-    function toggleSidebar() {
-      document.querySelector('.sidebar').classList.toggle('open');
-    }
-    
-    // ════════════════════════════════════════════════════════════════
-    // 🚀 INITIALISATION
-    // ════════════════════════════════════════════════════════════════
-    
+
     document.addEventListener('DOMContentLoaded', () => {
       loadData();
       setInterval(loadData, AUTO_REFRESH_INTERVAL);
