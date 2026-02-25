@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-// SolBot Pro v3.2 — Ultimate Edition
+// SolBot Pro v3.3 — Ultimate Edition (Jupiter Price Fix)
 // Backend Node.js pour Solana Trading Automatique
 // Hébergement : Render (Background Worker + API Web)
-// Features: Weighted Price + Smart Cache + Confidence + Manual Tokens + Logos
+// Features: Weighted Price (sans Jupiter Price) + Smart Cache + Confidence + Manual Tokens + Logos
 // ═══════════════════════════════════════════════════════════════
 
 "use strict";
@@ -102,19 +102,24 @@ function getConnection() {
 
 // ════════════════════════════════════════════════════════════════
 // 🎯 PRIX AGGREGÉ AVEC MOYENNE PONDÉRÉE (Weighted Average)
+// Jupiter Price API désactivée — poids réajustés
 // ════════════════════════════════════════════════════════════════
 
 async function getWeightedPrice(mintAddress) {
+  // Sources actives (Jupiter Price désactivé car ne répond pas)
   const sources = [
-    { name: 'DexScreener', fetch: () => fetchDexScreenerPrice(mintAddress), weight: 3 },
-    { name: 'Jupiter', fetch: () => fetchJupiterPrice(mintAddress), weight: 4 },
-    { name: 'Birdeye', fetch: () => fetchBirdeyePrice(mintAddress), weight: 2 },
-    { name: 'CoinGecko', fetch: () => fetchCoinGeckoPrice(mintAddress), weight: 1 },
-    { name: 'Helius', fetch: () => fetchHeliusPrice(mintAddress), weight: 2 },
+    { name: 'DexScreener', fetch: () => fetchDexScreenerPrice(mintAddress), weight: 5 },
+    { name: 'Jupiter', fetch: () => fetchJupiterPrice(mintAddress), weight: 0 },  // Désactivé
+    { name: 'Birdeye', fetch: () => fetchBirdeyePrice(mintAddress), weight: 3 },
+    { name: 'CoinGecko', fetch: () => fetchCoinGeckoPrice(mintAddress), weight: 2 },
+    { name: 'Helius', fetch: () => fetchHeliusPrice(mintAddress), weight: 3 },
   ];
 
+  // Exclure les sources désactivées (weight = 0)
+  const activeSources = sources.filter(src => src.weight > 0);
+
   const results = await Promise.allSettled(
-    sources.map(src => src.fetch().then(data => ({ ...data, source: src.name, weight: src.weight })))
+    activeSources.map(src => src.fetch().then(data => ({ ...data, source: src.name, weight: src.weight })))
   );
 
   const validPrices = results
@@ -125,8 +130,10 @@ async function getWeightedPrice(mintAddress) {
 
   const weightedSum = validPrices.reduce((sum, p) => sum + p.priceUsd * p.weight, 0);
   const totalWeight = validPrices.reduce((sum, p) => sum + p.weight, 0);
-  const confidence = validPrices.length / sources.length;
-
+  
+  // Confidence basée sur le nombre de sources actives qui ont répondu
+  const confidence = validPrices.length / activeSources.length;
+  
   return {
     priceUsd: weightedSum / totalWeight,
     confidence: Math.min(confidence, 1.0),
@@ -141,7 +148,7 @@ async function getWeightedPrice(mintAddress) {
 async function fetchDexScreenerPrice(mintAddress) {
   try {
     const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: { 'User-Agent': 'SolBot-Pro/3.3' } });
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.pairs?.length) return null;
@@ -157,22 +164,21 @@ async function fetchDexScreenerPrice(mintAddress) {
   } catch { return null; }
 }
 
+// ⚠️ Jupiter Price API désactivée (ne répond pas)
 async function fetchJupiterPrice(mintAddress) {
-  try {
-    const url = `https://price.jup.ag/v6/price?ids=${mintAddress}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.data?.[mintAddress]?.price) return null;
-    const p = data.data[mintAddress];
-    return { priceUsd: p.price, change24h: p.change24h || 0 };
-  } catch { return null; }
+  console.log(`[JUPITER PRICE] ⚠️ API indisponible — skip pour ${mintAddress.slice(0,8)}...`);
+  return null;
 }
 
 async function fetchBirdeyePrice(mintAddress) {
   try {
     const url = `https://public-api.birdeye.so/defi/price?address=${mintAddress}`;
-    const res = await fetch(url, { headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo' } });
+    const res = await fetch(url, { 
+      headers: { 
+        'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo',
+        'User-Agent': 'SolBot-Pro/3.3'
+      } 
+    });
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.success?.data?.value) return null;
@@ -183,7 +189,7 @@ async function fetchBirdeyePrice(mintAddress) {
 async function fetchCoinGeckoPrice(mintAddress) {
   try {
     const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress}&vs_currencies=usd`;
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: { 'User-Agent': 'SolBot-Pro/3.3' } });
     if (!res.ok) return null;
     const data = await res.json();
     const key = mintAddress.toLowerCase();
@@ -196,7 +202,7 @@ async function fetchHeliusPrice(mintAddress) {
   try {
     const apiKey = process.env.HELIUS_API_KEY || 'demo';
     const url = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${apiKey}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: { 'User-Agent': 'SolBot-Pro/3.3' } });
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.data?.[mintAddress]?.price_info?.price_per_token) return null;
@@ -229,7 +235,7 @@ async function getCachedPrice(mintAddress, liquidityUsd) {
   const fresh = await getWeightedPrice(mintAddress);
 
   if (fresh) {
-    priceCache.set(mintAddress, { data: fresh, timestamp: now, ttl });
+    priceCache.set(mintAddress, {  fresh, timestamp: now, ttl });
     console.log(`[PRIX] ✅ ${mintAddress.slice(0,8)}... = $${fresh.priceUsd.toExponential(4)} [${fresh.sources.join(',')}] (conf: ${(fresh.confidence*100).toFixed(0)}%)`);
   }
 
@@ -249,7 +255,7 @@ async function fetchTokenMetadata(mintAddress) {
 
   // SOURCE 1: Jupiter Token List
   try {
-    const response = await fetch('https://tokens.jup.ag/tokens');
+    const response = await fetch('https://tokens.jup.ag/tokens', { headers: { 'User-Agent': 'SolBot-Pro/3.3' } });
     if (response.ok) {
       const tokens = await response.json();
       const token = tokens.find(t => t.address === mintAddress);
@@ -271,7 +277,7 @@ async function fetchTokenMetadata(mintAddress) {
 
   // SOURCE 2: Solana Token List
   try {
-    const response = await fetch('https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json');
+    const response = await fetch('https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json', { headers: { 'User-Agent': 'SolBot-Pro/3.3' } });
     if (response.ok) {
       const data = await response.json();
       const token = data.tags?.[mintAddress] || data.tokens?.find(t => t.address === mintAddress);
@@ -287,7 +293,7 @@ async function fetchTokenMetadata(mintAddress) {
 
   // SOURCE 3: Metaplex API
   try {
-    const response = await fetch(`https://api.metaplex.com/v1/metadata/${mintAddress}`);
+    const response = await fetch(`https://api.metaplex.com/v1/metadata/${mintAddress}`, { headers: { 'User-Agent': 'SolBot-Pro/3.3' } });
     if (response.ok) {
       const data = await response.json();
       if (data?.metadata?.image) metadata.logo = data.metadata.image;
@@ -300,7 +306,7 @@ async function fetchTokenMetadata(mintAddress) {
 
   // SOURCE 4: DexScreener
   try {
-    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`);
+    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`, { headers: { 'User-Agent': 'SolBot-Pro/3.3' } });
     if (response.ok) {
       const data = await response.json();
       if (data.pairs?.[0]?.baseToken?.logoURI) metadata.logo = data.pairs[0].baseToken.logoURI;
@@ -317,7 +323,7 @@ async function fetchTokenMetadata(mintAddress) {
     const firstChar = metadata.symbol.charAt(0).toUpperCase();
     const colors = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#a78bfa', '#ec4899'];
     const colorIndex = firstChar.charCodeAt(0) % colors.length;
-    metadata.logo = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="${colors[colorIndex]}"/><text x="16" y="22" font-size="18" font-weight="bold" fill="white" text-anchor="middle" font-family="Arial">${firstChar}</text></svg>`)}`;
+    metadata.logo = `image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="${colors[colorIndex]}"/><text x="16" y="22" font-size="18" font-weight="bold" fill="white" text-anchor="middle" font-family="Arial">${firstChar}</text></svg>`)}`;
   }
 
   tokenMetadataCache[mintAddress] = metadata;
@@ -325,65 +331,135 @@ async function fetchTokenMetadata(mintAddress) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// VENTE VIA JUPITER AGGREGATOR V6
+// VENTE VIA JUPITER AGGREGATOR V6 — Avec retry et timeout long
 // ════════════════════════════════════════════════════════════════
 
-async function jupiterSell(mintAddress, amountRaw, slippageBps) {
+async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) {
   const SOL_MINT = "So11111111111111111111111111111111111111112";
-  console.log(`[JUPITER] Demande de quote : ${amountRaw} unités → SOL`);
-
-  const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${mintAddress}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}`;
-  const quoteRes = await fetch(quoteUrl);
-  if (!quoteRes.ok) throw new Error(`Quote échouée (${quoteRes.status}) : ${await quoteRes.text()}`);
   
-  const quote = await quoteRes.json();
-  console.log(`[JUPITER] Quote reçu. SOL estimé : ${(quote.outAmount / 1e9).toFixed(6)}`);
-
-  const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      quoteResponse: quote,
-      userPublicKey: keypair.publicKey.toString(),
-      wrapAndUnwrapSol: true,
-      dynamicComputeUnitLimit: true,
-      computeUnitPriceMicroLamports: "auto",
-    }),
-  });
-
-  if (!swapRes.ok) throw new Error(`Swap tx échouée (${swapRes.status}) : ${await swapRes.text()}`);
-  const { swapTransaction } = await swapRes.json();
-
-  const connection = getConnection();
-  const txBuffer = Buffer.from(swapTransaction, "base64");
-  const tx = VersionedTransaction.deserialize(txBuffer);
-  tx.sign([keypair]);
-
-  const txId = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
-  const latestBlockhash = await connection.getLatestBlockhash();
-  await connection.confirmTransaction({ signature: txId, ...latestBlockhash }, "confirmed");
-
-  console.log(`[JUPITER] ✅ Transaction confirmée : ${txId}`);
-  return txId;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[JUPITER] Tentative ${attempt}/${maxRetries} : Quote pour ${amountRaw} unités`);
+      
+      // ── Étape 1: Quote avec timeout long (30s) ─────────────────
+      const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${mintAddress}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      
+      const quoteRes = await fetch(quoteUrl, { 
+        signal: controller.signal,
+        headers: { 'User-Agent': 'SolBot-Pro/3.3' }
+      });
+      clearTimeout(timeoutId);
+      
+      if (!quoteRes.ok) {
+        const errorText = await quoteRes.text();
+        throw new Error(`Quote HTTP ${quoteRes.status}: ${errorText}`);
+      }
+      
+      const quote = await quoteRes.json();
+      console.log(`[JUPITER] Quote reçu. SOL estimé: ${(quote.outAmount / 1e9).toFixed(6)}`);
+      
+      // ── Étape 2: Swap ──────────────────────────────────────────
+      const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          'User-Agent': 'SolBot-Pro/3.3'
+        },
+        body: JSON.stringify({
+          quoteResponse: quote,
+          userPublicKey: keypair.publicKey.toString(),
+          wrapAndUnwrapSol: true,
+          dynamicComputeUnitLimit: true,
+          computeUnitPriceMicroLamports: "auto",
+        }),
+      });
+      
+      if (!swapRes.ok) {
+        const errorText = await swapRes.text();
+        throw new Error(`Swap HTTP ${swapRes.status}: ${errorText}`);
+      }
+      
+      const { swapTransaction } = await swapRes.json();
+      
+      // ── Étape 3: Signature et envoi ────────────────────────────
+      const connection = getConnection();
+      const txBuffer = Buffer.from(swapTransaction, "base64");
+      const tx = VersionedTransaction.deserialize(txBuffer);
+      tx.sign([keypair]);
+      
+      const txId = await connection.sendRawTransaction(tx.serialize(), { 
+        skipPreflight: false, 
+        maxRetries: 3 
+      });
+      
+      const latestBlockhash = await connection.getLatestBlockhash();
+      await connection.confirmTransaction(
+        { signature: txId, ...latestBlockhash }, 
+        "confirmed"
+      );
+      
+      console.log(`[JUPITER] ✅ Transaction confirmée : ${txId}`);
+      return txId;
+      
+    } catch (err) {
+      console.warn(`[JUPITER] ⚠️ Tentative ${attempt} échouée : ${err.message}`);
+      
+      // Si c'est une erreur DNS/réseau, attendre avant de réessayer
+      if (err.message.includes('ENOTFOUND') || err.message.includes('ECONNRESET') || err.message.includes('ETIMEDOUT')) {
+        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+        console.log(`[JUPITER] ⏳ Attente ${delay}ms avant réessai...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // Si c'est la dernière tentative ou une erreur non-réseau, échouer
+      if (attempt === maxRetries) {
+        throw err;
+      }
+    }
+  }
+  
+  throw new Error('Échec après toutes les tentatives');
 }
 
 // ════════════════════════════════════════════════════════════════
 // LOGIQUE DE VENTE — Stop-loss et paliers INDÉPENDANTS par token
+// Marque les paliers comme déclenchés UNIQUEMENT après succès
 // ════════════════════════════════════════════════════════════════
 
 async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl) {
-  if (!CONFIG.AUTO_SELL || pnl === null) return;
+  // Debug logging
+  console.log(`[DEBUG VENTE] ${mintAddress.slice(0,8)}... | AUTO_SELL: ${CONFIG.AUTO_SELL} | PnL: ${pnl} | Balance: ${balance}`);
+  
+  if (!CONFIG.AUTO_SELL) {
+    console.log(`[VENTE BLOQUÉE] AUTO_SELL = false`);
+    return;
+  }
+  
+  if (pnl === null) {
+    console.log(`[VENTE BLOQUÉE] PnL = null (prix non disponible)`);
+    return;
+  }
+  
+  if (balance <= 0) {
+    console.log(`[VENTE BLOQUÉE] Balance = ${balance}`);
+    return;
+  }
 
   const rawAmount = Math.floor(balance * Math.pow(10, decimals));
+  console.log(`[DEBUG VENTE] rawAmount: ${rawAmount} (balance: ${balance}, decimals: ${decimals})`);
 
   // 🛡️ STOP-LOSS
   if (CONFIG.STOP_LOSS_ENABLED && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
     console.log(`[🛡️ STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
     try {
-      await jupiterSell(mintAddress, rawAmount, CONFIG.SLIPPAGE_BPS);
-      console.log(`[✅ STOP-LOSS] Vente totale de ${mintAddress.slice(0,8)}... exécutée`);
+      const txId = await jupiterSell(mintAddress, rawAmount, CONFIG.SLIPPAGE_BPS);
+      console.log(`[✅ STOP-LOSS] Vente totale exécutée : ${txId}`);
     } catch (err) {
-      console.error(`[❌ STOP-LOSS] Échec : ${err.message}`);
+      console.error(`[❌ STOP-LOSS] ÉCHEC : ${err.message}`);
     }
     return;
   }
@@ -393,19 +469,36 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
     const tierKey = `${mintAddress}_tier_${i}`;
     const tier = CONFIG.TIERS[i];
 
+    // Réinitialiser si PnL redescend significativement (10% sous le seuil)
+    if (triggeredTiers[tierKey] && pnl < tier.targetPnl - 10) {
+      delete triggeredTiers[tierKey];
+      console.log(`[PALIER RESET] ${mintAddress.slice(0,8)}... : Palier ${i+1} réinitialisé (PnL: ${pnl.toFixed(2)}%)`);
+    }
+
+    // ✅ NE MARQUER COMME DÉCLENCHÉ QU'APRÈS VENTE RÉUSSIE
     if (!triggeredTiers[tierKey] && pnl >= tier.targetPnl) {
-      triggeredTiers[tierKey] = true;
       const sellPercent = tier.sellPercent / 100;
       const amountToSell = Math.floor(rawAmount * sellPercent);
 
+      console.log(`[🎯 PALIER ${i+1}] ${mintAddress.slice(0,8)}... : +${pnl.toFixed(2)}% → Vente de ${tier.sellPercent}% (${amountToSell} unités)`);
+
       if (amountToSell > 0) {
-        console.log(`[🎯 PALIER ${i+1}] ${mintAddress.slice(0,8)}... : +${pnl.toFixed(2)}% → Vente de ${tier.sellPercent}%`);
         try {
-          await jupiterSell(mintAddress, amountToSell, CONFIG.SLIPPAGE_BPS);
-          console.log(`[✅ PALIER ${i+1}] Vente exécutée`);
+          const txId = await jupiterSell(mintAddress, amountToSell, CONFIG.SLIPPAGE_BPS);
+          // ✅ MARQUER COMME DÉCLENCHÉ SEULEMENT APRÈS SUCCÈS
+          triggeredTiers[tierKey] = true;
+          console.log(`[✅ PALIER ${i+1}] Vente confirmée : ${txId}`);
         } catch (err) {
-          console.error(`[❌ PALIER ${i+1}] Échec : ${err.message}`);
+          console.error(`[❌ PALIER ${i+1}] ÉCHEC CRITIQUE : ${err.message}`);
+          console.error(`[❌ PALIER ${i+1}] Stack : ${err.stack}`);
+          // ⚠️ NE PAS marquer comme triggered - on pourra réessayer au prochain cycle
+          console.log(`[⚠️ PALIER ${i+1}] Palier NON marqué comme déclenché - réessai au prochain cycle`);
         }
+      }
+    } else {
+      // Debug : pourquoi le palier ne se déclenche pas
+      if (pnl < tier.targetPnl && pnl >= tier.targetPnl - 5) {
+        console.log(`[PALIER ATTENTE] ${mintAddress.slice(0,8)}... : Palier ${i+1} (${tier.targetPnl}%) — PnL actuel: ${pnl.toFixed(2)}% — Manque: ${(tier.targetPnl - pnl).toFixed(2)}%`);
       }
     }
   }
@@ -652,7 +745,10 @@ if (process.env.RENDER) {
         uptime: process.uptime(),
         autoSell: CONFIG.AUTO_SELL,
         stopLoss: CONFIG.STOP_LOSS_ENABLED,
-        priceStats: { cached: priceCache.size, highConfidence: lastTokensData.filter(t => t.priceConfidence >= 0.8).length }
+        priceStats: { 
+          cached: priceCache.size, 
+          highConfidence: lastTokensData.filter(t => t.priceConfidence >= 0.8).length 
+        }
       }));
       return;
     }
@@ -660,7 +756,7 @@ if (process.env.RENDER) {
     // GET /
     if (req.url === '/') {
       res.writeHead(200, {'Content-Type': 'text/plain'});
-      res.end('🤖 SolBot Pro v3.2 API\nEndpoints: GET /api/tokens | POST /api/tokens/add | DELETE /api/tokens/remove | GET /api/status');
+      res.end('🤖 SolBot Pro v3.3 API\nEndpoints: GET /api/tokens | POST /api/tokens/add | DELETE /api/tokens/remove | GET /api/status');
       return;
     }
 
@@ -682,18 +778,20 @@ if (process.env.RENDER) {
 
 async function main() {
   console.log("═══════════════════════════════════════════");
-  console.log("  🤖 SolBot Pro v3.2 — Ultimate Edition");
+  console.log("  🤖 SolBot Pro v3.3 — Ultimate Edition");
   console.log(`  RPC        : ${RPC_URL}`);
   console.log(`  Intervalle : ${CONFIG.INTERVAL_SEC}s`);
   console.log(`  Auto-sell  : ${CONFIG.AUTO_SELL}`);
   console.log(`  Stop-loss  : ${CONFIG.STOP_LOSS_ENABLED} (${CONFIG.STOP_LOSS_THRESHOLD}%)`);
   console.log("═══════════════════════════════════════════");
   console.log("  🎯 Features:");
-  console.log("  • Weighted Average Price (5 sources)");
+  console.log("  • Weighted Average Price (4 sources actives)");
+  console.log("  • Jupiter Price API: DÉSACTIVÉ (ne répond pas)");
   console.log("  • Smart Cache TTL dynamique");
   console.log("  • Confidence Score API");
   console.log("  • Tokens Manuels + Vente Auto");
   console.log("  • Logos Multi-sources");
+  console.log("  • Retry Jupiter Swap avec exponential backoff");
   console.log("═══════════════════════════════════════════");
 
   initWallet();
