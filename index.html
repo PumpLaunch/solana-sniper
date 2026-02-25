@@ -1,553 +1,1469 @@
-// ═══════════════════════════════════════════════════════════════
-// SolBot Pro — Backend Node.js
-// Hébergement : Render (Background Worker + API Web)
-// Version : 3.0 — Stop-loss indépendant par token + Multi-sources
-// ═══════════════════════════════════════════════════════════════
-
-"use strict";
-
-const {
-  Connection,
-  Keypair,
-  PublicKey,
-  VersionedTransaction,
-} = require("@solana/web3.js");
-
-// node-fetch v3 est un module ESM — on l'importe dynamiquement
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: f }) => f(...args));
-
-// ── Variables d'environnement ────────────────────────────────────
-const PRIVATE_KEY_RAW = process.env.PRIVATE_KEY;
-const RPC_URL = process.env.RPC_URL || "https://mainnet.helius-rpc.com/?api-key=43caa0a0-33d2-420c-b00a-e7261bfecf78";
-
-// ── Configuration du bot ─────────────────────────────────────────
-const CONFIG = {
-  TOKEN_MINT:           process.env.TOKEN_MINT || "",
-  BUY_PRICE_USD:        parseFloat(process.env.BUY_PRICE_USD || "0"),
-  STOP_LOSS_ENABLED:    process.env.STOP_LOSS === "true",
-  STOP_LOSS_THRESHOLD:  parseFloat(process.env.STOP_LOSS_PCT || "-20"),
-  SLIPPAGE_BPS:         parseInt(process.env.SLIPPAGE_BPS || "100"),
-  AUTO_SELL:            process.env.AUTO_SELL === "true",
-  INTERVAL_SEC:         parseInt(process.env.INTERVAL_SEC || "15"),
-  TIERS: [
-    { targetPnl: 25,  sellPercent: 25, triggered: false },
-    { targetPnl: 50,  sellPercent: 25, triggered: false },
-    { targetPnl: 75,  sellPercent: 25, triggered: false },
-    { targetPnl: 100, sellPercent: 25, triggered: false },
-  ],
-};
-
-// ── État global ──────────────────────────────────────────────────
-let keypair = null;
-
-// 🧠 STOCKAGE AUTO DES PRIX DE RÉFÉRENCE (par token)
-const autoBuyPrices = {};
-
-// 🧠 CACHE DES MÉTADONNÉES DE TOKENS (nom, symbole)
-const tokenMetadataCache = {};
-
-// 🧠 SUIVI DES PALIERS DÉCLENCHÉS (par token)
-const triggeredTiers = {};  // { "mintAddress_tierIndex": true }
-
-// 📦 Données pour l'API web
-let lastTokensData = [];
-
-// ════════════════════════════════════════════════════════════════
-// INITIALISATION DU WALLET
-// ════════════════════════════════════════════════════════════════
-
-function initWallet() {
-  if (!PRIVATE_KEY_RAW) {
-    console.error("[ERREUR] Variable d'environnement PRIVATE_KEY manquante.");
-    process.exit(1);
-  }
-  try {
-    const secretBytes = JSON.parse(PRIVATE_KEY_RAW);
-    keypair = Keypair.fromSecretKey(new Uint8Array(secretBytes));
-    console.log(`[WALLET] Connecté : ${keypair.publicKey.toString()}`);
-  } catch (err) {
-    console.error("[ERREUR] Impossible de lire PRIVATE_KEY :", err.message);
-    process.exit(1);
-  }
-}
-
-function getConnection() {
-  return new Connection(RPC_URL, "confirmed");
-}
-
-// ════════════════════════════════════════════════════════════════
-// FETCH DU PRIX VIA MULTIPLES SOURCES (5 APIs en cascade)
-// ════════════════════════════════════════════════════════════════
-
-async function fetchTokenPrice(mintAddress) {
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SolBot Pro — Dashboard de surveillance Solana en temps réel">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>🤖 SolBot Pro — Dashboard Professionnel</title>
   
-  // ── SOURCE 1: DEXSCREENER ─────────────────────────────────────
-  try {
-    const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.pairs && data.pairs.length > 0) {
-        const bestPair = data.pairs
-          .filter(p => p.chainId === "solana")
-          .sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-        if (bestPair && bestPair.priceUsd) {
-          return {
-            priceUsd: parseFloat(bestPair.priceUsd) || 0,
-            priceNative: parseFloat(bestPair.priceNative) || 0,
-            change24h: bestPair.priceChange?.h24 || 0,
-            liquidityUsd: bestPair.liquidity?.usd || 0,
-            pairAddress: bestPair.pairAddress,
-            source: 'DexScreener'
-          };
-        }
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ════════════════════════════════════════════════════════════════
+       VARIABLES & RESET
+       ════════════════════════════════════════════════════════════════ */
+    :root {
+      --bg-primary: #0f0f1a;
+      --bg-secondary: #1a1a2e;
+      --bg-card: rgba(26, 26, 46, 0.8);
+      --bg-hover: rgba(0, 217, 255, 0.1);
+      --border-color: rgba(0, 217, 255, 0.2);
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0b0;
+      --text-muted: #6b6b80;
+      --accent-cyan: #00d9ff;
+      --accent-green: #00ff88;
+      --accent-red: #ff4757;
+      --accent-yellow: #ffd93d;
+      --accent-purple: #a78bfa;
+      --gradient-primary: linear-gradient(135deg, #00d9ff 0%, #00ff88 100%);
+      --gradient-dark: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 8px 32px rgba(0, 217, 255, 0.15);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--gradient-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       LAYOUT & CONTAINER
+       ════════════════════════════════════════════════════════════════ */
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 15px;
       }
     }
-  } catch (err) {
-    console.warn(`[PRIX] DexScreener échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── SOURCE 2: JUPITER PRICE API ───────────────────────────────
-  try {
-    const url = `https://price.jup.ag/v6/price?ids=${mintAddress}`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data[mintAddress]) {
-        const p = data.data[mintAddress];
-        return {
-          priceUsd: p.price || 0,
-          priceNative: p.price / 1e-6 || 0,
-          change24h: p.change24h || 0,
-          liquidityUsd: 0,
-          pairAddress: null,
-          source: 'Jupiter'
-        };
+
+    /* ════════════════════════════════════════════════════════════════
+       HEADER
+       ════════════════════════════════════════════════════════════════ */
+    header {
+      text-align: center;
+      padding: 40px 20px;
+      margin-bottom: 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(0, 217, 255, 0.1) 0%, transparent 70%);
+      animation: pulse 4s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .header-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    header h1 {
+      font-size: 3em;
+      font-weight: 800;
+      margin-bottom: 10px;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -1px;
+      animation: glow 2s ease-in-out infinite;
+    }
+
+    @keyframes glow {
+      0%, 100% { filter: drop-shadow(0 0 20px rgba(0, 217, 255, 0.5)); }
+      50% { filter: drop-shadow(0 0 40px rgba(0, 255, 136, 0.5)); }
+    }
+
+    header .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.2em;
+      margin-bottom: 20px;
+      font-weight: 400;
+    }
+
+    .wallet-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .wallet-address {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(0, 217, 255, 0.1);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: var(--radius-md);
+      color: var(--accent-cyan);
+      font-size: 0.95em;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .wallet-address:hover {
+      background: rgba(0, 217, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.9em;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+
+    .status-live {
+      background: rgba(0, 255, 136, 0.15);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      color: var(--accent-green);
+    }
+
+    .status-offline {
+      background: rgba(255, 71, 87, 0.15);
+      border: 1px solid rgba(255, 71, 87, 0.3);
+      color: var(--accent-red);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    .status-live .status-dot {
+      background: var(--accent-green);
+    }
+
+    .status-offline .status-dot {
+      background: var(--accent-red);
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       STATS CARDS
+       ════════════════════════════════════════════════════════════════ */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 25px;
+      text-align: center;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--gradient-primary);
+      transform: scaleX(0);
+      transition: var(--transition);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--accent-cyan);
+    }
+
+    .stat-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .stat-card h3 {
+      color: var(--text-secondary);
+      font-size: 0.9em;
+      font-weight: 500;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stat-card .value {
+      font-size: 2.2em;
+      font-weight: 700;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stat-card .subtext {
+      font-size: 0.85em;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       CONTROLS & FILTERS
+       ════════════════════════════════════════════════════════════════ */
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 25px;
+      padding: 20px;
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 250px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 12px 20px 12px 45px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: 0.95em;
+      transition: var(--transition);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1);
+    }
+
+    .search-box::before {
+      content: '🔍';
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.1em;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 10px 18px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      font-size: 0.9em;
+      cursor: pointer;
+      transition: var(--transition);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .filter-btn:hover,
+    .filter-btn.active {
+      background: rgba(0, 217, 255, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--text-primary);
+    }
+
+    .action-btn {
+      padding: 12px 24px;
+      background: var(--gradient-primary);
+      border: none;
+      border-radius: var(--radius-md);
+      color: #0f0f1a;
+      font-weight: 600;
+      font-size: 0.95em;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       TOKENS TABLE
+       ════════════════════════════════════════════════════════════════ */
+    .tokens-section {
+      background: var(--bg-card);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 25px;
+      margin-bottom: 30px;
+      overflow: hidden;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .section-header h2 {
+      font-size: 1.5em;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95em;
+    }
+
+    thead {
+      background: rgba(0, 217, 255, 0.1);
+    }
+
+    th {
+      padding: 16px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      font-size: 0.8em;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: var(--transition);
+      user-select: none;
+    }
+
+    th:hover {
+      background: rgba(0, 217, 255, 0.2);
+    }
+
+    th .sort-icon {
+      margin-left: 5px;
+      opacity: 0.5;
+    }
+
+    th.sorted .sort-icon {
+      opacity: 1;
+    }
+
+    td {
+      padding: 16px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      transition: var(--transition);
+    }
+
+    tbody tr {
+      transition: var(--transition);
+    }
+
+    tbody tr:hover {
+      background: var(--bg-hover);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Token Info */
+    .token-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .token-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(0, 217, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      flex-shrink: 0;
+    }
+
+    .token-logo img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .token-details {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .token-symbol {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .token-name {
+      font-size: 0.85em;
+      color: var(--text-secondary);
+    }
+
+    .token-address {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8em;
+      color: var(--accent-cyan);
+      background: rgba(0, 217, 255, 0.1);
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-block;
+      margin-top: 3px;
+    }
+
+    .token-address:hover {
+      background: rgba(0, 217, 255, 0.2);
+    }
+
+    .token-address.copied {
+      background: rgba(0, 255, 136, 0.2);
+      color: var(--accent-green);
+    }
+
+    /* PnL Colors */
+    .pnl-positive {
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    .pnl-negative {
+      color: var(--accent-red);
+      font-weight: 600;
+    }
+
+    .pnl-neutral {
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+
+    /* Price Source Badge */
+    .source-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.75em;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .source-dexscreener {
+      background: rgba(0, 217, 255, 0.2);
+      color: var(--accent-cyan);
+    }
+
+    .source-jupiter {
+      background: rgba(167, 139, 250, 0.2);
+      color: var(--accent-purple);
+    }
+
+    .source-birdeye {
+      background: rgba(255, 217, 61, 0.2);
+      color: var(--accent-yellow);
+    }
+
+    .source-coingecko {
+      background: rgba(0, 255, 136, 0.2);
+      color: var(--accent-green);
+    }
+
+    .source-helius {
+      background: rgba(255, 71, 87, 0.2);
+      color: var(--accent-red);
+    }
+
+    .source-unknown {
+      background: rgba(160, 160, 176, 0.2);
+      color: var(--text-secondary);
+    }
+
+    /* Liquidity Badge */
+    .liquidity-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.85em;
+      background: rgba(0, 217, 255, 0.1);
+      color: var(--accent-cyan);
+      font-weight: 500;
+    }
+
+    /* No Price Warning */
+    .no-price {
+      color: var(--text-muted);
+      font-style: italic;
+      font-size: 0.9em;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       LOADING & ERROR STATES
+       ════════════════════════════════════════════════════════════════ */
+    .loading-state,
+    .error-state,
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(0, 217, 255, 0.2);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: var(--text-secondary);
+      font-size: 1.1em;
+    }
+
+    .error-state {
+      background: rgba(255, 71, 87, 0.1);
+      border: 1px solid rgba(255, 71, 87, 0.3);
+      border-radius: var(--radius-lg);
+      margin: 20px 0;
+    }
+
+    .error-state .error-icon {
+      font-size: 3em;
+      margin-bottom: 15px;
+    }
+
+    .error-state h3 {
+      color: var(--accent-red);
+      margin-bottom: 10px;
+    }
+
+    .error-state p {
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      opacity: 0.5;
+      color: var(--text-muted);
+    }
+
+    .empty-state h3 {
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       TOAST NOTIFICATIONS
+       ════════════════════════════════════════════════════════════════ */
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--shadow-md);
+      animation: slideIn 0.3s ease;
+      min-width: 300px;
+      backdrop-filter: blur(10px);
+    }
+
+    .toast.success {
+      border-color: rgba(0, 255, 136, 0.3);
+    }
+
+    .toast.error {
+      border-color: rgba(255, 71, 87, 0.3);
+    }
+
+    .toast.info {
+      border-color: rgba(0, 217, 255, 0.3);
+    }
+
+    .toast-icon {
+      font-size: 1.3em;
+    }
+
+    .toast-message {
+      flex: 1;
+      color: var(--text-primary);
+      font-size: 0.95em;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
       }
     }
-  } catch (err) {
-    console.warn(`[PRIX] Jupiter échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── SOURCE 3: BIRDEYE API ─────────────────────────────────────
-  try {
-    const url = `https://public-api.birdeye.so/defi/price?address=${mintAddress}`;
-    const res = await fetch(url, { 
-      headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo' } 
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.data && data.data.value) {
-        return {
-          priceUsd: data.data.value || 0,
-          priceNative: 0,
-          change24h: 0,
-          liquidityUsd: 0,
-          pairAddress: null,
-          source: 'Birdeye'
-        };
+
+    /* ════════════════════════════════════════════════════════════════
+       FOOTER
+       ════════════════════════════════════════════════════════════════ */
+    footer {
+      text-align: center;
+      padding: 30px 20px;
+      margin-top: 40px;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.9em;
+    }
+
+    footer a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    footer a:hover {
+      color: var(--accent-green);
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       RESPONSIVE DESIGN
+       ════════════════════════════════════════════════════════════════ */
+    @media (max-width: 1024px) {
+      header h1 {
+        font-size: 2.2em;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
       }
     }
-  } catch (err) {
-    console.warn(`[PRIX] Birdeye échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── SOURCE 4: COINGECKO API ───────────────────────────────────
-  try {
-    const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress}&vs_currencies=usd`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      const key = mintAddress.toLowerCase();
-      if (data[key] && data[key].usd) {
-        return {
-          priceUsd: data[key].usd || 0,
-          priceNative: 0,
-          change24h: 0,
-          liquidityUsd: 0,
-          pairAddress: null,
-          source: 'CoinGecko'
-        };
+
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 1.8em;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .stat-card .value {
+        font-size: 1.8em;
+      }
+
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .search-box {
+        min-width: 100%;
+      }
+
+      .filter-group {
+        justify-content: center;
+      }
+
+      .action-btn {
+        justify-content: center;
+      }
+
+      table {
+        font-size: 0.85em;
+      }
+
+      th, td {
+        padding: 12px 8px;
+      }
+
+      .token-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
       }
     }
-  } catch (err) {
-    console.warn(`[PRIX] CoinGecko échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── SOURCE 5: HELIUS TOKEN API ────────────────────────────────
-  try {
-    const apiKey = process.env.HELIUS_API_KEY || 'demo';
-    const url = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${apiKey}`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data[mintAddress]) {
-        const t = data.data[mintAddress];
-        if (t.price_info && t.price_info.price_per_token) {
-          return {
-            priceUsd: t.price_info.price_per_token || 0,
-            priceNative: t.price_info.price_per_token / 1e-6 || 0,
-            change24h: t.price_info?.percent_change_24h || 0,
-            liquidityUsd: t.liquidity_info?.total_liquidity_usd || 0,
-            pairAddress: null,
-            source: 'Helius'
-          };
-        }
-      }
+
+    /* ════════════════════════════════════════════════════════════════
+       SCROLLBAR CUSTOMIZATION
+       ════════════════════════════════════════════════════════════════ */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
     }
-  } catch (err) {
-    console.warn(`[PRIX] Helius échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── AUCUNE SOURCE N'A TROUVÉ DE PRIX ──────────────────────────
-  return null;
-}
 
-// ════════════════════════════════════════════════════════════════
-// RÉCUPÉRATION DES MÉTADONNÉES DU TOKEN (nom, symbole) via Jupiter
-// ════════════════════════════════════════════════════════════════
-
-async function fetchTokenMetadata(mintAddress) {
-  if (tokenMetadataCache[mintAddress]) {
-    return tokenMetadataCache[mintAddress];
-  }
-
-  try {
-    const response = await fetch('https://tokens.jup.ag/tokens');
-    if (!response.ok) return { symbol: '???', name: 'Unknown', logo: null };
-    
-    const tokens = await response.json();
-    const token = tokens.find(t => t.address === mintAddress);
-    
-    if (token) {
-      tokenMetadataCache[mintAddress] = {
-        symbol: token.symbol || '???',
-        name: token.name || 'Unknown',
-        logo: token.logoURI || null
-      };
-      return tokenMetadataCache[mintAddress];
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
     }
-    
-    return { symbol: '???', name: 'Unknown', logo: null };
-    
-  } catch (err) {
-    return { symbol: '???', name: 'Unknown', logo: null };
-  }
-}
 
-// ════════════════════════════════════════════════════════════════
-// VENTE VIA JUPITER AGGREGATOR V6
-// ════════════════════════════════════════════════════════════════
-
-async function jupiterSell(mintAddress, amountRaw, slippageBps) {
-  const SOL_MINT = "So11111111111111111111111111111111111111112";
-
-  console.log(`[JUPITER] Demande de quote : ${amountRaw} unités → SOL`);
-
-  const quoteUrl =
-    `https://quote-api.jup.ag/v6/quote?` +
-    `inputMint=${mintAddress}` +
-    `&outputMint=${SOL_MINT}` +
-    `&amount=${amountRaw}` +
-    `&slippageBps=${slippageBps}`;
-
-  const quoteRes = await fetch(quoteUrl);
-  if (!quoteRes.ok) {
-    throw new Error(`Quote échouée (${quoteRes.status}) : ${await quoteRes.text()}`);
-  }
-  const quote = await quoteRes.json();
-  console.log(`[JUPITER] Quote reçu. SOL estimé : ${(quote.outAmount / 1e9).toFixed(6)}`);
-
-  const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      quoteResponse:                 quote,
-      userPublicKey:                 keypair.publicKey.toString(),
-      wrapAndUnwrapSol:              true,
-      dynamicComputeUnitLimit:       true,
-      computeUnitPriceMicroLamports: "auto",
-    }),
-  });
-
-  if (!swapRes.ok) {
-    throw new Error(`Swap tx échouée (${swapRes.status}) : ${await swapRes.text()}`);
-  }
-
-  const { swapTransaction } = await swapRes.json();
-
-  const connection = getConnection();
-  const txBuffer   = Buffer.from(swapTransaction, "base64");
-  const tx         = VersionedTransaction.deserialize(txBuffer);
-  tx.sign([keypair]);
-
-  const txId = await connection.sendRawTransaction(tx.serialize(), {
-    skipPreflight: false,
-    maxRetries:    3,
-  });
-
-  const latestBlockhash = await connection.getLatestBlockhash();
-  await connection.confirmTransaction(
-    { signature: txId, ...latestBlockhash },
-    "confirmed"
-  );
-
-  console.log(`[JUPITER] ✅ Transaction confirmée : ${txId}`);
-  return txId;
-}
-
-// ════════════════════════════════════════════════════════════════
-// LOGIQUE DE VENTE — Stop-loss et paliers INDÉPENDANTS par token
-// ════════════════════════════════════════════════════════════════
-
-async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl) {
-  if (!CONFIG.AUTO_SELL || pnl === null) return;
-
-  const rawAmount = Math.floor(balance * Math.pow(10, decimals));
-
-  // 🛡️ STOP-LOSS : Vendre TOUT si le PnL atteint le seuil négatif
-  // (vérifié indépendamment pour CHAQUE token)
-  if (CONFIG.STOP_LOSS_ENABLED && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
-    console.log(`[🛡️ STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
-    
-    try {
-      await jupiterSell(mintAddress, rawAmount, CONFIG.SLIPPAGE_BPS);
-      console.log(`[✅ STOP-LOSS] Vente totale de ${mintAddress.slice(0,8)}... exécutée`);
-    } catch (err) {
-      console.error(`[❌ STOP-LOSS] Échec de la vente pour ${mintAddress.slice(0,8)}... : ${err.message}`);
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 5px;
     }
-    return;  // Sortir après stop-loss (pas de paliers de profit)
-  }
 
-  // 🎯 PALIERS DE PROFITS : Vendre par tranches si PnL positif
-  // (chaque palier est indépendant par token)
-  for (let i = 0; i < CONFIG.TIERS.length; i++) {
-    const tierKey = `${mintAddress}_tier_${i}`;
-    const tier = CONFIG.TIERS[i];
-    
-    // Vérifier si ce palier spécifique a déjà été déclenché pour CE token
-    if (!triggeredTiers[tierKey] && pnl >= tier.targetPnl) {
-      triggeredTiers[tierKey] = true;  // Marque ce palier comme déclenché pour ce token
-      const sellPercent = tier.sellPercent / 100;
-      const amountToSell = Math.floor(rawAmount * sellPercent);
-      
-      if (amountToSell > 0) {
-        console.log(`[🎯 PALIER ${i+1}] ${mintAddress.slice(0,8)}... : +${pnl.toFixed(2)}% → Vente de ${tier.sellPercent}%`);
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-cyan);
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       UTILITY CLASSES
+       ════════════════════════════════════════════════════════════════ */
+    .hidden {
+      display: none !important;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .mt-20 {
+      margin-top: 20px;
+    }
+
+    .mb-20 {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-content">
+        <h1>🤖 SolBot Pro Dashboard</h1>
+        <p class="subtitle">Surveillance en temps réel de votre portefeuille Solana</p>
         
-        try {
-          await jupiterSell(mintAddress, amountToSell, CONFIG.SLIPPAGE_BPS);
-          console.log(`[✅ PALIER ${i+1}] Vente de ${tier.sellPercent}% de ${mintAddress.slice(0,8)}... exécutée`);
-        } catch (err) {
-          console.error(`[❌ PALIER ${i+1}] Échec de la vente : ${err.message}`);
-        }
-      }
-    }
-  }
-}
+        <div class="wallet-info">
+          <span id="bot-status" class="status-badge status-offline">
+            <span class="status-dot"></span>
+            <span>Connexion...</span>
+          </span>
+          <code id="wallet-address" class="wallet-address" title="Cliquez pour copier" onclick="copyWallet()">
+            Wallet: Chargement...
+          </code>
+        </div>
+      </div>
+    </header>
 
-// ════════════════════════════════════════════════════════════════
-// BOUCLE DE SURVEILLANCE — TOUS LES TOKENS DU WALLET
-// ════════════════════════════════════════════════════════════════
+    <!-- Stats Cards -->
+    <div class="stats">
+      <div class="stat-card">
+        <h3>📊 Tokens Surveillés</h3>
+        <div class="value" id="total-tokens">-</div>
+        <div class="subtext">Actifs dans le wallet</div>
+      </div>
+      <div class="stat-card">
+        <h3>💰 Valeur Totale</h3>
+        <div class="value" id="total-value">-</div>
+        <div class="subtext">Estimation USD</div>
+      </div>
+      <div class="stat-card">
+        <h3>📈 Meilleur PnL</h3>
+        <div class="value" id="best-pnl">-</div>
+        <div class="subtext">Performance maximale</div>
+      </div>
+      <div class="stat-card">
+        <h3>📉 Pire PnL</h3>
+        <div class="value" id="worst-pnl">-</div>
+        <div class="subtext">Performance minimale</div>
+      </div>
+    </div>
 
-async function runCheck() {
-  try {
-    const connection = getConnection();
-    const tokenDataForAPI = [];  // Données locales pour ce cycle
-
-    const allAccounts = await connection.getParsedTokenAccountsByOwner(
-      keypair.publicKey,
-      { programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
-    );
-
-    if (allAccounts.value.length === 0) {
-      console.log("[BOT] Aucun token trouvé dans le wallet.");
-      lastTokensData = [];
-      return;
-    }
-
-    console.log(`[BOT] Analyse de ${allAccounts.value.length} token(s)...`);
-
-    // 2. Boucler sur chaque token
-    for (const account of allAccounts.value) {
-      const info = account.account.data.parsed.info;
-      const mintAddress = info.mint;
-      const balance = parseFloat(info.tokenAmount.uiAmount) || 0;
-      const decimals = info.tokenAmount.decimals;
-
-      // Ignorer si solde nul
-      if (balance <= 0) continue;
-
-      // Ignorer le SOL natif
-      if (mintAddress === "So11111111111111111111111111111111111111112") continue;
-
-      // 3. Récupérer le prix via multiples sources
-      const priceData = await fetchTokenPrice(mintAddress);
+    <!-- Controls & Filters -->
+    <div class="controls">
+      <div class="search-box">
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Rechercher un token (nom, symbole, adresse)..."
+          oninput="filterTokens()"
+        >
+      </div>
       
-      // ✅ Définir les variables de prix (MÊME si pas de prix trouvé)
-      const hasPrice = priceData && priceData.priceUsd > 0;
-      const currentPrice = hasPrice ? priceData.priceUsd : 0;
-      const liquidity = hasPrice ? priceData.liquidityUsd : 0;
-      const priceSource = hasPrice ? priceData.source : null;
+      <div class="filter-group">
+        <button class="filter-btn active" onclick="setFilter('all', this)">Tous</button>
+        <button class="filter-btn" onclick="setFilter('profit', this)">📈 Profit</button>
+        <button class="filter-btn" onclick="setFilter('loss', this)">📉 Perte</button>
+        <button class="filter-btn" onclick="setFilter('noprice', this)">⚠️ Sans prix</button>
+      </div>
+      
+      <button class="action-btn" id="refresh-btn" onclick="loadData()">
+        <span>🔄</span> Actualiser
+      </button>
+    </div>
 
-      // Calculer la valeur (0 si pas de prix)
-      const valueUsd = balance * currentPrice;
+    <!-- Tokens Section -->
+    <div class="tokens-section">
+      <div class="section-header">
+        <h2>🪙 Vos Tokens</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button class="action-btn" onclick="exportData()" style="background: rgba(0, 217, 255, 0.2); color: var(--accent-cyan);">
+            📥 Exporter CSV
+          </button>
+        </div>
+      </div>
+      
+      <!-- Loading State -->
+      <div id="loading" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Chargement des données depuis le bot...</p>
+      </div>
+      
+      <!-- Error State -->
+      <div id="error" class="error-state hidden">
+        <div class="error-icon">❌</div>
+        <h3>Erreur de connexion</h3>
+        <p id="error-message">Impossible de charger les données. Vérifiez que le bot est en ligne.</p>
+        <button class="action-btn" onclick="loadData()">
+          <span>🔄</span> Réessayer
+        </button>
+      </div>
+      
+      <!-- Empty State -->
+      <div id="empty" class="empty-state hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 8v8M8 12h8"/>
+        </svg>
+        <h3>Aucun token trouvé</h3>
+        <p>Votre wallet ne contient aucun token ou tous les tokens sont filtrés.</p>
+      </div>
+      
+      <!-- Table -->
+      <div class="table-container">
+        <table id="tokens-table" class="hidden">
+          <thead>
+            <tr>
+              <th onclick="sortTable('symbol')">Token <span class="sort-icon">↕</span></th>
+              <th>Address</th>
+              <th onclick="sortTable('balance')">Balance <span class="sort-icon">↕</span></th>
+              <th onclick="sortTable('price')">Prix <span class="sort-icon">↕</span></th>
+              <th onclick="sortTable('value')">Valeur <span class="sort-icon">↕</span></th>
+              <th onclick="sortTable('pnl')">PnL <span class="sort-icon">↕</span></th>
+              <th onclick="sortTable('liquidity')">Liquidité <span class="sort-icon">↕</span></th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody id="tokens-body"></tbody>
+        </table>
+      </div>
+    </div>
 
-      // 🧠 Auto-détection du prix de référence (seulement si prix disponible)
-      if (hasPrice && !autoBuyPrices[mintAddress]) {
-        autoBuyPrices[mintAddress] = currentPrice;
-        console.log(`[PRIX REF] ${mintAddress.slice(0,8)}... enregistré à $${currentPrice.toExponential(4)}`);
+    <!-- Last Update -->
+    <div style="text-align: center; margin-top: 25px;">
+      <p class="last-update" style="color: var(--text-muted); font-size: 0.9em;">
+        Dernière mise à jour : <span id="last-update" style="color: var(--accent-cyan);">-</span>
+      </p>
+      <p style="color: var(--text-muted); font-size: 0.85em; margin-top: 10px;">
+        🔄 Actualisation automatique toutes les 30 secondes
+      </p>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer>
+    <p>
+      🤖 SolBot Pro v3.0 — Développé avec ❤️ pour la communauté Solana
+    </p>
+    <p style="margin-top: 10px;">
+      <a href="https://solscan.io/" target="_blank">Solscan</a> • 
+      <a href="https://jup.ag/" target="_blank">Jupiter</a> • 
+      <a href="https://dexscreener.com/" target="_blank">DexScreener</a>
+    </p>
+  </footer>
+
+  <script>
+    // ════════════════════════════════════════════════════════════════
+    // ⚙️ CONFIGURATION
+    // ════════════════════════════════════════════════════════════════
+    
+    const API_BASE_URL = 'https://solana-sniper-7o8s.onrender.com';
+    const AUTO_REFRESH_INTERVAL = 30000;  // 30 secondes
+    const REQUEST_TIMEOUT = 15000;          // 15 secondes timeout
+    
+    // État global
+    let allTokens = [];
+    let filteredTokens = [];
+    let currentFilter = 'all';
+    let sortColumn = null;
+    let sortAscending = false;
+
+    // ════════════════════════════════════════════════════════════════
+    // 🔄 CHARGEMENT DES DONNÉES
+    // ════════════════════════════════════════════════════════════════
+    
+    async function loadData() {
+      const loading = document.getElementById('loading');
+      const error = document.getElementById('error');
+      const empty = document.getElementById('empty');
+      const table = document.getElementById('tokens-table');
+      const refreshBtn = document.getElementById('refresh-btn');
+      const statusBadge = document.getElementById('bot-status');
+      
+      // UI: État de chargement
+      loading.classList.remove('hidden');
+      error.classList.add('hidden');
+      empty.classList.add('hidden');
+      table.classList.add('hidden');
+      refreshBtn.disabled = true;
+      
+      try {
+        // Fetch avec timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+        
+        const response = await fetch(`${API_BASE_URL}/api/tokens`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.tokens) {
+          throw new Error('Format de réponse invalide');
+        }
+        
+        // Mettre à jour l'UI avec les données
+        allTokens = data.tokens || [];
+        filteredTokens = [...allTokens];
+        applyFilter();
+        
+        // Mettre à jour le statut du bot
+        statusBadge.className = 'status-badge status-live';
+        statusBadge.innerHTML = '<span class="status-dot"></span><span>Bot en ligne</span>';
+        
+        if (data.wallet) {
+          const shortWallet = `${data.wallet.slice(0, 8)}...${data.wallet.slice(-6)}`;
+          document.getElementById('wallet-address').textContent = `Wallet: ${shortWallet}`;
+          document.getElementById('wallet-address').dataset.full = data.wallet;
+        }
+        
+        // Mettre à jour l'heure
+        document.getElementById('last-update').textContent = 
+          new Date().toLocaleTimeString('fr-FR', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+          });
+        
+      } catch (err) {
+        console.error('Erreur de chargement:', err);
+        
+        // Afficher l'erreur
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+        
+        let errorMsg = 'Erreur de connexion au bot';
+        if (err.name === 'AbortError') {
+          errorMsg = 'Délai d\'attente dépassé. Le bot est peut-être surchargé.';
+        } else if (err.message.includes('Failed to fetch')) {
+          errorMsg = 'Impossible de contacter le bot. Vérifiez qu\'il est en ligne sur Render.';
+        }
+        
+        document.getElementById('error-message').textContent = errorMsg;
+        
+        // Mettre à jour le statut
+        statusBadge.className = 'status-badge status-offline';
+        statusBadge.innerHTML = '<span class="status-dot"></span><span>Bot hors ligne</span>';
+        
+        showToast('❌ ' + errorMsg, 'error');
+        
+      } finally {
+        refreshBtn.disabled = false;
       }
-
-      // Calculer le PnL (seulement si prix disponible)
-      let pnl = null;
-      let pnlStr = "N/A";
-      if (hasPrice && autoBuyPrices[mintAddress]) {
-        const buyPrice = autoBuyPrices[mintAddress];
-        pnl = ((currentPrice - buyPrice) / buyPrice) * 100;
-        pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%`;
+    }
+    
+    // ════════════════════════════════════════════════════════════════
+    // 🎯 FILTRES
+    // ════════════════════════════════════════════════════════════════
+    
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      
+      // Mettre à jour les boutons
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      
+      applyFilter();
+    }
+    
+    function applyFilter() {
+      switch (currentFilter) {
+        case 'profit':
+          filteredTokens = allTokens.filter(t => t.pnl !== null && t.pnl > 0.5);
+          break;
+        case 'loss':
+          filteredTokens = allTokens.filter(t => t.pnl !== null && t.pnl < -0.5);
+          break;
+        case 'noprice':
+          filteredTokens = allTokens.filter(t => !t.hasPrice || t.price === 0);
+          break;
+        default:
+          filteredTokens = [...allTokens];
       }
-
-      // 🧠 Récupérer les métadonnées du token
-      const metadata = await fetchTokenMetadata(mintAddress);
-      const tokenSymbol = metadata.symbol !== '???' ? metadata.symbol : (info.symbol || '???');
-      const tokenName = metadata.name || 'Unknown';
-
-      // ✅ Afficher le token avec ou sans prix
-      if (hasPrice) {
-        console.log(
-          `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
-          `Address: ${mintAddress} | ` +
-          `Balance: ${balance.toFixed(4)} | ` +
-          `Prix: $${currentPrice.toExponential(4)} [${priceSource}] | ` +
-          `Valeur: $${valueUsd.toFixed(2)} | ` +
-          `PnL: ${pnlStr} | ` +
-          `Liquidité: $${Math.round(liquidity).toLocaleString()}`
-        );
+      
+      // Appliquer la recherche si présente
+      filterTokens();
+    }
+    
+    function filterTokens() {
+      const search = document.getElementById('search-input').value.toLowerCase().trim();
+      
+      if (!search) {
+        applyFilter();
+        return;
+      }
+      
+      filteredTokens = allTokens.filter(t => {
+        const symbol = (t.symbol || '').toLowerCase();
+        const name = (t.name || '').toLowerCase();
+        const address = (t.address || '').toLowerCase();
+        
+        return symbol.includes(search) || 
+               name.includes(search) || 
+               address.includes(search);
+      });
+      
+      renderTable();
+    }
+    
+    // ════════════════════════════════════════════════════════════════
+    // 📊 TRI DU TABLEAU
+    // ════════════════════════════════════════════════════════════════
+    
+    function sortTable(column) {
+      if (sortColumn === column) {
+        sortAscending = !sortAscending;
       } else {
-        console.log(
-          `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
-          `Address: ${mintAddress} | ` +
-          `Balance: ${balance.toFixed(4)} | ` +
-          `Prix: ❌ NON TROUVÉ | ` +
-          `Valeur: $?.?? | ` +
-          `PnL: N/A`
-        );
+        sortColumn = column;
+        sortAscending = true;
       }
-
-      // Appliquer la logique de vente (seulement si prix disponible)
-      if (hasPrice) {
-        await applySellLogic(mintAddress, balance, decimals, currentPrice, pnl);
+      
+      // Mettre à jour l'UI des en-têtes
+      document.querySelectorAll('th').forEach(th => {
+        th.classList.remove('sorted');
+        th.querySelector('.sort-icon').textContent = '↕';
+      });
+      
+      const currentTh = event.currentTarget;
+      currentTh.classList.add('sorted');
+      currentTh.querySelector('.sort-icon').textContent = sortAscending ? '↑' : '↓';
+      
+      // Trier les données
+      filteredTokens.sort((a, b) => {
+        let aVal = a[column] || 0;
+        let bVal = b[column] || 0;
+        
+        if (column === 'symbol' || column === 'price') {
+          aVal = String(aVal).toLowerCase();
+          bVal = String(bVal).toLowerCase();
+        }
+        
+        if (aVal < bVal) return sortAscending ? -1 : 1;
+        if (aVal > bVal) return sortAscending ? 1 : -1;
+        return 0;
+      });
+      
+      renderTable();
+    }
+    
+    // ════════════════════════════════════════════════════════════════
+    // 🧱 AFFICHAGE DU TABLEAU
+    // ════════════════════════════════════════════════════════════════
+    
+    function renderTable() {
+      const loading = document.getElementById('loading');
+      const empty = document.getElementById('empty');
+      const table = document.getElementById('tokens-table');
+      const tbody = document.getElementById('tokens-body');
+      
+      loading.classList.add('hidden');
+      
+      if (filteredTokens.length === 0) {
+        table.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
       }
-
-      // 📦 Stocker les données pour l'API web (TOUS les tokens)
-      tokenDataForAPI.push({
-        symbol: tokenSymbol,
-        name: tokenName,
-        address: mintAddress,
-        balance: balance,
-        price: currentPrice,
-        value: valueUsd,
-        pnl: pnl,
-        liquidity: liquidity,
-        logo: metadata.logo,
-        hasPrice: hasPrice
+      
+      table.classList.remove('hidden');
+      empty.classList.add('hidden');
+      
+      // Calculer et mettre à jour les stats
+      updateStats();
+      
+      // Remplir le tableau
+      tbody.innerHTML = '';
+      filteredTokens.forEach(token => {
+        const row = createTokenRow(token);
+        tbody.appendChild(row);
       });
     }
-
-    // 🔄 Mettre à jour le stockage global pour l'API
-    lastTokensData = tokenDataForAPI;
-
-  } catch (err) {
-    console.error("[BOT] Erreur dans runCheck :", err.message);
-  }
-}
-
-// ════════════════════════════════════════════════════════════════
-// 🌐 API HTTP POUR L'INTERFACE WEB
-// ════════════════════════════════════════════════════════════════
-
-if (process.env.RENDER) {
-  const http = require('http');
-  
-  const server = http.createServer((req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'application/json');
     
-    if (req.url === '/api/tokens') {
-      res.writeHead(200);
-      res.end(JSON.stringify({
-        success: true,
-        wallet: keypair?.publicKey?.toString() || 'N/A',
-        tokens: lastTokensData,
-        count: lastTokensData.length,
-        timestamp: new Date().toISOString()
-      }));
-    } else if (req.url === '/api/status') {
-      res.writeHead(200);
-      res.end(JSON.stringify({
-        status: 'running',
-        wallet: keypair?.publicKey?.toString() || 'N/A',
-        tokensCount: lastTokensData.length,
-        uptime: process.uptime(),
-        autoSell: CONFIG.AUTO_SELL,
-        stopLoss: CONFIG.STOP_LOSS_ENABLED
-      }));
-    } else if (req.url === '/') {
-      res.writeHead(200, {'Content-Type': 'text/plain'});
-      res.end('🤖 SolBot Pro API is running!\nEndpoints: /api/tokens, /api/status');
-    } else {
-      res.writeHead(404);
-      res.end(JSON.stringify({ error: 'Not found' }));
+    function createTokenRow(token) {
+      const row = document.createElement('tr');
+      
+      const pnlClass = getPnlClass(token.pnl);
+      const pnlSign = token.pnl !== null && token.pnl >= 0 ? '+' : '';
+      const shortAddress = `${token.address.slice(0, 6)}...${token.address.slice(-4)}`;
+      const sourceClass = getSourceClass(token.priceSource || (token.hasPrice ? 'dexscreener' : 'unknown'));
+      const sourceLabel = token.hasPrice ? (token.priceSource || 'Inconnu') : '-';
+      
+      row.innerHTML = `
+        <td>
+          <div class="token-info">
+            <div class="token-logo">
+              ${token.logo ? `<img src="${token.logo}" alt="${token.symbol}" onerror="this.parentElement.innerHTML='🪙'">` : '🪙'}
+            </div>
+            <div class="token-details">
+              <span class="token-symbol">${escapeHtml(token.symbol || '???')}</span>
+              <span class="token-name">${escapeHtml(token.name || 'Unknown')}</span>
+            </div>
+          </div>
+        </td>
+        <td>
+          <code class="token-address" onclick="copyAddress('${token.address}', this)" title="Cliquez pour copier">
+            ${shortAddress}
+          </code>
+        </td>
+        <td style="font-family: 'JetBrains Mono', monospace;">
+          ${formatNumber(token.balance, 4)}
+        </td>
+        <td style="font-family: 'JetBrains Mono', monospace;">
+          ${token.hasPrice ? '$' + formatPrice(token.price) : '<span class="no-price">N/A</span>'}
+        </td>
+        <td style="font-family: 'JetBrains Mono', monospace;">
+          ${token.hasPrice ? '$' + formatNumber(token.value, 2) : '<span class="no-price">N/A</span>'}
+        </td>
+        <td class="${pnlClass}">
+          ${token.pnl !== null ? `${pnlSign}${token.pnl.toFixed(2)}%` : 'N/A'}
+        </td>
+        <td>
+          ${token.hasPrice ? `<span class="liquidity-badge">💧 $${formatLiquidity(token.liquidity)}</span>` : '-'}
+        </td>
+        <td>
+          ${token.hasPrice ? `<span class="source-badge source-${sourceClass}">${sourceLabel}</span>` : '-'}
+        </td>
+      `;
+      
+      return row;
     }
-  });
-  
-  const PORT = process.env.PORT || 10000;
-  server.listen(PORT, () => {
-    console.log(`[HTTP] ✅ API disponible sur le port ${PORT}`);
-    console.log(`[HTTP] 📡 Endpoints: /api/tokens | /api/status`);
-  });
-}
-
-// ════════════════════════════════════════════════════════════════
-// POINT D'ENTRÉE
-// ════════════════════════════════════════════════════════════════
-
-async function main() {
-  console.log("═══════════════════════════════════════════");
-  console.log("  🤖 SolBot Pro — Backend Node.js démarré");
-  console.log(`  RPC        : ${RPC_URL}`);
-  console.log(`  Token      : ${CONFIG.TOKEN_MINT || "Multi-tokens"}`);
-  console.log(`  Intervalle : ${CONFIG.INTERVAL_SEC}s`);
-  console.log(`  Auto-sell  : ${CONFIG.AUTO_SELL}`);
-  console.log(`  Stop-loss  : ${CONFIG.STOP_LOSS_ENABLED} (${CONFIG.STOP_LOSS_THRESHOLD}%)`);
-  console.log("═══════════════════════════════════════════");
-
-  initWallet();
-
-  // Premier cycle immédiat au démarrage
-  await runCheck();
-
-  // Boucle principale — maintient le processus actif sur Render
-  setInterval(async () => {
-    try {
-      await runCheck();
-    } catch (err) {
-      console.error("[BOT] Erreur non gérée dans runCheck :", err.message);
+    
+    // ════════════════════════════════════════════════════════════════
+    // 📈 MISE À JOUR DES STATS
+    // ════════════════════════════════════════════════════════════════
+    
+    function updateStats() {
+      const totalValue = allTokens.reduce((sum, t) => sum + (t.value || 0), 0);
+      const validPnls = allTokens.map(t => t.pnl).filter(pnl => pnl !== null && !isNaN(pnl));
+      const bestPnl = validPnls.length > 0 ? Math.max(...validPnls) : 0;
+      const worstPnl = validPnls.length > 0 ? Math.min(...validPnls) : 0;
+      
+      document.getElementById('total-tokens').textContent = allTokens.length;
+      document.getElementById('total-value').textContent = '$' + formatNumber(totalValue, 2);
+      
+      const bestPnlEl = document.getElementById('best-pnl');
+      bestPnlEl.textContent = `${bestPnl >= 0 ? '+' : ''}${bestPnl.toFixed(2)}%`;
+      bestPnlEl.className = 'value ' + getPnlClass(bestPnl);
+      
+      const worstPnlEl = document.getElementById('worst-pnl');
+      worstPnlEl.textContent = `${worstPnl >= 0 ? '+' : ''}${worstPnl.toFixed(2)}%`;
+      worstPnlEl.className = 'value ' + getPnlClass(worstPnl);
     }
-  }, CONFIG.INTERVAL_SEC * 1000);
-
-  console.log("[BOT] 🔄 Surveillance active. Processus maintenu ouvert.");
-}
-
-// ── Gestion des erreurs critiques ────────────────────────────────
-
-process.on("uncaughtException", (err) => {
-  console.error("[FATAL] Exception non capturée :", err.message);
-});
-
-process.on("unhandledRejection", (reason) => {
-  console.error("[FATAL] Promesse rejetée non gérée :", reason);
-});
-
-main();
+    
+    // ════════════════════════════════════════════════════════════════
+    // 📥 EXPORT CSV
+    // ════════════════════════════════════════════════════════════════
+    
+    function exportData() {
+      if (allTokens.length === 0) {
+        showToast('⚠️ Aucune donnée à exporter', 'info');
+        return;
+      }
+      
+      const headers = ['Symbol', 'Name', 'Address', 'Balance', 'Price', 'Value', 'PnL', 'Liquidity', 'Source'];
+      const rows = allTokens.map(t => [
+        t.symbol || '???',
+        t.name || 'Unknown',
+        t.address,
+        t.balance.toFixed(4),
+        t.price.toFixed(8),
+        t.value.toFixed(2),
+        t.pnl !== null ? t.pnl.toFixed(2) + '%' : 'N/A',
+        t.liquidity.toFixed(2),
+        t.priceSource || 'N/A'
+      ]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `solbot-tokens-${new Date().toISOString().slice(0,10)}.csv`;
+      link.click();
+      
+      showToast('✅ Export CSV téléchargé', 'success');
+    }
+    
+    // ════════════════════════════════════════════════════════════════
+    // 🔧 FONCTIONS UTILITAIRES
+    // ════════════════════════════════════════════════════════════════
+    
+    function getPnlClass(pnl) {
+      if (pnl === null || isNaN(pnl)) return 'pnl-neutral';
+      if (pnl > 0.5) return 'pnl-positive';
+      if (pnl < -0.5) return 'pnl-negative';
+      return 'pnl-neutral';
+    }
+    
+    function getSourceClass(source) {
+      const sources = ['dexscreener', 'jupiter', 'birdeye', 'coingecko', 'helius'];
+      const normalized = source.toLowerCase();
+      return sources.find(s => normalized.includes(s)) || 'unknown';
+    }
+    
+    function formatNumber(num, decimals) {
+      if (num === null || num === undefined) return '-';
+      if (num === 0) return '0';
+      if (Math.abs(num) < 0.0001 && decimals >= 4) {
+        return num.toExponential(2);
+      }
+      return num.toLocaleString('fr-FR', { 
+        minimumFractionDigits: decimals, 
+        maximumFractionDigits: decimals 
+      });
+    }
+    
+    function formatPrice(price) {
+      if (price === null || price === undefined) return '-';
+      if (price < 0.0001) return price.toExponential(4);
+      if (price < 0.01) return price.toFixed(6);
+      if (price < 1) return price.toFixed(4);
+      return price.toFixed(2);
+    }
+    
+    function formatLiquidity(liquidity) {
+      if (liquidity === null || liquidity === undefined) return '0';
+      if (liquidity >= 1000000) return (liquidity / 1000000).toFixed(2) + 'M';
+      if (liquidity >= 1000) return (liquidity / 1000).toFixed(1) + 'K';
+      return Math.round(liquidity).toLocaleString('fr-FR');
+    }
+    
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function copyAddress(address, element) {
+      navigator.clipboard.writeText(address).then(() => {
+        element.classList.add('copied');
+        element.textContent = '✓ Copié!';
+        showToast('✅ Adresse copiée dans le presse-papiers', 'success');
+        
+        setTimeout(() => {
+          element.classList.remove('copied');
+          const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
+          element.textContent = shortAddress;
+        }, 2000);
+      }).catch(err => {
+        console.error('Erreur de copie:', err);
+        showToast('❌ Échec de la copie', 'error');
+      });
+    }
+    
+    function copyWallet() {
+      const walletEl = document.getElementById('wallet-address');
+      const fullWallet = walletEl.dataset.full;
+      
+      if (fullWallet) {
+        navigator.clipboard.writeText(fullWallet).then(() => {
+          showToast('✅ Adresse du wallet copiée', 'success');
+        });
+      }
+    }
+    
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+      
+      toast.innerHTML = `
+        <span class="toast-icon">${icon}</span>
+        <span class="toast-message">${message}</span>
+      `;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.animation = 'slideIn 0.3s ease reverse';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    // ════════════════════════════════════════════════════════════════
+    // 🚀 INITIALISATION
+    // ════════════════════════════════════════════════════════════════
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      // Chargement initial
+      loadData();
+      
+      // Auto-refresh toutes les 30 secondes
+      setInterval(loadData, AUTO_REFRESH_INTERVAL);
+      
+      // Rafraîchir quand la page redevient visible
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          loadData();
+        }
+      });
+      
+      // Rafraîchir au retour du focus
+      window.addEventListener('focus', () => {
+        loadData();
+      });
+    });
+  </script>
+</body>
+</html>
