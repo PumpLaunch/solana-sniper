@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // SolBot Pro — Backend Node.js
 // Hébergement : Render (Background Worker + API Web)
-// Version : 2.0 — Multi-sources de prix + Affichage complet
+// Version : 3.0 — Stop-loss indépendant par token + Multi-sources
 // ═══════════════════════════════════════════════════════════════
 
 "use strict";
@@ -40,13 +40,15 @@ const CONFIG = {
 
 // ── État global ──────────────────────────────────────────────────
 let keypair = null;
-let stopLossTriggered = false;
 
 // 🧠 STOCKAGE AUTO DES PRIX DE RÉFÉRENCE (par token)
 const autoBuyPrices = {};
 
 // 🧠 CACHE DES MÉTADONNÉES DE TOKENS (nom, symbole)
 const tokenMetadataCache = {};
+
+// 🧠 SUIVI DES PALIERS DÉCLENCHÉS (par token)
+const triggeredTiers = {};  // { "mintAddress_tierIndex": true }
 
 // 📦 Données pour l'API web
 let lastTokensData = [];
@@ -235,34 +237,6 @@ async function fetchTokenMetadata(mintAddress) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// RÉCUPÉRATION DE LA BALANCE TOKEN
-// ════════════════════════════════════════════════════════════════
-
-async function getTokenBalance(mintAddress) {
-  try {
-    const connection = getConnection();
-    const mintPubkey = new PublicKey(mintAddress);
-
-    const accounts = await connection.getParsedTokenAccountsByOwner(
-      keypair.publicKey,
-      { mint: mintPubkey }
-    );
-
-    if (accounts.value.length === 0) return { balance: 0, raw: 0, decimals: 6 };
-
-    const info = accounts.value[0].account.data.parsed.info;
-    return {
-      balance:  info.tokenAmount.uiAmount || 0,
-      raw:      parseInt(info.tokenAmount.amount),
-      decimals: info.tokenAmount.decimals,
-    };
-  } catch (err) {
-    console.error("[BALANCE] Erreur lecture balance :", err.message);
-    return null;
-  }
-}
-
-// ════════════════════════════════════════════════════════════════
 // VENTE VIA JUPITER AGGREGATOR V6
 // ════════════════════════════════════════════════════════════════
 
@@ -324,7 +298,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// LOGIQUE DE VENTE — Réutilisable pour chaque token
+// LOGIQUE DE VENTE — Stop-loss et paliers INDÉPENDANTS par token
 // ════════════════════════════════════════════════════════════════
 
 async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl) {
@@ -332,26 +306,41 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
 
   const rawAmount = Math.floor(balance * Math.pow(10, decimals));
 
-  // Stop-loss
-  if (CONFIG.STOP_LOSS_ENABLED && !stopLossTriggered && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
-    stopLossTriggered = true;
-    console.log(`[STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
-    await jupiterSell(mintAddress, rawAmount, CONFIG.SLIPPAGE_BPS);
-    return;
+  // 🛡️ STOP-LOSS : Vendre TOUT si le PnL atteint le seuil négatif
+  // (vérifié indépendamment pour CHAQUE token)
+  if (CONFIG.STOP_LOSS_ENABLED && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
+    console.log(`[🛡️ STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
+    
+    try {
+      await jupiterSell(mintAddress, rawAmount, CONFIG.SLIPPAGE_BPS);
+      console.log(`[✅ STOP-LOSS] Vente totale de ${mintAddress.slice(0,8)}... exécutée`);
+    } catch (err) {
+      console.error(`[❌ STOP-LOSS] Échec de la vente pour ${mintAddress.slice(0,8)}... : ${err.message}`);
+    }
+    return;  // Sortir après stop-loss (pas de paliers de profit)
   }
 
-  // Paliers de prise de profits
+  // 🎯 PALIERS DE PROFITS : Vendre par tranches si PnL positif
+  // (chaque palier est indépendant par token)
   for (let i = 0; i < CONFIG.TIERS.length; i++) {
+    const tierKey = `${mintAddress}_tier_${i}`;
     const tier = CONFIG.TIERS[i];
-    if (!tier.triggered && pnl >= tier.targetPnl) {
-      tier.triggered = true;
+    
+    // Vérifier si ce palier spécifique a déjà été déclenché pour CE token
+    if (!triggeredTiers[tierKey] && pnl >= tier.targetPnl) {
+      triggeredTiers[tierKey] = true;  // Marque ce palier comme déclenché pour ce token
       const sellPercent = tier.sellPercent / 100;
       const amountToSell = Math.floor(rawAmount * sellPercent);
       
-      console.log(`[PALIER ${i+1}] ${mintAddress.slice(0,8)}... : +${pnl.toFixed(2)}% → Vente de ${tier.sellPercent}%`);
-      
       if (amountToSell > 0) {
-        await jupiterSell(mintAddress, amountToSell, CONFIG.SLIPPAGE_BPS);
+        console.log(`[🎯 PALIER ${i+1}] ${mintAddress.slice(0,8)}... : +${pnl.toFixed(2)}% → Vente de ${tier.sellPercent}%`);
+        
+        try {
+          await jupiterSell(mintAddress, amountToSell, CONFIG.SLIPPAGE_BPS);
+          console.log(`[✅ PALIER ${i+1}] Vente de ${tier.sellPercent}% de ${mintAddress.slice(0,8)}... exécutée`);
+        } catch (err) {
+          console.error(`[❌ PALIER ${i+1}] Échec de la vente : ${err.message}`);
+        }
       }
     }
   }
