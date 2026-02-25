@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-// SolBot Pro — Backend Node.js
+// SolBot Pro v3.2 — Ultimate Edition
+// Backend Node.js pour Solana Trading Automatique
 // Hébergement : Render (Background Worker + API Web)
-// Version : 3.0 — Stop-loss indépendant par token + Multi-sources
+// Features: Weighted Price + Smart Cache + Confidence + Manual Tokens + Logos
 // ═══════════════════════════════════════════════════════════════
 
 "use strict";
@@ -44,11 +45,34 @@ let keypair = null;
 // 🧠 STOCKAGE AUTO DES PRIX DE RÉFÉRENCE (par token)
 const autoBuyPrices = {};
 
-// 🧠 CACHE DES MÉTADONNÉES DE TOKENS (nom, symbole)
+// 🧠 CACHE DES MÉTADONNÉES DE TOKENS (nom, symbole, logo)
 const tokenMetadataCache = {};
 
 // 🧠 SUIVI DES PALIERS DÉCLENCHÉS (par token)
-const triggeredTiers = {};  // { "mintAddress_tierIndex": true }
+const triggeredTiers = {};
+
+// 🧠 CACHE INTELLIGENT DES PRIX AVEC TTL DYNAMIQUE
+const priceCache = new Map();
+const CACHE_TTL = {
+  high: 30000,    // 30s pour liquidité >= $1M
+  medium: 60000,  // 1min pour $100K-$1M
+  low: 120000,    // 2min pour $1K-$100K
+  none: 300000,   // 5min pour tokens sans prix
+};
+
+// 📋 LISTE MANUELLE DE TOKENS À SURVEILLER
+let manualTokens = [];
+let dynamicTokens = [];
+
+// Charger les tokens manuels depuis les variables d'environnement
+if (process.env.MANUAL_TOKENS) {
+  try {
+    manualTokens = JSON.parse(process.env.MANUAL_TOKENS);
+    console.log(`[MANUAL] ${manualTokens.length} token(s) chargés depuis MANUAL_TOKENS`);
+  } catch (e) {
+    console.warn('[MANUAL] Erreur de parsing MANUAL_TOKENS');
+  }
+}
 
 // 📦 Données pour l'API web
 let lastTokensData = [];
@@ -77,135 +101,143 @@ function getConnection() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// FETCH DU PRIX VIA MULTIPLES SOURCES (5 APIs en cascade)
+// 🎯 PRIX AGGREGÉ AVEC MOYENNE PONDÉRÉE (Weighted Average)
 // ════════════════════════════════════════════════════════════════
 
-async function fetchTokenPrice(mintAddress) {
-  
-  // ── SOURCE 1: DEXSCREENER ─────────────────────────────────────
+async function getWeightedPrice(mintAddress) {
+  const sources = [
+    { name: 'DexScreener', fetch: () => fetchDexScreenerPrice(mintAddress), weight: 3 },
+    { name: 'Jupiter', fetch: () => fetchJupiterPrice(mintAddress), weight: 4 },
+    { name: 'Birdeye', fetch: () => fetchBirdeyePrice(mintAddress), weight: 2 },
+    { name: 'CoinGecko', fetch: () => fetchCoinGeckoPrice(mintAddress), weight: 1 },
+    { name: 'Helius', fetch: () => fetchHeliusPrice(mintAddress), weight: 2 },
+  ];
+
+  const results = await Promise.allSettled(
+    sources.map(src => src.fetch().then(data => ({ ...data, source: src.name, weight: src.weight })))
+  );
+
+  const validPrices = results
+    .filter(r => r.status === 'fulfilled' && r.value?.priceUsd > 0)
+    .map(r => r.value);
+
+  if (validPrices.length === 0) return null;
+
+  const weightedSum = validPrices.reduce((sum, p) => sum + p.priceUsd * p.weight, 0);
+  const totalWeight = validPrices.reduce((sum, p) => sum + p.weight, 0);
+  const confidence = validPrices.length / sources.length;
+
+  return {
+    priceUsd: weightedSum / totalWeight,
+    confidence: Math.min(confidence, 1.0),
+    sources: validPrices.map(p => p.source),
+    liquidityUsd: validPrices.find(p => p.liquidityUsd)?.liquidityUsd || 0,
+    change24h: validPrices.find(p => p.change24h)?.change24h || 0
+  };
+}
+
+// ── Sources individuelles ───────────────────────────────────────
+
+async function fetchDexScreenerPrice(mintAddress) {
   try {
     const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
     const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.pairs && data.pairs.length > 0) {
-        const bestPair = data.pairs
-          .filter(p => p.chainId === "solana")
-          .sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-        if (bestPair && bestPair.priceUsd) {
-          return {
-            priceUsd: parseFloat(bestPair.priceUsd) || 0,
-            priceNative: parseFloat(bestPair.priceNative) || 0,
-            change24h: bestPair.priceChange?.h24 || 0,
-            liquidityUsd: bestPair.liquidity?.usd || 0,
-            pairAddress: bestPair.pairAddress,
-            source: 'DexScreener'
-          };
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[PRIX] DexScreener échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── SOURCE 2: JUPITER PRICE API ───────────────────────────────
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.pairs?.length) return null;
+    const bestPair = data.pairs
+      .filter(p => p.chainId === "solana")
+      .sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+    if (!bestPair?.priceUsd) return null;
+    return {
+      priceUsd: parseFloat(bestPair.priceUsd),
+      liquidityUsd: bestPair.liquidity?.usd || 0,
+      change24h: bestPair.priceChange?.h24 || 0
+    };
+  } catch { return null; }
+}
+
+async function fetchJupiterPrice(mintAddress) {
   try {
     const url = `https://price.jup.ag/v6/price?ids=${mintAddress}`;
     const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data[mintAddress]) {
-        const p = data.data[mintAddress];
-        return {
-          priceUsd: p.price || 0,
-          priceNative: p.price / 1e-6 || 0,
-          change24h: p.change24h || 0,
-          liquidityUsd: 0,
-          pairAddress: null,
-          source: 'Jupiter'
-        };
-      }
-    }
-  } catch (err) {
-    console.warn(`[PRIX] Jupiter échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── SOURCE 3: BIRDEYE API ─────────────────────────────────────
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.data?.[mintAddress]?.price) return null;
+    const p = data.data[mintAddress];
+    return { priceUsd: p.price, change24h: p.change24h || 0 };
+  } catch { return null; }
+}
+
+async function fetchBirdeyePrice(mintAddress) {
   try {
     const url = `https://public-api.birdeye.so/defi/price?address=${mintAddress}`;
-    const res = await fetch(url, { 
-      headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo' } 
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.data && data.data.value) {
-        return {
-          priceUsd: data.data.value || 0,
-          priceNative: 0,
-          change24h: 0,
-          liquidityUsd: 0,
-          pairAddress: null,
-          source: 'Birdeye'
-        };
-      }
-    }
-  } catch (err) {
-    console.warn(`[PRIX] Birdeye échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── SOURCE 4: COINGECKO API ───────────────────────────────────
+    const res = await fetch(url, { headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.success?.data?.value) return null;
+    return { priceUsd: data.data.value };
+  } catch { return null; }
+}
+
+async function fetchCoinGeckoPrice(mintAddress) {
   try {
     const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress}&vs_currencies=usd`;
     const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      const key = mintAddress.toLowerCase();
-      if (data[key] && data[key].usd) {
-        return {
-          priceUsd: data[key].usd || 0,
-          priceNative: 0,
-          change24h: 0,
-          liquidityUsd: 0,
-          pairAddress: null,
-          source: 'CoinGecko'
-        };
-      }
-    }
-  } catch (err) {
-    console.warn(`[PRIX] CoinGecko échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── SOURCE 5: HELIUS TOKEN API ────────────────────────────────
+    if (!res.ok) return null;
+    const data = await res.json();
+    const key = mintAddress.toLowerCase();
+    if (!data[key]?.usd) return null;
+    return { priceUsd: data[key].usd };
+  } catch { return null; }
+}
+
+async function fetchHeliusPrice(mintAddress) {
   try {
     const apiKey = process.env.HELIUS_API_KEY || 'demo';
     const url = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${apiKey}`;
     const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data[mintAddress]) {
-        const t = data.data[mintAddress];
-        if (t.price_info && t.price_info.price_per_token) {
-          return {
-            priceUsd: t.price_info.price_per_token || 0,
-            priceNative: t.price_info.price_per_token / 1e-6 || 0,
-            change24h: t.price_info?.percent_change_24h || 0,
-            liquidityUsd: t.liquidity_info?.total_liquidity_usd || 0,
-            pairAddress: null,
-            source: 'Helius'
-          };
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[PRIX] Helius échec pour ${mintAddress.slice(0,8)}...`);
-  }
-  
-  // ── AUCUNE SOURCE N'A TROUVÉ DE PRIX ──────────────────────────
-  return null;
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.data?.[mintAddress]?.price_info?.price_per_token) return null;
+    const t = data.data[mintAddress];
+    return {
+      priceUsd: t.price_info.price_per_token,
+      liquidityUsd: t.liquidity_info?.total_liquidity_usd || 0
+    };
+  } catch { return null; }
 }
 
 // ════════════════════════════════════════════════════════════════
-// RÉCUPÉRATION DES MÉTADONNÉES DU TOKEN (nom, symbole) via Jupiter
+// 🧠 CACHE INTELLIGENT AVEC TTL DYNAMIQUE
+// ════════════════════════════════════════════════════════════════
+
+async function getCachedPrice(mintAddress, liquidityUsd) {
+  const cached = priceCache.get(mintAddress);
+  const now = Date.now();
+
+  let ttl = CACHE_TTL.none;
+  if (liquidityUsd >= 1_000_000) ttl = CACHE_TTL.high;
+  else if (liquidityUsd >= 100_000) ttl = CACHE_TTL.medium;
+  else if (liquidityUsd > 0) ttl = CACHE_TTL.low;
+
+  if (cached && (now - cached.timestamp) < ttl) {
+    return { ...cached.data, fromCache: true };
+  }
+
+  console.log(`[PRIX] Refresh ${mintAddress.slice(0,8)}... (liquidity: $${Math.round(liquidityUsd).toLocaleString()})`);
+  const fresh = await getWeightedPrice(mintAddress);
+
+  if (fresh) {
+    priceCache.set(mintAddress, { data: fresh, timestamp: now, ttl });
+    console.log(`[PRIX] ✅ ${mintAddress.slice(0,8)}... = $${fresh.priceUsd.toExponential(4)} [${fresh.sources.join(',')}] (conf: ${(fresh.confidence*100).toFixed(0)}%)`);
+  }
+
+  return fresh ? { ...fresh, fromCache: false } : null;
+}
+
+// ════════════════════════════════════════════════════════════════
+// 🖼️ RÉCUPÉRATION DES MÉTADONNÉES + LOGOS (Multi-sources)
 // ════════════════════════════════════════════════════════════════
 
 async function fetchTokenMetadata(mintAddress) {
@@ -213,27 +245,83 @@ async function fetchTokenMetadata(mintAddress) {
     return tokenMetadataCache[mintAddress];
   }
 
+  let metadata = { symbol: '???', name: 'Unknown', logo: null };
+
+  // SOURCE 1: Jupiter Token List
   try {
     const response = await fetch('https://tokens.jup.ag/tokens');
-    if (!response.ok) return { symbol: '???', name: 'Unknown', logo: null };
-    
-    const tokens = await response.json();
-    const token = tokens.find(t => t.address === mintAddress);
-    
-    if (token) {
-      tokenMetadataCache[mintAddress] = {
-        symbol: token.symbol || '???',
-        name: token.name || 'Unknown',
-        logo: token.logoURI || null
-      };
-      return tokenMetadataCache[mintAddress];
+    if (response.ok) {
+      const tokens = await response.json();
+      const token = tokens.find(t => t.address === mintAddress);
+      if (token) {
+        metadata = {
+          symbol: token.symbol || '???',
+          name: token.name || 'Unknown',
+          logo: token.logoURI || null
+        };
+        if (metadata.logo) {
+          tokenMetadataCache[mintAddress] = metadata;
+          return metadata;
+        }
+      }
     }
-    
-    return { symbol: '???', name: 'Unknown', logo: null };
-    
   } catch (err) {
-    return { symbol: '???', name: 'Unknown', logo: null };
+    console.warn(`[META] Jupiter échec pour ${mintAddress.slice(0,8)}...`);
   }
+
+  // SOURCE 2: Solana Token List
+  try {
+    const response = await fetch('https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json');
+    if (response.ok) {
+      const data = await response.json();
+      const token = data.tags?.[mintAddress] || data.tokens?.find(t => t.address === mintAddress);
+      if (token?.logoURI) {
+        metadata.logo = token.logoURI;
+        if (token.symbol) metadata.symbol = token.symbol;
+        if (token.name) metadata.name = token.name;
+      }
+    }
+  } catch (err) {
+    console.warn(`[META] Solana Token List échec pour ${mintAddress.slice(0,8)}...`);
+  }
+
+  // SOURCE 3: Metaplex API
+  try {
+    const response = await fetch(`https://api.metaplex.com/v1/metadata/${mintAddress}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.metadata?.image) metadata.logo = data.metadata.image;
+      if (data?.metadata?.symbol) metadata.symbol = data.metadata.symbol;
+      if (data?.metadata?.name) metadata.name = data.metadata.name;
+    }
+  } catch (err) {
+    console.warn(`[META] Metaplex échec pour ${mintAddress.slice(0,8)}...`);
+  }
+
+  // SOURCE 4: DexScreener
+  try {
+    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.pairs?.[0]?.baseToken?.logoURI) metadata.logo = data.pairs[0].baseToken.logoURI;
+      if (data.pairs?.[0]?.baseToken?.symbol && metadata.symbol === '???') {
+        metadata.symbol = data.pairs[0].baseToken.symbol;
+      }
+    }
+  } catch (err) {
+    console.warn(`[META] DexScreener échec pour ${mintAddress.slice(0,8)}...`);
+  }
+
+  // SOURCE 5: Fallback avec placeholder coloré
+  if (!metadata.logo && metadata.symbol !== '???') {
+    const firstChar = metadata.symbol.charAt(0).toUpperCase();
+    const colors = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#a78bfa', '#ec4899'];
+    const colorIndex = firstChar.charCodeAt(0) % colors.length;
+    metadata.logo = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="${colors[colorIndex]}"/><text x="16" y="22" font-size="18" font-weight="bold" fill="white" text-anchor="middle" font-family="Arial">${firstChar}</text></svg>`)}`;
+  }
+
+  tokenMetadataCache[mintAddress] = metadata;
+  return metadata;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -242,56 +330,38 @@ async function fetchTokenMetadata(mintAddress) {
 
 async function jupiterSell(mintAddress, amountRaw, slippageBps) {
   const SOL_MINT = "So11111111111111111111111111111111111111112";
-
   console.log(`[JUPITER] Demande de quote : ${amountRaw} unités → SOL`);
 
-  const quoteUrl =
-    `https://quote-api.jup.ag/v6/quote?` +
-    `inputMint=${mintAddress}` +
-    `&outputMint=${SOL_MINT}` +
-    `&amount=${amountRaw}` +
-    `&slippageBps=${slippageBps}`;
-
+  const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${mintAddress}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}`;
   const quoteRes = await fetch(quoteUrl);
-  if (!quoteRes.ok) {
-    throw new Error(`Quote échouée (${quoteRes.status}) : ${await quoteRes.text()}`);
-  }
+  if (!quoteRes.ok) throw new Error(`Quote échouée (${quoteRes.status}) : ${await quoteRes.text()}`);
+  
   const quote = await quoteRes.json();
   console.log(`[JUPITER] Quote reçu. SOL estimé : ${(quote.outAmount / 1e9).toFixed(6)}`);
 
   const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
-    method:  "POST",
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      quoteResponse:                 quote,
-      userPublicKey:                 keypair.publicKey.toString(),
-      wrapAndUnwrapSol:              true,
-      dynamicComputeUnitLimit:       true,
+      quoteResponse: quote,
+      userPublicKey: keypair.publicKey.toString(),
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
       computeUnitPriceMicroLamports: "auto",
     }),
   });
 
-  if (!swapRes.ok) {
-    throw new Error(`Swap tx échouée (${swapRes.status}) : ${await swapRes.text()}`);
-  }
-
+  if (!swapRes.ok) throw new Error(`Swap tx échouée (${swapRes.status}) : ${await swapRes.text()}`);
   const { swapTransaction } = await swapRes.json();
 
   const connection = getConnection();
-  const txBuffer   = Buffer.from(swapTransaction, "base64");
-  const tx         = VersionedTransaction.deserialize(txBuffer);
+  const txBuffer = Buffer.from(swapTransaction, "base64");
+  const tx = VersionedTransaction.deserialize(txBuffer);
   tx.sign([keypair]);
 
-  const txId = await connection.sendRawTransaction(tx.serialize(), {
-    skipPreflight: false,
-    maxRetries:    3,
-  });
-
+  const txId = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
   const latestBlockhash = await connection.getLatestBlockhash();
-  await connection.confirmTransaction(
-    { signature: txId, ...latestBlockhash },
-    "confirmed"
-  );
+  await connection.confirmTransaction({ signature: txId, ...latestBlockhash }, "confirmed");
 
   console.log(`[JUPITER] ✅ Transaction confirmée : ${txId}`);
   return txId;
@@ -306,40 +376,35 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
 
   const rawAmount = Math.floor(balance * Math.pow(10, decimals));
 
-  // 🛡️ STOP-LOSS : Vendre TOUT si le PnL atteint le seuil négatif
-  // (vérifié indépendamment pour CHAQUE token)
+  // 🛡️ STOP-LOSS
   if (CONFIG.STOP_LOSS_ENABLED && pnl <= CONFIG.STOP_LOSS_THRESHOLD) {
     console.log(`[🛡️ STOP-LOSS] ${mintAddress.slice(0,8)}... : Seuil atteint (${pnl.toFixed(2)}%)`);
-    
     try {
       await jupiterSell(mintAddress, rawAmount, CONFIG.SLIPPAGE_BPS);
       console.log(`[✅ STOP-LOSS] Vente totale de ${mintAddress.slice(0,8)}... exécutée`);
     } catch (err) {
-      console.error(`[❌ STOP-LOSS] Échec de la vente pour ${mintAddress.slice(0,8)}... : ${err.message}`);
+      console.error(`[❌ STOP-LOSS] Échec : ${err.message}`);
     }
-    return;  // Sortir après stop-loss (pas de paliers de profit)
+    return;
   }
 
-  // 🎯 PALIERS DE PROFITS : Vendre par tranches si PnL positif
-  // (chaque palier est indépendant par token)
+  // 🎯 PALIERS DE PROFITS
   for (let i = 0; i < CONFIG.TIERS.length; i++) {
     const tierKey = `${mintAddress}_tier_${i}`;
     const tier = CONFIG.TIERS[i];
-    
-    // Vérifier si ce palier spécifique a déjà été déclenché pour CE token
+
     if (!triggeredTiers[tierKey] && pnl >= tier.targetPnl) {
-      triggeredTiers[tierKey] = true;  // Marque ce palier comme déclenché pour ce token
+      triggeredTiers[tierKey] = true;
       const sellPercent = tier.sellPercent / 100;
       const amountToSell = Math.floor(rawAmount * sellPercent);
-      
+
       if (amountToSell > 0) {
         console.log(`[🎯 PALIER ${i+1}] ${mintAddress.slice(0,8)}... : +${pnl.toFixed(2)}% → Vente de ${tier.sellPercent}%`);
-        
         try {
           await jupiterSell(mintAddress, amountToSell, CONFIG.SLIPPAGE_BPS);
-          console.log(`[✅ PALIER ${i+1}] Vente de ${tier.sellPercent}% de ${mintAddress.slice(0,8)}... exécutée`);
+          console.log(`[✅ PALIER ${i+1}] Vente exécutée`);
         } catch (err) {
-          console.error(`[❌ PALIER ${i+1}] Échec de la vente : ${err.message}`);
+          console.error(`[❌ PALIER ${i+1}] Échec : ${err.message}`);
         }
       }
     }
@@ -347,59 +412,68 @@ async function applySellLogic(mintAddress, balance, decimals, currentPrice, pnl)
 }
 
 // ════════════════════════════════════════════════════════════════
-// BOUCLE DE SURVEILLANCE — TOUS LES TOKENS DU WALLET
+// BOUCLE DE SURVEILLANCE — Wallet + Tokens Manuels
 // ════════════════════════════════════════════════════════════════
 
 async function runCheck() {
   try {
     const connection = getConnection();
-    const tokenDataForAPI = [];  // Données locales pour ce cycle
+    const tokenDataForAPI = [];
 
+    // 1. Récupérer les tokens du wallet
     const allAccounts = await connection.getParsedTokenAccountsByOwner(
       keypair.publicKey,
       { programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
     );
 
-    if (allAccounts.value.length === 0) {
-      console.log("[BOT] Aucun token trouvé dans le wallet.");
-      lastTokensData = [];
-      return;
-    }
+    const walletTokens = allAccounts.value.map(acc => acc.account.data.parsed.info.mint);
+    console.log(`[BOT] Wallet: ${walletTokens.length} tokens détectés`);
 
-    console.log(`[BOT] Analyse de ${allAccounts.value.length} token(s)...`);
+    // 2. Combiner avec les tokens manuels
+    const allTokensToCheck = [...walletTokens, ...manualTokens, ...dynamicTokens];
+    const uniqueTokens = [...new Set(allTokensToCheck)];
+    console.log(`[BOT] Analyse de ${uniqueTokens.length} token(s) (wallet + manuels)...`);
 
-    // 2. Boucler sur chaque token
-    for (const account of allAccounts.value) {
-      const info = account.account.data.parsed.info;
-      const mintAddress = info.mint;
-      const balance = parseFloat(info.tokenAmount.uiAmount) || 0;
-      const decimals = info.tokenAmount.decimals;
-
-      // Ignorer si solde nul
-      if (balance <= 0) continue;
-
-      // Ignorer le SOL natif
+    // 3. Boucler sur chaque token
+    for (const mintAddress of uniqueTokens) {
+      const isManual = manualTokens.includes(mintAddress) || dynamicTokens.includes(mintAddress);
       if (mintAddress === "So11111111111111111111111111111111111111112") continue;
 
-      // 3. Récupérer le prix via multiples sources
-      const priceData = await fetchTokenPrice(mintAddress);
-      
-      // ✅ Définir les variables de prix (MÊME si pas de prix trouvé)
+      let balance = 0;
+      let decimals = 6;
+      let isInWallet = false;
+
+      // 4. Vérifier si dans le wallet
+      const account = allAccounts.value.find(acc => acc.account.data.parsed.info.mint === mintAddress);
+      if (account) {
+        balance = parseFloat(account.account.data.parsed.info.tokenAmount.uiAmount) || 0;
+        decimals = account.account.data.parsed.info.tokenAmount.decimals;
+        isInWallet = true;
+        if (balance <= 0) continue;
+      } else {
+        if (isManual) {
+          console.log(`[MANUAL] ⚠️ ${mintAddress.slice(0,8)}... : Token manuel mais PAS dans le wallet`);
+        } else {
+          continue;
+        }
+      }
+
+      // 5. Récupérer le prix
+      const priceData = await getCachedPrice(mintAddress, 0);
       const hasPrice = priceData && priceData.priceUsd > 0;
       const currentPrice = hasPrice ? priceData.priceUsd : 0;
-      const liquidity = hasPrice ? priceData.liquidityUsd : 0;
-      const priceSource = hasPrice ? priceData.source : null;
-
-      // Calculer la valeur (0 si pas de prix)
+      const liquidity = hasPrice ? (priceData.liquidityUsd || 0) : 0;
+      const priceSource = hasPrice ? priceData.sources?.join(',') : null;
+      const priceConfidence = hasPrice ? priceData.confidence : null;
       const valueUsd = balance * currentPrice;
 
-      // 🧠 Auto-détection du prix de référence (seulement si prix disponible)
+      // 6. Auto-détection du prix de référence
       if (hasPrice && !autoBuyPrices[mintAddress]) {
         autoBuyPrices[mintAddress] = currentPrice;
         console.log(`[PRIX REF] ${mintAddress.slice(0,8)}... enregistré à $${currentPrice.toExponential(4)}`);
       }
 
-      // Calculer le PnL (seulement si prix disponible)
+      // 7. Calculer le PnL
       let pnl = null;
       let pnlStr = "N/A";
       if (hasPrice && autoBuyPrices[mintAddress]) {
@@ -408,39 +482,37 @@ async function runCheck() {
         pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}%`;
       }
 
-      // 🧠 Récupérer les métadonnées du token
+      // 8. Récupérer les métadonnées
       const metadata = await fetchTokenMetadata(mintAddress);
-      const tokenSymbol = metadata.symbol !== '???' ? metadata.symbol : (info.symbol || '???');
+      const tokenSymbol = metadata.symbol !== '???' ? metadata.symbol : '???';
       const tokenName = metadata.name || 'Unknown';
 
-      // ✅ Afficher le token avec ou sans prix
+      // 9. Afficher le token
+      const manualBadge = isManual ? '📋' : '';
+      const walletBadge = isInWallet ? '✅' : '❌';
+
       if (hasPrice) {
+        const cacheMark = priceData.fromCache ? '📦' : '🔄';
+        const confMark = priceConfidence >= 0.8 ? '✅' : priceConfidence >= 0.5 ? '⚠️' : '❓';
         console.log(
-          `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
-          `Address: ${mintAddress} | ` +
-          `Balance: ${balance.toFixed(4)} | ` +
-          `Prix: $${currentPrice.toExponential(4)} [${priceSource}] | ` +
-          `Valeur: $${valueUsd.toFixed(2)} | ` +
-          `PnL: ${pnlStr} | ` +
-          `Liquidité: $${Math.round(liquidity).toLocaleString()}`
+          `[TOKEN] ${manualBadge}${walletBadge}${cacheMark}${confMark} ${tokenSymbol} (${tokenName}) | ` +
+          `Address: ${mintAddress} | Balance: ${balance.toFixed(4)} | ` +
+          `Prix: $${currentPrice.toExponential(4)} [${priceSource}] | Valeur: $${valueUsd.toFixed(2)} | ` +
+          `PnL: ${pnlStr} | Liquidité: $${Math.round(liquidity).toLocaleString()} | Conf: ${(priceConfidence*100).toFixed(0)}%`
         );
       } else {
         console.log(
-          `[TOKEN] ${tokenSymbol} (${tokenName}) | ` +
-          `Address: ${mintAddress} | ` +
-          `Balance: ${balance.toFixed(4)} | ` +
-          `Prix: ❌ NON TROUVÉ | ` +
-          `Valeur: $?.?? | ` +
-          `PnL: N/A`
+          `[TOKEN] ${manualBadge}${walletBadge}❓ ${tokenSymbol} (${tokenName}) | ` +
+          `Address: ${mintAddress} | Balance: ${balance.toFixed(4)} | Prix: ❌ NON TROUVÉ`
         );
       }
 
-      // Appliquer la logique de vente (seulement si prix disponible)
-      if (hasPrice) {
+      // 10. Vente auto (seulement si dans le wallet avec balance > 0)
+      if (hasPrice && isInWallet && balance > 0) {
         await applySellLogic(mintAddress, balance, decimals, currentPrice, pnl);
       }
 
-      // 📦 Stocker les données pour l'API web (TOUS les tokens)
+      // 11. Stocker pour l'API
       tokenDataForAPI.push({
         symbol: tokenSymbol,
         name: tokenName,
@@ -451,11 +523,16 @@ async function runCheck() {
         pnl: pnl,
         liquidity: liquidity,
         logo: metadata.logo,
-        hasPrice: hasPrice
+        hasPrice: hasPrice,
+        priceSource: priceSource,
+        priceConfidence: priceConfidence,
+        priceSources: priceData?.sources || [],
+        isManual: isManual,
+        isInWallet: isInWallet,
+        autoSellEnabled: hasPrice && isInWallet && balance > 0
       });
     }
 
-    // 🔄 Mettre à jour le stockage global pour l'API
     lastTokensData = tokenDataForAPI;
 
   } catch (err) {
@@ -469,43 +546,133 @@ async function runCheck() {
 
 if (process.env.RENDER) {
   const http = require('http');
-  
+
   const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.setHeader('Content-Type', 'application/json');
-    
-    if (req.url === '/api/tokens') {
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // GET /api/tokens
+    if (req.url === '/api/tokens' && req.method === 'GET') {
       res.writeHead(200);
       res.end(JSON.stringify({
         success: true,
         wallet: keypair?.publicKey?.toString() || 'N/A',
         tokens: lastTokensData,
         count: lastTokensData.length,
-        timestamp: new Date().toISOString()
+        manualTokens: manualTokens,
+        dynamicTokens: dynamicTokens,
+        timestamp: new Date().toISOString(),
+        priceQuality: {
+          highConfidence: lastTokensData.filter(t => t.priceConfidence >= 0.8).length,
+          mediumConfidence: lastTokensData.filter(t => t.priceConfidence >= 0.5 && t.priceConfidence < 0.8).length,
+          lowConfidence: lastTokensData.filter(t => t.priceConfidence < 0.5 && t.hasPrice).length,
+          noPrice: lastTokensData.filter(t => !t.hasPrice).length
+        }
       }));
-    } else if (req.url === '/api/status') {
+      return;
+    }
+
+    // POST /api/tokens/add
+    if (req.url === '/api/tokens/add' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          const { address, name, symbol } = data;
+          if (!address || address.length < 32) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ success: false, error: 'Adresse invalide' }));
+            return;
+          }
+          if (manualTokens.includes(address) || dynamicTokens.includes(address)) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ success: false, error: 'Token déjà dans la liste' }));
+            return;
+          }
+          dynamicTokens.push(address);
+          if (name || symbol) {
+            tokenMetadataCache[address] = { symbol: symbol || '???', name: name || 'Unknown', logo: null };
+          }
+          console.log(`[MANUAL] ✅ Token ajouté : ${address.slice(0,8)}...`);
+          res.writeHead(200);
+          res.end(JSON.stringify({ success: true, message: 'Token ajouté', address, totalManual: manualTokens.length, totalDynamic: dynamicTokens.length }));
+        } catch (e) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ success: false, error: 'JSON invalide' }));
+        }
+      });
+      return;
+    }
+
+    // DELETE /api/tokens/remove
+    if (req.url === '/api/tokens/remove' && req.method === 'DELETE') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          const { address } = data;
+          const manualIndex = manualTokens.indexOf(address);
+          const dynamicIndex = dynamicTokens.indexOf(address);
+          if (manualIndex > -1) manualTokens.splice(manualIndex, 1);
+          else if (dynamicIndex > -1) dynamicTokens.splice(dynamicIndex, 1);
+          else {
+            res.writeHead(404);
+            res.end(JSON.stringify({ success: false, error: 'Token non trouvé' }));
+            return;
+          }
+          console.log(`[MANUAL] ❌ Token supprimé : ${address.slice(0,8)}...`);
+          res.writeHead(200);
+          res.end(JSON.stringify({ success: true, message: 'Token supprimé', address }));
+        } catch (e) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ success: false, error: 'JSON invalide' }));
+        }
+      });
+      return;
+    }
+
+    // GET /api/status
+    if (req.url === '/api/status' && req.method === 'GET') {
       res.writeHead(200);
       res.end(JSON.stringify({
         status: 'running',
         wallet: keypair?.publicKey?.toString() || 'N/A',
         tokensCount: lastTokensData.length,
+        manualTokensCount: manualTokens.length + dynamicTokens.length,
         uptime: process.uptime(),
         autoSell: CONFIG.AUTO_SELL,
-        stopLoss: CONFIG.STOP_LOSS_ENABLED
+        stopLoss: CONFIG.STOP_LOSS_ENABLED,
+        priceStats: { cached: priceCache.size, highConfidence: lastTokensData.filter(t => t.priceConfidence >= 0.8).length }
       }));
-    } else if (req.url === '/') {
-      res.writeHead(200, {'Content-Type': 'text/plain'});
-      res.end('🤖 SolBot Pro API is running!\nEndpoints: /api/tokens, /api/status');
-    } else {
-      res.writeHead(404);
-      res.end(JSON.stringify({ error: 'Not found' }));
+      return;
     }
+
+    // GET /
+    if (req.url === '/') {
+      res.writeHead(200, {'Content-Type': 'text/plain'});
+      res.end('🤖 SolBot Pro v3.2 API\nEndpoints: GET /api/tokens | POST /api/tokens/add | DELETE /api/tokens/remove | GET /api/status');
+      return;
+    }
+
+    res.writeHead(404);
+    res.end(JSON.stringify({ error: 'Not found' }));
   });
-  
+
   const PORT = process.env.PORT || 10000;
   server.listen(PORT, () => {
-    console.log(`[HTTP] ✅ API disponible sur le port ${PORT}`);
-    console.log(`[HTTP] 📡 Endpoints: /api/tokens | /api/status`);
+    console.log(`[HTTP] ✅ API sur le port ${PORT}`);
+    console.log(`[HTTP] 📡 Endpoints: /api/tokens | /api/tokens/add | /api/tokens/remove | /api/status`);
+    console.log(`[HTTP] 📋 Tokens manuels: ${manualTokens.length} chargés`);
   });
 }
 
@@ -515,39 +682,33 @@ if (process.env.RENDER) {
 
 async function main() {
   console.log("═══════════════════════════════════════════");
-  console.log("  🤖 SolBot Pro — Backend Node.js démarré");
+  console.log("  🤖 SolBot Pro v3.2 — Ultimate Edition");
   console.log(`  RPC        : ${RPC_URL}`);
-  console.log(`  Token      : ${CONFIG.TOKEN_MINT || "Multi-tokens"}`);
   console.log(`  Intervalle : ${CONFIG.INTERVAL_SEC}s`);
   console.log(`  Auto-sell  : ${CONFIG.AUTO_SELL}`);
   console.log(`  Stop-loss  : ${CONFIG.STOP_LOSS_ENABLED} (${CONFIG.STOP_LOSS_THRESHOLD}%)`);
   console.log("═══════════════════════════════════════════");
+  console.log("  🎯 Features:");
+  console.log("  • Weighted Average Price (5 sources)");
+  console.log("  • Smart Cache TTL dynamique");
+  console.log("  • Confidence Score API");
+  console.log("  • Tokens Manuels + Vente Auto");
+  console.log("  • Logos Multi-sources");
+  console.log("═══════════════════════════════════════════");
 
   initWallet();
-
-  // Premier cycle immédiat au démarrage
   await runCheck();
 
-  // Boucle principale — maintient le processus actif sur Render
   setInterval(async () => {
-    try {
-      await runCheck();
-    } catch (err) {
-      console.error("[BOT] Erreur non gérée dans runCheck :", err.message);
-    }
+    try { await runCheck(); }
+    catch (err) { console.error("[BOT] Erreur runCheck :", err.message); }
   }, CONFIG.INTERVAL_SEC * 1000);
 
   console.log("[BOT] 🔄 Surveillance active. Processus maintenu ouvert.");
 }
 
 // ── Gestion des erreurs critiques ────────────────────────────────
-
-process.on("uncaughtException", (err) => {
-  console.error("[FATAL] Exception non capturée :", err.message);
-});
-
-process.on("unhandledRejection", (reason) => {
-  console.error("[FATAL] Promesse rejetée non gérée :", reason);
-});
+process.on("uncaughtException", (err) => console.error("[FATAL] Exception :", err.message));
+process.on("unhandledRejection", (reason) => console.error("[FATAL] Rejection :", reason));
 
 main();
