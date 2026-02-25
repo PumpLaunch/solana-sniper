@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-// SolBot Pro v3.5 — Pump.fun Edition
+// SolBot Pro v3.6 — Cache Fix Edition
 // Backend Node.js pour Solana Trading Automatique
 // Hébergement : Render (Background Worker + API Web)
-// Features: Pump.fun API + Weighted Price + Smart Cache + Confidence + Manual Tokens + Logos
+// Features: Cache succès uniquement + Pump.fun + Weighted Price + Smart Cache + Confidence + Manual Tokens + Logos
 // ═══════════════════════════════════════════════════════════════
 
 "use strict";
@@ -93,18 +93,16 @@ function getConnection() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// SOURCES DE PRIX — Pump.fun + Autres avec fallbacks
+// SOURCES DE PRIX — Avec retry intelligent et headers
 // ════════════════════════════════════════════════════════════════
 
-// ── Pump.fun API (NOUVEAU — pour tokens pump.fun) ───────────────
+// ── Pump.fun API ────────────────────────────────────────────────
 async function fetchPumpFunPrice(mintAddress) {
   try {
-    // Pump.fun API publique pour les prix
     const url = `https://frontend-api.pump.fun/coins/${mintAddress}`;
-    
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'SolBot-Pro/3.5',
+        'User-Agent': 'SolBot-Pro/3.6',
         'Accept': 'application/json',
         'Origin': 'https://pump.fun'
       },
@@ -117,20 +115,13 @@ async function fetchPumpFunPrice(mintAddress) {
     }
     
     const data = await res.json();
+    if (!data?.usd_market_cap || !data?.virtual_sol_reserves) return null;
     
-    // Vérifier les données nécessaires
-    if (!data?.usd_market_cap || !data?.virtual_sol_reserves) {
-      return null;
-    }
-    
-    // Calculer le prix à partir des réserves virtuelles
     const virtualSolReserves = data.virtual_sol_reserves || 0;
     const virtualTokenReserves = data.virtual_token_reserves || 1;
-    const solPrice = data.sol_price || 200; // Prix SOL en USD (fallback)
+    const solPrice = data.sol_price || 200;
     
-    // Prix en SOL
     const priceSol = virtualSolReserves / virtualTokenReserves;
-    // Prix en USD
     const priceUsd = priceSol * solPrice;
     
     if (priceUsd <= 0) return null;
@@ -148,48 +139,59 @@ async function fetchPumpFunPrice(mintAddress) {
   }
 }
 
-// ── DexScreener ─────────────────────────────────────────────────
-async function fetchDexScreenerPrice(mintAddress) {
-  try {
-    const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
-    const headers = {
-      'User-Agent': 'SolBot-Pro/3.5',
-      'Accept': 'application/json',
-      'Connection': 'keep-alive'
-    };
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
-    const res = await fetch(url, { signal: controller.signal, headers });
-    clearTimeout(timeoutId);
-    
-    if (!res.ok) {
-      console.warn(`[DEXSCREENER] HTTP ${res.status} pour ${mintAddress.slice(0,8)}...`);
+// ── DexScreener — Avec retry et backoff ─────────────────────────
+async function fetchDexScreenerPrice(mintAddress, maxRetries = 2) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
+      const headers = {
+        'User-Agent': 'SolBot-Pro/3.6 (Trading Bot)',
+        'Accept': 'application/json',
+        'Connection': 'keep-alive'
+      };
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      const res = await fetch(url, { signal: controller.signal, headers });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        console.warn(`[DEXSCREENER] HTTP ${res.status} pour ${mintAddress.slice(0,8)}...`);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+          continue;
+        }
+        return null;
+      }
+      
+      const data = await res.json();
+      if (!data.pairs?.length) return null;
+      
+      const solanaPairs = data.pairs.filter(p => p.chainId === "solana");
+      if (solanaPairs.length === 0) return null;
+      
+      const bestPair = solanaPairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+      if (!bestPair?.priceUsd) return null;
+      
+      return {
+        priceUsd: parseFloat(bestPair.priceUsd),
+        liquidityUsd: bestPair.liquidity?.usd || 0,
+        change24h: bestPair.priceChange?.h24 || 0,
+        source: 'DexScreener'
+      };
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn(`[DEXSCREENER] Erreur pour ${mintAddress.slice(0,8)}... : ${err.message}`);
+      }
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+        continue;
+      }
       return null;
     }
-    
-    const data = await res.json();
-    if (!data.pairs?.length) return null;
-    
-    const solanaPairs = data.pairs.filter(p => p.chainId === "solana");
-    if (solanaPairs.length === 0) return null;
-    
-    const bestPair = solanaPairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-    if (!bestPair?.priceUsd) return null;
-    
-    return {
-      priceUsd: parseFloat(bestPair.priceUsd),
-      liquidityUsd: bestPair.liquidity?.usd || 0,
-      change24h: bestPair.priceChange?.h24 || 0,
-      source: 'DexScreener'
-    };
-  } catch (err) {
-    if (err.name !== 'AbortError') {
-      console.warn(`[DEXSCREENER] Erreur pour ${mintAddress.slice(0,8)}... : ${err.message}`);
-    }
-    return null;
   }
+  return null;
 }
 
 // ── Jupiter Price (désactivé — ne répond pas) ───────────────────
@@ -205,7 +207,7 @@ async function fetchBirdeyePrice(mintAddress) {
     const res = await fetch(url, {
       headers: {
         'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo',
-        'User-Agent': 'SolBot-Pro/3.5'
+        'User-Agent': 'SolBot-Pro/3.6'
       },
       signal: AbortSignal.timeout(10000)
     });
@@ -221,7 +223,7 @@ async function fetchCoinGeckoPrice(mintAddress) {
   try {
     const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress.toLowerCase()}&vs_currencies=usd`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.6' },
       signal: AbortSignal.timeout(10000)
     });
     if (!res.ok) return null;
@@ -238,7 +240,7 @@ async function fetchHeliusPrice(mintAddress) {
     const apiKey = process.env.HELIUS_API_KEY || 'demo';
     const url = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${apiKey}`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.6' },
       signal: AbortSignal.timeout(10000)
     });
     if (!res.ok) return null;
@@ -258,7 +260,7 @@ async function fetchCoinGeckoFallback(mintAddress) {
   try {
     const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress.toLowerCase()}&vs_currencies=usd`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.6' },
       signal: AbortSignal.timeout(10000)
     });
     if (!res.ok) return null;
@@ -272,7 +274,7 @@ async function fetchCoinGeckoFallback(mintAddress) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PRIX AGGREGÉ — Weighted Average avec Pump.fun en priorité
+// PRIX AGGREGÉ — Weighted Average avec Pump.fun
 // ════════════════════════════════════════════════════════════════
 
 async function getWeightedPrice(mintAddress) {
@@ -282,7 +284,7 @@ async function getWeightedPrice(mintAddress) {
     { name: 'Birdeye', fetch: () => fetchBirdeyePrice(mintAddress), weight: 3 },
     { name: 'CoinGecko', fetch: () => fetchCoinGeckoPrice(mintAddress), weight: 2 },
     { name: 'Helius', fetch: () => fetchHeliusPrice(mintAddress), weight: 3 },
-    { name: 'PumpFun', fetch: () => fetchPumpFunPrice(mintAddress), weight: 4 },  // ← Pump.fun ajouté
+    { name: 'PumpFun', fetch: () => fetchPumpFunPrice(mintAddress), weight: 4 },
   ];
 
   const activeSources = sources.filter(src => src.weight > 0);
@@ -295,7 +297,7 @@ async function getWeightedPrice(mintAddress) {
     .filter(r => r.status === 'fulfilled' && r.value?.priceUsd > 0)
     .map(r => r.value);
 
-  // Fallback ultime si aucune source n'a répondu
+  // Fallback ultime
   if (validPrices.length === 0) {
     console.log(`[PRIX] 🔄 Fallback CoinGecko pour ${mintAddress.slice(0,8)}...`);
     const fallback = await fetchCoinGeckoFallback(mintAddress);
@@ -320,28 +322,34 @@ async function getWeightedPrice(mintAddress) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// CACHE INTELLIGENT AVEC TTL DYNAMIQUE
+// CACHE INTELLIGENT — Ne cache QUE les succès ✅
 // ════════════════════════════════════════════════════════════════
 
 async function getCachedPrice(mintAddress, liquidityUsd) {
   const cached = priceCache.get(mintAddress);
   const now = Date.now();
 
+  // Déterminer le TTL selon la liquidité
   let ttl = CACHE_TTL.none;
   if (liquidityUsd >= 1_000_000) ttl = CACHE_TTL.high;
   else if (liquidityUsd >= 100_000) ttl = CACHE_TTL.medium;
   else if (liquidityUsd > 0) ttl = CACHE_TTL.low;
 
-  if (cached && (now - cached.timestamp) < ttl) {
+  // ✅ Retourner le cache SEULEMENT si c'est un succès (priceUsd > 0) et pas expiré
+  if (cached && cached.data?.priceUsd > 0 && (now - cached.timestamp) < ttl) {
     return { ...cached.data, fromCache: true };
   }
 
   console.log(`[PRIX] Refresh ${mintAddress.slice(0,8)}... (liquidity: $${Math.round(liquidityUsd).toLocaleString()})`);
   const fresh = await getWeightedPrice(mintAddress);
 
-  if (fresh) {
+  // ✅ NE CACHER QUE LES SUCCÈS (priceUsd > 0)
+  if (fresh && fresh.priceUsd > 0) {
     priceCache.set(mintAddress, {  fresh, timestamp: now, ttl });
     console.log(`[PRIX] ✅ ${mintAddress.slice(0,8)}... = $${fresh.priceUsd.toExponential(4)} [${fresh.sources.join(',')}] (conf: ${(fresh.confidence*100).toFixed(0)}%)`);
+  } else {
+    // Log l'échec mais NE PAS cacher — on réessaiera au prochain cycle
+    console.log(`[PRIX] ❌ ${mintAddress.slice(0,8)}... : Aucun prix trouvé (sources: DexScreener/Birdeye/etc.)`);
   }
 
   return fresh ? { ...fresh, fromCache: false } : null;
@@ -361,7 +369,7 @@ async function fetchTokenMetadata(mintAddress) {
   // SOURCE 1: Jupiter Token List
   try {
     const res = await fetch('https://tokens.jup.ag/tokens', { 
-      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.6' },
       signal: AbortSignal.timeout(15000)
     });
     if (res.ok) {
@@ -386,7 +394,7 @@ async function fetchTokenMetadata(mintAddress) {
   // SOURCE 2: Solana Token List
   try {
     const res = await fetch('https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json', {
-      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.6' },
       signal: AbortSignal.timeout(15000)
     });
     if (res.ok) {
@@ -405,7 +413,7 @@ async function fetchTokenMetadata(mintAddress) {
   // SOURCE 3: Metaplex API
   try {
     const res = await fetch(`https://api.metaplex.com/v1/metadata/${mintAddress}`, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.6' },
       signal: AbortSignal.timeout(10000)
     });
     if (res.ok) {
@@ -421,7 +429,7 @@ async function fetchTokenMetadata(mintAddress) {
   // SOURCE 4: DexScreener
   try {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.6' },
       signal: AbortSignal.timeout(10000)
     });
     if (res.ok) {
@@ -465,7 +473,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) 
       
       const quoteRes = await fetch(quoteUrl, {
         signal: controller.signal,
-        headers: { 'User-Agent': 'SolBot-Pro/3.5' }
+        headers: { 'User-Agent': 'SolBot-Pro/3.6' }
       });
       clearTimeout(timeoutId);
       
@@ -480,7 +488,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) 
       // Swap
       const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
         method: "POST",
-        headers: { "Content-Type": "application/json", 'User-Agent': 'SolBot-Pro/3.5' },
+        headers: { "Content-Type": "application/json", 'User-Agent': 'SolBot-Pro/3.6' },
         body: JSON.stringify({
           quoteResponse: quote,
           userPublicKey: keypair.publicKey.toString(),
@@ -808,7 +816,7 @@ if (process.env.RENDER) {
     // GET /
     if (req.url === '/') {
       res.writeHead(200, {'Content-Type': 'text/plain'});
-      res.end('🤖 SolBot Pro v3.5 API\nEndpoints: GET /api/tokens | POST /api/tokens/add | DELETE /api/tokens/remove | GET /api/status');
+      res.end('🤖 SolBot Pro v3.6 API\nEndpoints: GET /api/tokens | POST /api/tokens/add | DELETE /api/tokens/remove | GET /api/status');
       return;
     }
 
@@ -828,14 +836,16 @@ if (process.env.RENDER) {
 
 async function main() {
   console.log("═══════════════════════════════════════════");
-  console.log("  🤖 SolBot Pro v3.5 — Pump.fun Edition");
+  console.log("  🤖 SolBot Pro v3.6 — Cache Fix Edition");
   console.log(`  RPC        : ${RPC_URL}`);
   console.log(`  Intervalle : ${CONFIG.INTERVAL_SEC}s`);
   console.log(`  Auto-sell  : ${CONFIG.AUTO_SELL}`);
   console.log(`  Stop-loss  : ${CONFIG.STOP_LOSS_ENABLED} (${CONFIG.STOP_LOSS_THRESHOLD}%)`);
   console.log("═══════════════════════════════════════════");
   console.log("  🎯 Features:");
-  console.log("  • Pump.fun API (tokens pump.fun) ✅ NOUVEAU");
+  console.log("  • Cache succès uniquement ✅ FIX CRITIQUE");
+  console.log("  • DexScreener retry avec backoff");
+  console.log("  • Pump.fun API (tokens pump.fun)");
   console.log("  • Weighted Price (5 sources actives + fallback)");
   console.log("  • Jupiter Price: DÉSACTIVÉ (ne répond pas)");
   console.log("  • Smart Cache TTL dynamique");
