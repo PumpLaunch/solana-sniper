@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-// SolBot Pro v3.4 — Production Ready Edition
+// SolBot Pro v3.5 — Pump.fun Edition
 // Backend Node.js pour Solana Trading Automatique
 // Hébergement : Render (Background Worker + API Web)
-// Features: Weighted Price + Smart Cache + Confidence + Manual Tokens + Logos + Fallbacks
+// Features: Pump.fun API + Weighted Price + Smart Cache + Confidence + Manual Tokens + Logos
 // ═══════════════════════════════════════════════════════════════
 
 "use strict";
@@ -93,15 +93,67 @@ function getConnection() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// SOURCES DE PRIX — Robustes avec fallbacks
+// SOURCES DE PRIX — Pump.fun + Autres avec fallbacks
 // ════════════════════════════════════════════════════════════════
 
-// ── DexScreener (principal) ─────────────────────────────────────
+// ── Pump.fun API (NOUVEAU — pour tokens pump.fun) ───────────────
+async function fetchPumpFunPrice(mintAddress) {
+  try {
+    // Pump.fun API publique pour les prix
+    const url = `https://frontend-api.pump.fun/coins/${mintAddress}`;
+    
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'SolBot-Pro/3.5',
+        'Accept': 'application/json',
+        'Origin': 'https://pump.fun'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+    
+    if (!res.ok) {
+      console.log(`[PUMP.FUN] HTTP ${res.status} pour ${mintAddress.slice(0,8)}...`);
+      return null;
+    }
+    
+    const data = await res.json();
+    
+    // Vérifier les données nécessaires
+    if (!data?.usd_market_cap || !data?.virtual_sol_reserves) {
+      return null;
+    }
+    
+    // Calculer le prix à partir des réserves virtuelles
+    const virtualSolReserves = data.virtual_sol_reserves || 0;
+    const virtualTokenReserves = data.virtual_token_reserves || 1;
+    const solPrice = data.sol_price || 200; // Prix SOL en USD (fallback)
+    
+    // Prix en SOL
+    const priceSol = virtualSolReserves / virtualTokenReserves;
+    // Prix en USD
+    const priceUsd = priceSol * solPrice;
+    
+    if (priceUsd <= 0) return null;
+    
+    return {
+      priceUsd: priceUsd,
+      liquidityUsd: data.usd_market_cap || 0,
+      change24h: data.price_change_24h || 0,
+      source: 'PumpFun'
+    };
+    
+  } catch (err) {
+    console.log(`[PUMP.FUN] Erreur pour ${mintAddress.slice(0,8)}... : ${err.message}`);
+    return null;
+  }
+}
+
+// ── DexScreener ─────────────────────────────────────────────────
 async function fetchDexScreenerPrice(mintAddress) {
   try {
     const url = `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`;
     const headers = {
-      'User-Agent': 'SolBot-Pro/3.4 (Trading Bot)',
+      'User-Agent': 'SolBot-Pro/3.5',
       'Accept': 'application/json',
       'Connection': 'keep-alive'
     };
@@ -153,7 +205,7 @@ async function fetchBirdeyePrice(mintAddress) {
     const res = await fetch(url, {
       headers: {
         'X-API-KEY': process.env.BIRDEYE_API_KEY || 'demo',
-        'User-Agent': 'SolBot-Pro/3.4'
+        'User-Agent': 'SolBot-Pro/3.5'
       },
       signal: AbortSignal.timeout(10000)
     });
@@ -169,7 +221,7 @@ async function fetchCoinGeckoPrice(mintAddress) {
   try {
     const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress.toLowerCase()}&vs_currencies=usd`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.4' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
       signal: AbortSignal.timeout(10000)
     });
     if (!res.ok) return null;
@@ -186,7 +238,7 @@ async function fetchHeliusPrice(mintAddress) {
     const apiKey = process.env.HELIUS_API_KEY || 'demo';
     const url = `https://api.helius.xyz/v0/tokens?ids=${mintAddress}&api-key=${apiKey}`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.4' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
       signal: AbortSignal.timeout(10000)
     });
     if (!res.ok) return null;
@@ -206,7 +258,7 @@ async function fetchCoinGeckoFallback(mintAddress) {
   try {
     const url = `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mintAddress.toLowerCase()}&vs_currencies=usd`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.4' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
       signal: AbortSignal.timeout(10000)
     });
     if (!res.ok) return null;
@@ -220,16 +272,17 @@ async function fetchCoinGeckoFallback(mintAddress) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PRIX AGGREGÉ — Weighted Average avec fallback intelligent
+// PRIX AGGREGÉ — Weighted Average avec Pump.fun en priorité
 // ════════════════════════════════════════════════════════════════
 
 async function getWeightedPrice(mintAddress) {
   const sources = [
     { name: 'DexScreener', fetch: () => fetchDexScreenerPrice(mintAddress), weight: 5 },
-    { name: 'Jupiter', fetch: () => fetchJupiterPrice(mintAddress), weight: 0 },  // Désactivé
+    { name: 'Jupiter', fetch: () => fetchJupiterPrice(mintAddress), weight: 0 },
     { name: 'Birdeye', fetch: () => fetchBirdeyePrice(mintAddress), weight: 3 },
     { name: 'CoinGecko', fetch: () => fetchCoinGeckoPrice(mintAddress), weight: 2 },
     { name: 'Helius', fetch: () => fetchHeliusPrice(mintAddress), weight: 3 },
+    { name: 'PumpFun', fetch: () => fetchPumpFunPrice(mintAddress), weight: 4 },  // ← Pump.fun ajouté
   ];
 
   const activeSources = sources.filter(src => src.weight > 0);
@@ -242,7 +295,7 @@ async function getWeightedPrice(mintAddress) {
     .filter(r => r.status === 'fulfilled' && r.value?.priceUsd > 0)
     .map(r => r.value);
 
-  // Fallback ultime si aucune source principale n'a répondu
+  // Fallback ultime si aucune source n'a répondu
   if (validPrices.length === 0) {
     console.log(`[PRIX] 🔄 Fallback CoinGecko pour ${mintAddress.slice(0,8)}...`);
     const fallback = await fetchCoinGeckoFallback(mintAddress);
@@ -308,7 +361,7 @@ async function fetchTokenMetadata(mintAddress) {
   // SOURCE 1: Jupiter Token List
   try {
     const res = await fetch('https://tokens.jup.ag/tokens', { 
-      headers: { 'User-Agent': 'SolBot-Pro/3.4' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
       signal: AbortSignal.timeout(15000)
     });
     if (res.ok) {
@@ -333,7 +386,7 @@ async function fetchTokenMetadata(mintAddress) {
   // SOURCE 2: Solana Token List
   try {
     const res = await fetch('https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json', {
-      headers: { 'User-Agent': 'SolBot-Pro/3.4' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
       signal: AbortSignal.timeout(15000)
     });
     if (res.ok) {
@@ -352,7 +405,7 @@ async function fetchTokenMetadata(mintAddress) {
   // SOURCE 3: Metaplex API
   try {
     const res = await fetch(`https://api.metaplex.com/v1/metadata/${mintAddress}`, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.4' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
       signal: AbortSignal.timeout(10000)
     });
     if (res.ok) {
@@ -368,7 +421,7 @@ async function fetchTokenMetadata(mintAddress) {
   // SOURCE 4: DexScreener
   try {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`, {
-      headers: { 'User-Agent': 'SolBot-Pro/3.4' },
+      headers: { 'User-Agent': 'SolBot-Pro/3.5' },
       signal: AbortSignal.timeout(10000)
     });
     if (res.ok) {
@@ -412,7 +465,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) 
       
       const quoteRes = await fetch(quoteUrl, {
         signal: controller.signal,
-        headers: { 'User-Agent': 'SolBot-Pro/3.4' }
+        headers: { 'User-Agent': 'SolBot-Pro/3.5' }
       });
       clearTimeout(timeoutId);
       
@@ -427,7 +480,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) 
       // Swap
       const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
         method: "POST",
-        headers: { "Content-Type": "application/json", 'User-Agent': 'SolBot-Pro/3.4' },
+        headers: { "Content-Type": "application/json", 'User-Agent': 'SolBot-Pro/3.5' },
         body: JSON.stringify({
           quoteResponse: quote,
           userPublicKey: keypair.publicKey.toString(),
@@ -755,7 +808,7 @@ if (process.env.RENDER) {
     // GET /
     if (req.url === '/') {
       res.writeHead(200, {'Content-Type': 'text/plain'});
-      res.end('🤖 SolBot Pro v3.4 API\nEndpoints: GET /api/tokens | POST /api/tokens/add | DELETE /api/tokens/remove | GET /api/status');
+      res.end('🤖 SolBot Pro v3.5 API\nEndpoints: GET /api/tokens | POST /api/tokens/add | DELETE /api/tokens/remove | GET /api/status');
       return;
     }
 
@@ -775,14 +828,15 @@ if (process.env.RENDER) {
 
 async function main() {
   console.log("═══════════════════════════════════════════");
-  console.log("  🤖 SolBot Pro v3.4 — Production Ready");
+  console.log("  🤖 SolBot Pro v3.5 — Pump.fun Edition");
   console.log(`  RPC        : ${RPC_URL}`);
   console.log(`  Intervalle : ${CONFIG.INTERVAL_SEC}s`);
   console.log(`  Auto-sell  : ${CONFIG.AUTO_SELL}`);
   console.log(`  Stop-loss  : ${CONFIG.STOP_LOSS_ENABLED} (${CONFIG.STOP_LOSS_THRESHOLD}%)`);
   console.log("═══════════════════════════════════════════");
   console.log("  🎯 Features:");
-  console.log("  • Weighted Price (4 sources actives + fallback)");
+  console.log("  • Pump.fun API (tokens pump.fun) ✅ NOUVEAU");
+  console.log("  • Weighted Price (5 sources actives + fallback)");
   console.log("  • Jupiter Price: DÉSACTIVÉ (ne répond pas)");
   console.log("  • Smart Cache TTL dynamique");
   console.log("  • Confidence Score API");
