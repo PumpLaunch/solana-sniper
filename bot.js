@@ -425,9 +425,6 @@ async function fetchDexScreenerPrice(mintAddress) {
 }
 
 // ── Jupiter Price (désactivé — ne répond pas) ───────────────────
-async function fetchJupiterPrice() {
-  return null;
-}
 
 // ── Birdeye ─────────────────────────────────────────────────────
 async function fetchBirdeyePrice(mintAddress) {
@@ -680,31 +677,32 @@ async function fetchTokenMetadata(mintAddress) {
 // ════════════════════════════════════════════════════════════════
 // VENTE JUPITER — Avec retry robuste, timeout, et logging détaillé
 // ════════════════════════════════════════════════════════════════
-
 async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) {
   const SOL_MINT = "So11111111111111111111111111111111111111112";
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      log('debug', `[JUPITER] Tentative ${attempt}/${maxRetries} : Quote pour ${amountRaw} unités`);
+      log('debug', `[JUPITER] Tentative ${attempt}/${maxRetries}`);
       
+      // ↑↑↑ TIMEOUT 60s + 3 retries + 3s delay ↑↑↑
       const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${mintAddress}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s
       
       const quoteData = await fetchWithRetry(quoteUrl, {
         headers: { 'User-Agent': 'SolBot-Pro/3.8' },
-        timeout: 30000
-      }, 1, 2000);
+        timeout: 60000
+      }, 3, 3000); // 3 retries, 3s base delay
       
-      if (!quoteData) {
-        throw new Error('Quote API timeout or error');
-      }
+      clearTimeout(timeoutId);
       
-      if (quoteData?.errorCode) {
-        throw new Error(`Quote error: ${quoteData.error}`);
-      }
+      if (!quoteData) throw new Error('Quote API timeout after 60s');
+      if (quoteData?.errorCode) throw new Error(`Quote error: ${quoteData.error}`);
       
-      log('debug', `[JUPITER] Quote reçu: ${(quoteData.outAmount / 1e9).toFixed(6)} SOL`);
+      log('debug', `[JUPITER] Quote: ${(quoteData.outAmount / 1e9).toFixed(6)} SOL`);
       
+      // ↑↑↑ SWAP TIMEOUT 60s ↑↑↑
       const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", {
         method: "POST",
         headers: { "Content-Type": "application/json", 'User-Agent': 'SolBot-Pro/3.8' },
@@ -715,7 +713,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) 
           dynamicComputeUnitLimit: true,
           computeUnitPriceMicroLamports: "auto",
         }),
-        signal: AbortSignal.timeout(30000)
+        signal: AbortSignal.timeout(60000) // 60s
       });
       
       if (!swapRes.ok) {
@@ -730,7 +728,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) 
       const tx = VersionedTransaction.deserialize(txBuffer);
       tx.sign([keypair]);
       
-      const txId = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const txId = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 5 });
       const latestBlockhash = await connection.getLatestBlockhash();
       await connection.confirmTransaction({ signature: txId, ...latestBlockhash }, "confirmed");
       
@@ -741,7 +739,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) 
       log('warn', `[JUPITER] ⚠️ Tentative ${attempt} échouée : ${err.message}`);
       
       if (err.message.includes('ENOTFOUND') || err.message.includes('ECONNRESET') || err.message.includes('ETIMEDOUT')) {
-        const delay = Math.pow(2, attempt) * 1000;
+        const delay = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -749,7 +747,7 @@ async function jupiterSell(mintAddress, amountRaw, slippageBps, maxRetries = 3) 
       if (attempt === maxRetries) throw err;
     }
   }
-  throw new Error('Échec après toutes les tentatives Jupiter');
+  throw new Error('Échec Jupiter après 3 tentatives (60s timeout)');
 }
 
 // ════════════════════════════════════════════════════════════════
