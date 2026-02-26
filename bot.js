@@ -21,7 +21,7 @@ const fetch = (...args) =>
 
 // ── Variables d'environnement ────────────────────────────────────
 const PRIVATE_KEY_RAW = process.env.PRIVATE_KEY;
-const RPC_URL = process.env.RPC_URL || "https://mainnet.helius-rpc.com/?api-key=43caa0a0-33d2-420c-b00a-e7261bfecf78";
+const RPC_URL = process.env.RPC_URL || "https://mainnet.helius-rpc.com";
 const API_AUTH_KEY = process.env.API_AUTH_KEY || null; // Optionnel: clé pour sécuriser les endpoints POST/DELETE
 
 // ── Configuration de base du bot ─────────────────────────────────
