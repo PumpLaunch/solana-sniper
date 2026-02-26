@@ -1,8 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// SolBot Pro v3.11 — Security Edition
+// SolBot Pro v3.12 — RPC Health Fix Edition
 // Backend Node.js pour Solana Trading Automatique
 // Hébergement : Render (Background Worker + API Web)
-// ⚠️ IMPORTANT: La clé API est dans les variables Render, JAMAIS dans le code
 // ═══════════════════════════════════════════════════════════════
 
 "use strict";
@@ -10,15 +9,13 @@
 const { Connection, Keypair, PublicKey, VersionedTransaction } = require("@solana/web3.js");
 const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
 
-// ── Variables d'environnement (JAMAIS de clés en dur dans le code) ────────────────────────────────────
+// ── Variables d'environnement (sécurisées) ──────────────────────
 const PRIVATE_KEY_RAW = process.env.PRIVATE_KEY;
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY || null; // ← Clé depuis Render, pas dans le code
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY || null;
 
-// ── Configuration RPC avec fallback (clés publiques uniquement) ────────────────────────────────────────
+// ── Configuration RPC avec fallback ─────────────────────────────
 const RPC_URLS = [
-  // Priorité 1: Helius avec clé depuis env var (si configurée)
   HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}` : null,
-  // Priorité 2: RPC publics de fallback (pas de clé nécessaire)
   "https://api.mainnet-beta.solana.com",
   "https://solana-mainnet.public.blastapi.io",
   "https://rpc.ankr.com/solana",
@@ -57,50 +54,45 @@ const CACHE_TTL = { high: 30000, medium: 60000, low: 120000, none: 300000 };
 
 // ── Initialisation ───────────────────────────────────────────────
 function initWallet() {
-  if (!PRIVATE_KEY_RAW) { 
-    console.error("[ERREUR] PRIVATE_KEY manquante dans les variables d'environnement"); 
-    process.exit(1); 
-  }
+  if (!PRIVATE_KEY_RAW) { console.error("[ERREUR] PRIVATE_KEY manquante"); process.exit(1); }
   try {
     const secretBytes = JSON.parse(PRIVATE_KEY_RAW);
     keypair = Keypair.fromSecretKey(new Uint8Array(secretBytes));
     console.log(`[WALLET] Connecté : ${keypair.publicKey.toString()}`);
-  } catch (err) { 
-    console.error("[ERREUR] PRIVATE_KEY invalide :", err.message); 
-    process.exit(1); 
-  }
+  } catch (err) { console.error("[ERREUR] PRIVATE_KEY invalide :", err.message); process.exit(1); }
 }
 
-// ── Connexion RPC avec fallback automatique ──────────────────────
+// ── Connexion RPC ────────────────────────────────────────────────
 function getConnection() {
   const url = RPC_URLS[rpcIndex];
   return new Connection(url, { commitment: "confirmed", confirmTransactionInitialTimeout: 60000 });
 }
 
-// Test de santé RPC et basculement en cas d'échec
+// ── Test RPC avec getSlot() (compatible toutes versions) ─────────
 async function testAndSwitchRpc() {
   for (let i = 0; i < RPC_URLS.length; i++) {
     try {
       const conn = new Connection(RPC_URLS[i], { commitment: "confirmed", confirmTransactionInitialTimeout: 10000 });
-      await conn.getHealth();
-      rpcIndex = i;
-      const displayUrl = RPC_URLS[i].includes('api-key') 
-        ? RPC_URLS[i].slice(0, 50) + '***' 
-        : RPC_URLS[i].slice(0, 50) + '...';
-      console.log(`[RPC] ✅ Connecté à : ${displayUrl}`);
-      return conn;
+      // ←←← UTILISER getSlot() AU LIEU DE getHealth() ←←←
+      const slot = await conn.getSlot();
+      if (slot > 0) {
+        rpcIndex = i;
+        const displayUrl = RPC_URLS[i].includes('api-key') ? RPC_URLS[i].slice(0, 50) + '***' : RPC_URLS[i].slice(0, 50) + '...';
+        console.log(`[RPC] ✅ Connecté à : ${displayUrl} (slot: ${slot})`);
+        return conn;
+      }
     } catch (e) {
-      const displayUrl = RPC_URLS[i].includes('api-key') 
-        ? RPC_URLS[i].slice(0, 40) + '***' 
-        : RPC_URLS[i].slice(0, 40) + '...';
+      const displayUrl = RPC_URLS[i].includes('api-key') ? RPC_URLS[i].slice(0, 40) + '***' : RPC_URLS[i].slice(0, 40) + '...';
       console.log(`[RPC] ❌ Échec ${displayUrl} : ${e.message}`);
     }
   }
-  console.error("[RPC] ❌ Aucun RPC disponible");
+  // Fallback: utiliser le premier RPC même si le test échoue
+  console.log(`[RPC] ⚠️ Aucun RPC testé OK, utilisation du fallback: ${RPC_URLS[0]?.slice(0,50)}...`);
+  rpcIndex = 0;
   return getConnection();
 }
 
-// ── Logging utilitaire ───────────────────────────────────────────
+// ── Logging ──────────────────────────────────────────────────────
 function log(level, msg, meta = {}) {
   const ts = new Date().toISOString();
   const prefix = { debug: '🔍', info: 'ℹ️', warn: '⚠️', error: '❌' }[level] || 'ℹ️';
@@ -125,7 +117,7 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2, baseDelay = 100
 // ── Sources de prix ──────────────────────────────────────────────
 async function fetchDexScreenerPrice(mint) {
   try {
-    const data = await fetchWithRetry(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { headers: { 'User-Agent': 'SolBot-Pro/3.11', 'Accept': 'application/json' }, timeout: 15000 }, 2, 1000);
+    const data = await fetchWithRetry(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { headers: { 'User-Agent': 'SolBot-Pro/3.12', 'Accept': 'application/json' }, timeout: 15000 }, 2, 1000);
     if (!data?.pairs?.length) return null;
     const pairs = data.pairs.filter(p => p.chainId === "solana");
     if (!pairs.length) return null;
@@ -137,7 +129,7 @@ async function fetchDexScreenerPrice(mint) {
 
 async function fetchPumpFunPrice(mint) {
   try {
-    const data = await fetchWithRetry(`https://frontend-api.pump.fun/coins/${mint}`, { headers: { 'User-Agent': 'SolBot-Pro/3.11', 'Accept': 'application/json', 'Origin': 'https://pump.fun' }, timeout: 10000 }, 1, 2000);
+    const data = await fetchWithRetry(`https://frontend-api.pump.fun/coins/${mint}`, { headers: { 'User-Agent': 'SolBot-Pro/3.12', 'Accept': 'application/json', 'Origin': 'https://pump.fun' }, timeout: 10000 }, 1, 2000);
     if (!data?.usd_market_cap || !data?.virtual_sol_reserves) return null;
     const priceUsd = (data.virtual_sol_reserves / (data.virtual_token_reserves || 1)) * (data.sol_price || 200);
     if (priceUsd <= 0) return null;
@@ -147,7 +139,7 @@ async function fetchPumpFunPrice(mint) {
 
 async function fetchCoinGeckoPrice(mint) {
   try {
-    const data = await fetchWithRetry(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mint.toLowerCase()}&vs_currencies=usd`, { headers: { 'User-Agent': 'SolBot-Pro/3.11' }, timeout: 10000 }, 1, 2000);
+    const data = await fetchWithRetry(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mint.toLowerCase()}&vs_currencies=usd`, { headers: { 'User-Agent': 'SolBot-Pro/3.12' }, timeout: 10000 }, 1, 2000);
     const key = mint.toLowerCase();
     if (!data?.[key]?.usd) return null;
     return { priceUsd: data[key].usd, source: 'CoinGecko' };
@@ -185,7 +177,7 @@ async function fetchTokenMetadata(mint) {
   if (tokenMetadataCache[mint]) return tokenMetadataCache[mint];
   let meta = { symbol: '???', name: 'Unknown', logo: null };
   try {
-    const tokens = await fetchWithRetry('https://tokens.jup.ag/tokens', { headers: { 'User-Agent': 'SolBot-Pro/3.11' }, timeout: 15000 }, 1, 2000);
+    const tokens = await fetchWithRetry('https://tokens.jup.ag/tokens', { headers: { 'User-Agent': 'SolBot-Pro/3.12' }, timeout: 15000 }, 1, 2000);
     if (tokens) { const t = tokens.find(x => x.address === mint); if (t) { meta = { symbol: t.symbol || '???', name: t.name || 'Unknown', logo: t.logoURI || null }; if (meta.logo) { tokenMetadataCache[mint] = meta; return meta; } } }
   } catch {}
   if (!meta.logo && meta.symbol !== '???') {
@@ -206,11 +198,11 @@ async function jupiterSell(mint, amountRaw, slippageBps, maxRetries = 3) {
       const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${SOL}&amount=${amountRaw}&slippageBps=${slippageBps}`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
-      const quote = await fetchWithRetry(quoteUrl, { headers: { 'User-Agent': 'SolBot-Pro/3.11' }, timeout: 60000 }, 3, 3000);
+      const quote = await fetchWithRetry(quoteUrl, { headers: { 'User-Agent': 'SolBot-Pro/3.12' }, timeout: 60000 }, 3, 3000);
       clearTimeout(timeoutId);
       if (!quote) throw new Error('Quote timeout');
       if (quote.errorCode) throw new Error(quote.error);
-      const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", { method: "POST", headers: { "Content-Type": "application/json", 'User-Agent': 'SolBot-Pro/3.11' }, body: JSON.stringify({ quoteResponse: quote, userPublicKey: keypair.publicKey.toString(), wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, computeUnitPriceMicroLamports: "auto" }), signal: AbortSignal.timeout(60000) });
+      const swapRes = await fetch("https://quote-api.jup.ag/v6/swap", { method: "POST", headers: { "Content-Type": "application/json", 'User-Agent': 'SolBot-Pro/3.12' }, body: JSON.stringify({ quoteResponse: quote, userPublicKey: keypair.publicKey.toString(), wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, computeUnitPriceMicroLamports: "auto" }), signal: AbortSignal.timeout(60000) });
       if (!swapRes.ok) throw new Error(`Swap HTTP ${swapRes.status}: ${await swapRes.text()}`);
       const { swapTransaction } = await swapRes.json();
       const conn = getConnection();
@@ -283,10 +275,15 @@ async function applySellLogic(mint, balance, decimals, price, pnl, liquidity, ch
   }
 }
 
-// ── Boucle principale avec gestion RPC ───────────────────────────
+// ── Boucle principale ────────────────────────────────────────────
 async function runCheck() {
   try {
-    await testAndSwitchRpc();
+    // Test RPC au premier cycle uniquement pour éviter le spam
+    if (rpcIndex === 0 && Date.now() - (globalThis.lastRpcTest || 0) > 300000) {
+      await testAndSwitchRpc();
+      globalThis.lastRpcTest = Date.now();
+    }
+    
     const conn = getConnection();
     const tokens = [];
     const accounts = await conn.getParsedTokenAccountsByOwner(keypair.publicKey, { programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") });
@@ -370,7 +367,7 @@ if (process.env.RENDER) {
       }); return;
     }
     
-    if (req.url === '/') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('🤖 SolBot Pro v3.11 API\nEndpoints: GET /api/tokens | GET /api/status | POST /api/tokens/add | DELETE /api/tokens/remove'); return; }
+    if (req.url === '/') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('🤖 SolBot Pro v3.12 API\nEndpoints: GET /api/tokens | GET /api/status | POST /api/tokens/add | DELETE /api/tokens/remove'); return; }
     res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' }));
   });
   const PORT = process.env.PORT || 10000;
@@ -380,14 +377,14 @@ if (process.env.RENDER) {
 // ── Point d'entrée ───────────────────────────────────────────────
 async function main() {
   log('info', "═══════════════════════════════════════════");
-  log('info', "  🤖 SolBot Pro v3.11 — Security Edition");
+  log('info', "  🤖 SolBot Pro v3.12 — RPC Health Fix");
   log('info', `  RPCs configurés : ${RPC_URLS.length} endpoints`);
   log('info', `  Helius API Key : ${HELIUS_API_KEY ? '✅ Configurée (secure)' : '❌ Non configurée (fallback public)'}`);
   log('info', `  Intervalle : ${CONFIG.INTERVAL_SEC}s | Auto-sell : ${CONFIG.AUTO_SELL}`);
   log('info', "═══════════════════════════════════════════");
   
   initWallet();
-  await testAndSwitchRpc();
+  await testAndSwitchRpc(); // Premier test au démarrage
   await runCheck();
   setInterval(async () => { try { await runCheck(); } catch (e) { log('error', `Loop error: ${e.message}`); } }, CONFIG.INTERVAL_SEC * 1000);
   log('info', "[BOT] 🔄 Surveillance active");
