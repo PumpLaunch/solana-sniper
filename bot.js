@@ -624,7 +624,7 @@ async function main() {
   // Gestion erreurs non capturées — CORRECTION ICI 👇
   process.on('uncaughtException', (err) => 
     log('error', '💥 Exception', { error: err.message })
-  ); // ← Deux parenthèses fermantes : )) 
+  )); // ← Deux parenthèses fermantes : )) 
 }
 
 // Lancer le bot
