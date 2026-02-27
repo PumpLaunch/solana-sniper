@@ -239,15 +239,6 @@ class SellExecutor {
     this.rpc = rpc;
   }
   
-  // Simulation pour tests
-  async simulateSell(mint, amount, reason, tier = null) {
-    const tierLabel = tier ? ` (Tier ${tier})` : '';
-    log('success', `🎯 [SIMULATION] Vente${tierLabel} — ${reason}`, {
-      mint: mint.slice(0,8) + '...', amount: parseFloat(amount).toFixed(4)
-    });
-    return { success: true, txId: `sim_${Date.now()}`, simulated: true };
-  }
-  
   // Vente réelle via Jupiter
   async executeJupiterSell(mint, amount, slippageBps = 500) {
     try {
