@@ -1,17 +1,20 @@
 {
-  "name": "solbot-pro-backend",
-  "version": "1.0.0",
-  "description": "Bot de trading Solana - Backend Node.js pour Render",
+  "name": "solbot-pro-single",
+  "version": "5.1.0",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "node bot.js",
+    "dev": "node --watch bot.js"
   },
   "dependencies": {
-    "@solana/web3.js": "^1.91.8",
+    "@solana/web3.js": "^2.3.0",
+    "ioredis": "^5.4.1",
     "node-fetch": "^3.3.2",
-    "bs58": "^5.0.0"
-  }
+    "bs58": "^5.0.0",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.2.0",
+    "dotenv": "^16.4.5"
+  },
+  "license": "MIT"
 }
