@@ -14,6 +14,7 @@ const CONFIG = {
   PORT: parseInt(process.env.PORT) || 10000,
   INTERVAL_SEC: parseInt(process.env.INTERVAL_SEC) || 30,
   NODE_ENV: process.env.NODE_ENV || 'production',
+  const { Connection, Keypair, PublicKey, VersionedTransaction } = require('@solana/web3.js');
   
   // 🎯 TAKE-PROFIT PAR PALIERS
   TAKE_PROFIT_ENABLED: process.env.TAKE_PROFIT_ENABLED === 'true',
@@ -298,8 +299,10 @@ class TieredTakeProfitManager {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔄 SELL EXECUTOR (Simulation + Placeholder Jupiter)
+// 🔄 SELL EXECUTOR — MODE RÉEL (Jupiter + Signature)
 // ═══════════════════════════════════════════════════════════════════════════
+
+const { VersionedTransaction } = require('@solana/web3.js'); // ← À ajouter en haut du fichier si pas déjà présent
 
 class SellExecutor {
   constructor(wallet, rpc) {
@@ -307,68 +310,136 @@ class SellExecutor {
     this.rpc = rpc;
   }
   
-  async simulateSell(mint, amount, reason, tier = null) {
-    const tierLabel = tier ? ` (Tier ${tier})` : '';
-    log('success', `🎯 [SIMULATION] Vente${tierLabel} — ${reason}`, {
-      mint: mint.slice(0,8) + '...',
-      amount: parseFloat(amount).toFixed(4),
-      timestamp: new Date().toISOString()
-    });
-    return { success: true, txId: `sim_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, reason, simulated: true };
-  }
-  
-  async executeJupiterSell(mint, amount, slippageBps = 300) {
+  // ✅ Vente RÉELLE via Jupiter + Signature + Envoi
+  async executeJupiterSell(mint, amount, slippageBps = 500) {
     try {
-      const amountRaw = Math.floor(amount * 1e9);
+      // Convertir amount en lamports (SOL a 9 décimales)
+      // Pour les tokens, adapter selon decimals (ici on suppose 6-9)
+      const tokenDecimals = 9; // À ajuster selon le token réel
+      const amountRaw = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
       
-      const quoteRes = await fetch(
-        `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}`,
-        { signal: AbortSignal.timeout(30000) }
-      );
-      if (!quoteRes.ok) throw new Error('Quote failed');
+      log('debug', 'Jupiter: Préparation quote', { 
+        mint: mint.slice(0,8) + '...', 
+        amount: amount.toFixed(4),
+        slippage: slippageBps + 'bps'
+      });
+      
+      // 1️⃣ Obtenir le quote depuis Jupiter
+      const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=So11111111111111111111111111111111111111112&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
+      
+      const quoteRes = await fetch(quoteUrl, { 
+        headers: { 'User-Agent': 'SolBot-Basic/1.2' },
+        signal: AbortSignal.timeout(30000) 
+      });
+      
+      if (!quoteRes.ok) {
+        const errText = await quoteRes.text().catch(() => 'Unknown');
+        throw new Error(`Quote HTTP ${quoteRes.status}: ${errText.slice(0,100)}`);
+      }
+      
       const quote = await quoteRes.json();
       
       if (!quote?.outAmount) {
-        log('warn', 'Jupiter: pas de quote', { mint: mint.slice(0,8) + '...' });
-        return { success: false, error: 'No quote' };
+        log('warn', 'Jupiter: Pas de quote disponible', { mint: mint.slice(0,8) + '...', error: quote?.error });
+        return { success: false, error: 'No quote or invalid response' };
       }
       
+      log('debug', 'Jupiter: Quote reçu', { 
+        inAmount: quote.inAmount, 
+        outAmount: quote.outAmount,
+        priceImpact: quote.priceImpactPct 
+      });
+      
+      // 2️⃣ Obtenir la transaction swap signable
       const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'SolBot-Basic/1.2' },
         body: JSON.stringify({
           quoteResponse: quote,
           userPublicKey: this.wallet.publicKey.toString(),
           wrapAndUnwrapSol: true,
+          dynamicComputeUnitLimit: true,
+          prioritizationFeeLamports: 'auto', // Auto-priorisation pour inclusion rapide
         }),
         signal: AbortSignal.timeout(30000)
       });
-      if (!swapRes.ok) throw new Error('Swap failed');
+      
+      if (!swapRes.ok) {
+        const errText = await swapRes.text().catch(() => 'Unknown');
+        throw new Error(`Swap HTTP ${swapRes.status}: ${errText.slice(0,100)}`);
+      }
+      
       const swapData = await swapRes.json();
       
-      // TODO: Sign & send transaction here
-      log('success', '🎯 Jupiter: Transaction prête', { mint: mint.slice(0,8) + '...' });
-      return { success: true, txId: `jupiter_${Date.now()}`, quote };
+      if (!swapData?.swapTransaction) {
+        throw new Error('No swapTransaction in Jupiter response');
+      }
+      
+      // 3️⃣ Désérialiser, signer et envoyer la transaction
+      const transactionBuf = Buffer.from(swapData.swapTransaction, 'base64');
+      const transaction = VersionedTransaction.deserialize(transactionBuf);
+      
+      // Signer avec notre wallet
+      transaction.sign([this.wallet]);
+      
+      // Envoyer la transaction signée
+      const txId = await this.rpc.connection.sendRawTransaction(transaction.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+        preflightCommitment: 'confirmed'
+      });
+      
+      log('info', 'Jupiter: Transaction envoyée', { 
+        mint: mint.slice(0,8) + '...', 
+        txId: txId.slice(0, 8) + '...' + txId.slice(-4) 
+      });
+      
+      // 4️⃣ Confirmer la transaction
+      const latestBlockhash = await this.rpc.connection.getLatestBlockhash();
+      const confirmation = await this.rpc.connection.confirmTransaction({
+        signature: txId,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+      }, 'confirmed');
+      
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+      
+      log('success', '🎯 Vente RÉELLE confirmée !', {
+        mint: mint.slice(0,8) + '...',
+        txId: `https://solscan.io/tx/${txId}`,
+        outAmount: quote.outAmount
+      });
+      
+      return { 
+        success: true, 
+        txId, 
+        txUrl: `https://solscan.io/tx/${txId}`,
+        quote 
+      };
       
     } catch (err) {
-      log('error', 'Jupiter: Échec', { error: err.message, mint: mint?.slice(0,8) + '...' });
+      log('error', '❌ Jupiter: Échec vente réelle', { 
+        error: err.message, 
+        mint: mint?.slice(0,8) + '...',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      });
       return { success: false, error: err.message };
     }
   }
   
-  async sell(mint, amount, reason, tier = null, useReal = false) {
-    if (useReal) {
-      const result = await this.executeJupiterSell(mint, amount);
-      if (result.success) {
-        log('success', `🎯 Vente réelle${tier ? ` (Tier ${tier})` : ''} — ${reason}`, { 
-          mint: mint.slice(0,8) + '...', 
-          tx: result.txId 
-        });
-        return result;
-      }
-      log('warn', 'Vente réelle échouée, fallback simulation', { mint: mint.slice(0,8) + '...' });
-    }
-    return await this.simulateSell(mint, amount, reason, tier);
+  // Méthode principale: appelle executeJupiterSell pour vente réelle
+  async sell(mint, amount, reason, tier = null) {
+    const tierLabel = tier ? ` (Tier ${tier})` : '';
+    
+    log('info', `🎯 Exécution vente${tierLabel} — ${reason}`, {
+      mint: mint.slice(0,8) + '...',
+      amount: parseFloat(amount).toFixed(4),
+      mode: 'REAL'
+    });
+    
+    return await this.executeJupiterSell(mint, amount);
   }
 }
 
@@ -433,7 +504,7 @@ class BotLoop {
               
               // Exécuter la vente (simulation par défaut)
               const USE_REAL_SELL = false; // ← Mettre à true pour activer Jupiter réel
-              await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex + 1, USE_REAL_SELL);
+              await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex + 1);
               
               // Marquer le palier comme exécuté
               this.takeProfit.markTierExecuted(mint, tier.tierIndex, tier.sellAmount);
@@ -544,8 +615,20 @@ async function main() {
     takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? 'tiers: 25%x4' : 'disabled'
   });
   
-  process.on('SIGINT', () => { log('info', '🛑 Arrêt'); process.exit(0); });
-  process.on('uncaughtException', (err) => log('error', '💥 Exception', { error: err.message });
+  // Gestion arrêt propre — CORRECTION ICI 👇
+  process.on('SIGINT', () => { 
+    log('info', '🛑 Arrêt'); 
+    process.exit(0); 
+  });
+  
+  // Gestion erreurs non capturées — CORRECTION ICI 👇
+  process.on('uncaughtException', (err) => 
+    log('error', '💥 Exception', { error: err.message })
+  ); // ← Deux parenthèses fermantes : )) 
 }
 
-main().catch(err => { console.error('🚨 Échec:', err.message); process.exit(1); });
+// Lancer le bot
+main().catch(err => { 
+  console.error('🚨 Échec démarrage:', err.message); 
+  process.exit(1); 
+});
