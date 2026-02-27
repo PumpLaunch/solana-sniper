@@ -722,3 +722,395 @@
     @media (max-width: 700px) {
       .metrics-row { grid-template-columns: repeat(2, 1fr); }
       .right-col { grid-template-columns: 1fr; }
+      .token-table-head, .token-row { grid-template-columns: 1fr 1fr 1fr; }
+      .token-table-head .th:nth-child(n+4),
+      .token-row .td:nth-child(n+4) { display: none; }
+      .brand-title { font-size: 1.8rem; }
+    }
+
+    /* ================================================================
+       ANIMATIONS ON LOAD
+    ================================================================ */
+    .metric-card { animation: fadeUp 0.4s ease both; }
+    .metric-card:nth-child(1) { animation-delay: 0.05s; }
+    .metric-card:nth-child(2) { animation-delay: 0.10s; }
+    .metric-card:nth-child(3) { animation-delay: 0.15s; }
+    .metric-card:nth-child(4) { animation-delay: 0.20s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel { animation: fadeUp 0.5s ease both; animation-delay: 0.25s; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ═══════════════════════ TOP BAR ═══════════════════════ -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-title">SOL<span>BOT</span></div>
+      <div class="brand-sub">TERMINAL v1.2 · SOLANA MAINNET · TAKE-PROFIT ENGINE</div>
+    </div>
+    <div class="topbar-right">
+      <div class="live-indicator">
+        <div class="live-dot"></div>
+        <span>LIVE · AUTO-REFRESH 10s</span>
+      </div>
+      <div class="wallet-pill">
+        <span class="wallet-label">Wallet</span>
+        <code class="wallet-addr" id="walletAddress">—</code>
+        <button class="copy-btn" id="copyBtn" title="Copier">⎘</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ METRICS ═══════════════════════ -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-label">Valeur Portfolio</div>
+      <div class="metric-value cyan" id="totalValue">$—</div>
+      <div class="metric-sub" id="lastUpdate">Dernière MAJ: —</div>
+    </div>
+    <div class="metric-card amber">
+      <div class="metric-label">Tokens Actifs</div>
+      <div class="metric-value amber" id="tokenCount">—</div>
+      <div class="metric-sub">positions ouvertes</div>
+    </div>
+    <div class="metric-card green">
+      <div class="metric-label">Take-Profit</div>
+      <div class="metric-value green" id="tpTriggered">—</div>
+      <div class="metric-sub">paliers déclenchés</div>
+    </div>
+    <div class="metric-card purple">
+      <div class="metric-label">Uptime</div>
+      <div class="metric-value" id="uptime" style="color:var(--purple)">—</div>
+      <div class="metric-sub">depuis démarrage</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ MAIN GRID ═══════════════════════ -->
+  <div class="content-grid">
+
+    <!-- LEFT COL -->
+    <div class="left-col">
+
+      <!-- Portfolio Table -->
+      <div class="panel bracket">
+        <div class="panel-header">
+          <div class="panel-title"><span class="panel-title-accent">//</span>PORTFOLIO</div>
+          <div class="panel-actions">
+            <span class="count-badge" id="portfolioBadge">0 tokens</span>
+            <button class="btn-refresh" onclick="fetchAll()">↻ REFRESH</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding: 12px 16px;">
+          <div class="token-table">
+            <div class="token-table-head">
+              <span class="th">TOKEN</span>
+              <span class="th right">PRIX</span>
+              <span class="th right">VALEUR</span>
+              <span class="th right">BALANCE</span>
+              <span class="th right">PNL</span>
+              <span class="th right">TP</span>
+            </div>
+            <div class="token-rows" id="tokenRows">
+              <div class="empty-state">Chargement des positions…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs -->
+      <div class="panel bracket">
+        <div class="panel-header">
+          <div class="panel-title"><span class="panel-title-accent">//</span>JOURNAL</div>
+          <div class="panel-actions">
+            <span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-dim);">AUTO-SCROLL ↓</span>
+          </div>
+        </div>
+        <div class="logs-body" id="logsBody">
+          <div class="log-line info">
+            <span class="log-time">--:--:--</span>
+            <span class="log-lvl">INFO</span>
+            <span class="log-msg">En attente de connexion…</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COL -->
+    <div class="right-col">
+
+      <!-- Take-Profit Live -->
+      <div class="panel bracket">
+        <div class="panel-header">
+          <div class="panel-title"><span class="panel-title-accent">//</span>TAKE-PROFIT</div>
+          <span class="count-badge" id="tpActiveBadge">0 actifs</span>
+        </div>
+        <div class="panel-body">
+          <div class="tp-entries" id="tpEntries">
+            <div class="empty-state" style="padding:20px;">Aucun palier actif</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TP Config -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="panel-title-accent">//</span>CONFIG PALIERS</div>
+          <span id="tpStatus" class="sys-val off">OFF</span>
+        </div>
+        <div class="tiers-grid" id="tiersGrid">
+          <div class="empty-state" style="padding:10px;font-size:0.6rem;">—</div>
+        </div>
+      </div>
+
+      <!-- System Status -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="panel-title-accent">//</span>SYSTÈME</div>
+        </div>
+        <div class="sys-rows">
+          <div class="sys-row">
+            <span class="sys-key">Statut Bot</span>
+            <span class="sys-val on" id="sysStatus">ONLINE</span>
+          </div>
+          <div class="sys-row">
+            <span class="sys-key">Réseau</span>
+            <span class="sys-val">MAINNET-BETA</span>
+          </div>
+          <div class="sys-row">
+            <span class="sys-key">Intervalle</span>
+            <span class="sys-val" id="sysInterval">—</span>
+          </div>
+          <div class="sys-row">
+            <span class="sys-key">Hysteresis</span>
+            <span class="sys-val" id="sysHysteresis">—</span>
+          </div>
+          <div class="sys-row">
+            <span class="sys-key">Version</span>
+            <span class="sys-val">1.2.0</span>
+          </div>
+          <div class="sys-row">
+            <span class="sys-key">Auto-refresh</span>
+            <span class="sys-val on" id="autoStatus">ON</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+  <div class="footer-bar">
+    <div class="footer-info">SOLBOT TERMINAL <span>v1.2.0</span> · SOLANA MAINNET · JUPITER DEX AGGREGATOR</div>
+    <div class="footer-info">AUTO-REFRESH: <span id="footerAutoStatus">ON</span> · LAST UPDATE: <span id="footerLastUpdate">—</span></div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ── Config ──────────────────────────────────────────────
+const API_BASE = window.location.origin;
+const REFRESH_MS = 10000;
+let autoRefresh = true;
+let logBuffer = [];
+const MAX_LOGS = 80;
+
+// ── Helpers ─────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmtN  = (n, d = 2) => parseFloat(n || 0).toFixed(d);
+const fmtUSD = n => '$' + fmtN(n, 2);
+const fmtAddr = a => a ? a.slice(0, 6) + '…' + a.slice(-4) : '—';
+const fmtTime = ts => new Date(ts).toLocaleTimeString('fr-FR');
+function fmtUptime(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
+}
+
+// ── Copy wallet ──────────────────────────────────────────
+$('copyBtn').addEventListener('click', () => {
+  const addr = $('walletAddress').textContent;
+  navigator.clipboard.writeText(addr).then(() => {
+    $('copyBtn').textContent = '✓';
+    setTimeout(() => { $('copyBtn').textContent = '⎘'; }, 1200);
+  });
+});
+
+// ── Push a log line ──────────────────────────────────────
+function pushLog(level, msg) {
+  const time = new Date().toLocaleTimeString('fr-FR');
+  logBuffer.unshift({ time, level, msg });
+  if (logBuffer.length > MAX_LOGS) logBuffer.pop();
+  renderLogs();
+}
+
+function renderLogs() {
+  $('logsBody').innerHTML = logBuffer.map(l => `
+    <div class="log-line ${l.level}">
+      <span class="log-time">${l.time}</span>
+      <span class="log-lvl">${l.level}</span>
+      <span class="log-msg">${escHtml(l.msg)}</span>
+    </div>
+  `).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Fetch all data ───────────────────────────────────────
+async function fetchAll() {
+  try {
+    const [sRes, pRes, tRes] = await Promise.all([
+      fetch(`${API_BASE}/api/stats`),
+      fetch(`${API_BASE}/api/portfolio`),
+      fetch(`${API_BASE}/api/take-profit`)
+    ]);
+    if (!sRes.ok || !pRes.ok || !tRes.ok) throw new Error('HTTP error');
+    const [stats, portfolio, tp] = await Promise.all([sRes.json(), pRes.json(), tRes.json()]);
+    updateAll(stats, portfolio, tp);
+    pushLog('info', `Cycle OK — ${portfolio.tokens?.length || 0} tokens — ${fmtUSD(stats.totalValue)}`);
+    setStatus(true);
+  } catch (err) {
+    pushLog('error', 'Fetch échoué: ' + err.message);
+    setStatus(false);
+  }
+}
+
+function setStatus(online) {
+  const el = $('sysStatus');
+  el.textContent = online ? 'ONLINE' : 'OFFLINE';
+  el.className = 'sys-val ' + (online ? 'on' : 'off');
+}
+
+// ── Update all UI ────────────────────────────────────────
+function updateAll(stats, portfolio, tp) {
+  // Metrics
+  $('totalValue').textContent  = fmtUSD(stats.totalValue);
+  $('tokenCount').textContent  = stats.tokens ?? '—';
+  $('tpTriggered').textContent = tp.entries?.reduce((s, e) => s + (e.triggeredTiers?.length || 0), 0) ?? '—';
+  $('uptime').textContent      = fmtUptime(stats.uptime || 0);
+  $('lastUpdate').textContent  = 'Dernière MAJ: ' + fmtTime(Date.now());
+  $('footerLastUpdate').textContent = fmtTime(Date.now());
+
+  // Wallet
+  $('walletAddress').textContent = fmtAddr(portfolio.address);
+  $('copyBtn').dataset.full = portfolio.address || '';
+
+  // TP Status
+  const tpEnabled = tp.enabled || stats.takeProfit?.enabled;
+  $('tpStatus').textContent  = tpEnabled ? 'ON' : 'OFF';
+  $('tpStatus').className    = 'sys-val ' + (tpEnabled ? 'on' : 'off');
+  $('sysHysteresis').textContent = (tp.hysteresis || stats.takeProfit?.hysteresis || '—');
+  $('sysInterval').textContent   = '30s';
+
+  // Tiers config
+  const tiers = tp.tiers || stats.takeProfit?.tiers || [];
+  $('tiersGrid').innerHTML = tiers.length
+    ? tiers.map((t, i) => `
+      <div class="tier-pill" data-n="${i+1}">
+        <div class="tier-pill-label">cible / vente</div>
+        <div class="tier-pill-val">${t.pnl}</div>
+        <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--amber)">→ ${t.sell}</div>
+      </div>
+    `).join('')
+    : '<div class="empty-state" style="padding:10px;font-size:0.6rem;">—</div>';
+
+  // Portfolio badge
+  $('portfolioBadge').textContent = (portfolio.tokens?.length || 0) + ' tokens';
+
+  // Token rows
+  const tokens = portfolio.tokens || [];
+  $('tokenRows').innerHTML = tokens.length
+    ? tokens.map((tok, idx) => {
+        const pnl = tok.pnl;
+        const pnlClass = pnl === null ? 'pnl-neu' : pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+        const pnlText  = pnl === null ? 'N/A' : (pnl >= 0 ? '+' : '') + fmtN(pnl, 2) + '%';
+        const allTiers  = tp.tiers || [];
+        const done      = tok.triggeredTiers || [];
+        const tpDots    = allTiers.map(t => `<div class="tp-dot ${done.includes(t.pnl) ? 'done' : 'wait'}"></div>`).join('');
+        return `
+          <div class="token-row" style="animation-delay:${idx * 0.04}s">
+            <div>
+              <div class="token-name">${tok.mint}</div>
+              <div class="token-addr">${fmtAddr(tok.mintFull)}</div>
+            </div>
+            <div class="td right price-text">${tok.price ? fmtUSD(tok.price) : '—'}</div>
+            <div class="td right value-text">${fmtUSD(tok.value)}</div>
+            <div class="td right balance-text">${fmtN(tok.balance, 4)}</div>
+            <div class="td right"><span class="pnl-badge ${pnlClass}">${pnlText}</span></div>
+            <div class="td right"><div class="tp-mini">${tpDots}</div></div>
+          </div>
+        `;
+      }).join('')
+    : '<div class="empty-state">Aucune position ouverte</div>';
+
+  // TP entries
+  const entries = tp.entries || [];
+  $('tpActiveBadge').textContent = entries.length + ' actifs';
+  $('tpEntries').innerHTML = entries.length
+    ? entries.map(e => {
+        const tiers = tp.tiers || [];
+        const pnl   = tiers.length > 0 && e.triggeredTiers ? e.triggeredTiers : [];
+        // find live PnL from tokens
+        const match = tokens.find(t => t.mintFull && t.mintFull.startsWith(e.mint.replace('...','').slice(0,6)));
+        const livePnl = match?.pnl ?? null;
+
+        const tiersHtml = tiers.map((t, i) => {
+          const isDone   = e.triggeredTiers?.includes(t.pnl);
+          const isActive = !isDone && livePnl !== null && livePnl >= (i > 0 ? tiers[i-1].pnl : 0);
+          const cls = isDone ? 'done' : isActive ? 'active' : 'wait';
+          const fill = isDone ? '100' : isActive ? '60' : '0';
+          return `
+            <div class="tp-tier-block">
+              <div class="tp-tier-bar"><div class="tp-tier-bar-fill ${cls}" style="width:${fill}%"></div></div>
+              <div class="tp-tier-label ${cls}">${t.pnl}</div>
+            </div>`;
+        }).join('');
+
+        const pnlColor = livePnl === null ? 'var(--text-dim)' : livePnl >= 0 ? 'var(--green)' : 'var(--red)';
+        const pnlStr   = livePnl !== null ? (livePnl >= 0 ? '+' : '') + fmtN(livePnl, 2) + '%' : '— %';
+        return `
+          <div class="tp-entry-card">
+            <div class="tp-entry-top">
+              <div>
+                <div class="tp-entry-mint">${e.mint}</div>
+                <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-dim);margin-top:2px;">entry ${fmtUSD(e.entryPrice)}</div>
+              </div>
+              <div class="tp-entry-pnl" style="color:${pnlColor}">${pnlStr}</div>
+            </div>
+            <div class="tp-progress-row">${tiersHtml}</div>
+            <div class="tp-entry-meta">
+              <span>vendu: ${fmtN(e.sold, 4)}</span>
+              <span>restant: ${fmtN(e.remaining, 4)}</span>
+            </div>
+          </div>`;
+      }).join('')
+    : '<div class="empty-state" style="padding:20px;">Aucun palier actif</div>';
+}
+
+// ── Visibility API ───────────────────────────────────────
+document.addEventListener('visibilitychange', () => {
+  autoRefresh = !document.hidden;
+  const v = autoRefresh ? 'ON' : 'OFF';
+  $('autoStatus').textContent = v;
+  $('footerAutoStatus').textContent = v;
+});
+
+// ── Auto-refresh loop ────────────────────────────────────
+setInterval(() => { if (autoRefresh) fetchAll(); }, REFRESH_MS);
+
+// ── Init ─────────────────────────────────────────────────
+pushLog('info', 'SolBot Terminal démarré');
+pushLog('info', 'Connexion à l\'API…');
+fetchAll();
+</script>
+</body>
+</html>
