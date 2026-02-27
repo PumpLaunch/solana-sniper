@@ -1,7 +1,7 @@
 {
   "name": "solbot-basic",
-  "version": "1.0.0",
-  "description": "Solana bot minimal - monitoring wallet",
+  "version": "1.2.0",
+  "description": "Solana bot - Take-Profit par paliers + Ventes réelles Jupiter",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
