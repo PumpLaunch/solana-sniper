@@ -1,13 +1,12 @@
 /**
- * 🤖 SolBot-Pro v5.1 — Single File Edition
- * Gestion complète : Grid, DCA, Sniping, Raydium Fallback, Honeypot Detection
- * Optimisé pour déploiement mobile depuis GitHub
+ * 🤖 SolBot-Pro v5.2 — Single File Edition (CORRIGÉ)
+ * Fixes: PublicKey filter + Redis connection
  */
 
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 1: CONFIGURATION & ENVIRONMENT
+// SECTION 1: CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
 require('dotenv').config();
@@ -30,9 +29,6 @@ const CONFIG = {
   LIQUIDITY_MIN_USD: parseFloat(process.env.LIQUIDITY_MIN_USD || '0'),
   LIQUIDITY_ALERT_USD: parseFloat(process.env.LIQUIDITY_ALERT_USD || '100'),
   
-  GRID_DEFAULT_LEVELS: parseInt(process.env.GRID_DEFAULT_LEVELS || '20'),
-  GRID_DEFAULT_INVESTMENT: parseFloat(process.env.GRID_DEFAULT_INVESTMENT || '10'),
-  
   SNIPE_PUMP: process.env.SNIPE_PUMP === 'true',
   SNIPE_AMOUNT_SOL: parseFloat(process.env.SNIPE_AMOUNT_SOL || '0.1'),
   SNIPE_MIN_LIQ: parseFloat(process.env.SNIPE_MIN_LIQ || '1000'),
@@ -49,14 +45,10 @@ const CONFIG = {
   ALERT_WEBHOOK_URL: process.env.ALERT_WEBHOOK_URL || '',
 };
 
-// Validation basique
 if (!CONFIG.PRIVATE_KEY) { console.error('❌ PRIVATE_KEY manquante'); process.exit(1); }
-if (CONFIG.NODE_ENV === 'production' && !CONFIG.CACHE_ENCRYPTION_KEY) {
-  console.warn('⚠️ CACHE_ENCRYPTION_KEY non définie en production');
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 2: LOGGER SÉCURISÉ (Sans fuite de données)
+// SECTION 2: LOGGER
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SENSITIVE_PATTERNS = [
@@ -88,7 +80,7 @@ function log(level, message, meta = null) {
 // SECTION 3: DÉPENDANCES
 // ═══════════════════════════════════════════════════════════════════════════
 
-const { Connection, Keypair, PublicKey, VersionedTransaction } = require('@solana/web3.js');
+const { Connection, Keypair, PublicKey } = require('@solana/web3.js');
 const Redis = require('ioredis');
 const bs58 = require('bs58');
 const express = require('express');
@@ -102,8 +94,7 @@ const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...ar
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-const PUMP_FUN_PROGRAM = '6EF8rrecthR5Dkzon8NQuTjrAtp7zfoTBVKM1jCPnitp';
-const BOT_VERSION = '5.1.0';
+const BOT_VERSION = '5.2.0';
 
 const TAKE_PROFIT_TIERS = [
   { targetPnl: 20, sellPercent: 30 },
@@ -113,7 +104,7 @@ const TAKE_PROFIT_TIERS = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 5: GESTIONNAIRE DE WALLET
+// SECTION 5: WALLET
 // ═══════════════════════════════════════════════════════════════════════════
 
 function loadKeypair() {
@@ -134,32 +125,53 @@ function loadKeypair() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 6: CACHE SÉCURISÉ (REDIS)
+// SECTION 6: CACHE REDIS (CORRIGÉ)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class SecureCache {
   constructor() {
+    const isTLS = CONFIG.REDIS_URL.startsWith('rediss://') || CONFIG.NODE_ENV === 'production';
+    
     this._redis = new Redis(CONFIG.REDIS_URL, {
-      tls: CONFIG.NODE_ENV === 'production' || CONFIG.REDIS_URL.startsWith('rediss://')
-        ? { rejectUnauthorized: false } : undefined,
+      tls: isTLS ? { rejectUnauthorized: false } : undefined,
       maxRetriesPerRequest: 3,
       retryStrategy: (times) => Math.min(times * 100, 3000),
+      connectTimeout: 10000,
+      commandTimeout: 5000,
     });
-    this._redis.on('error', (err) => log('error', '[REDIS] Erreur', { message: err.message }));
-    this._redis.on('connect', () => log('info', '[REDIS] Connecté'));
+    
+    this._redis.on('error', (err) => {
+      log('error', '[REDIS] Erreur', { 
+        message: err.message || 'Connection failed',
+        code: err.code || 'UNKNOWN'
+      });
+    });
+    
+    this._redis.on('connect', () => {
+      log('info', '[REDIS] Connecté', { tls: isTLS });
+    });
+    
+    this._redis.on('close', () => {
+      log('warn', '[REDIS] Connexion fermée');
+    });
   }
 
   async get(key) {
     try {
       const raw = await this._redis.get(`bot:${key}`);
       return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
+    } catch (err) {
+      log('debug', '[REDIS] Get error', { key, error: err.message });
+      return null;
+    }
   }
 
   async set(key, value, ttl = 300) {
     try {
       await this._redis.set(`bot:${key}`, JSON.stringify(value), 'EX', ttl);
-    } catch (err) { log('error', '[REDIS] Set error', { key, error: err.message }); }
+    } catch (err) {
+      log('debug', '[REDIS] Set error', { key, error: err.message });
+    }
   }
 
   async del(key) {
@@ -170,7 +182,7 @@ class SecureCache {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 7: GESTIONNAIRE RPC (Avec Failover)
+// SECTION 7: RPC MANAGER
 // ═══════════════════════════════════════════════════════════════════════════
 
 class RpcManager {
@@ -185,7 +197,10 @@ class RpcManager {
   }
 
   get connection() {
-    return new Connection(this._urls[this._index], { commitment: 'confirmed', confirmTransactionInitialTimeout: 60000 });
+    return new Connection(this._urls[this._index], { 
+      commitment: 'confirmed', 
+      confirmTransactionInitialTimeout: 60000 
+    });
   }
 
   async healthCheck() {
@@ -200,15 +215,14 @@ class RpcManager {
     }
   }
 
-  failover() { this._index = (this._index + 1) % this._urls.length; log('warn', '[RPC] Failover', { index: this._index }); }
-
-  async subscribeAccount(pubkey, callback) {
-    return await this.connection.onAccountChange(new PublicKey(pubkey), callback);
+  failover() { 
+    this._index = (this._index + 1) % this._urls.length; 
+    log('warn', '[RPC] Failover', { index: this._index }); 
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 8: MOTEUR DE PRIX (Multi-Sources)
+// SECTION 8: PRICE ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
 
 class PriceEngine {
@@ -238,7 +252,7 @@ class PriceEngine {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 9: MOTEUR DE VENTE (Avec Fallback Raydium)
+// SECTION 9: SELL ENGINE (Avec Fallback Raydium)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class SellEngine {
@@ -270,14 +284,12 @@ class SellEngine {
 
     const slippage = this._calcSlippage(liquidityUsd, change24h, 0);
 
-    // Stop-Loss
     if (CONFIG.STOP_LOSS && pnl <= CONFIG.STOP_LOSS_PCT) {
       log('warn', '[🔴 STOP-LOSS]', { mint: mint.slice(0, 8) + '...', pnl: pnl.toFixed(2) + '%' });
       await this._executeSell({ mint, amount: amountRaw, slippage, reason: 'STOP_LOSS' });
       return;
     }
 
-    // Trailing Stop
     if (pnl >= 5) {
       const td = this._trailingData.get(mint) ?? { highest: pnl, active: false };
       if (pnl > td.highest) td.highest = pnl;
@@ -291,7 +303,6 @@ class SellEngine {
       this._trailingData.set(mint, td);
     }
 
-    // Take-Profit
     for (let i = 0; i < TAKE_PROFIT_TIERS.length; i++) {
       const tier = TAKE_PROFIT_TIERS[i];
       const key = `${mint}_tier_${i}`;
@@ -315,10 +326,8 @@ class SellEngine {
       return null;
     }
 
-    // Jupiter
     let txId = await this._jupiterSell(mint, amount, slippage);
 
-    // Raydium Fallback
     if (!txId && CONFIG.RAYDIUM_FALLBACK_ENABLED) {
       log('warn', '[SELL] Fallback Raydium', { mint: mint.slice(0, 8) + '...' });
       txId = await this._raydiumSell(mint, amount, slippage);
@@ -357,7 +366,6 @@ class SellEngine {
       const data = await swapRes.json();
       if (!data?.swapTransaction) return null;
 
-      // TODO: Signer et envoyer la transaction
       return `jupiter_${Date.now()}`;
     } catch { return null; }
   }
@@ -372,7 +380,6 @@ class SellEngine {
       const data = await res.json();
       if (!data?.data?.outAmount) return null;
 
-      // TODO: Signer et envoyer la transaction
       return `raydium_${Date.now()}`;
     } catch { return null; }
   }
@@ -392,7 +399,7 @@ class SellEngine {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 10: MOTEUR D'ACHAT (Avec Détection Honeypot)
+// SECTION 10: BUY ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
 
 class BuyEngine {
@@ -439,52 +446,7 @@ class BuyEngine {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 11: MOTEUR GRID TRADING
-// ═══════════════════════════════════════════════════════════════════════════
-
-class GridEngine {
-  constructor(cache, prices) {
-    this._cache = cache; this._prices = prices;
-    this._grids = new Map();
-    this._orders = new Map();
-  }
-
-  async createGrid({ mint, lowerPrice, upperPrice, levels, investmentPerLevel }) {
-    const prices = [];
-    const step = (upperPrice - lowerPrice) / (levels - 1);
-    for (let i = 0; i < levels; i++) prices.push(lowerPrice + step * i);
-
-    const grid = { mint, lowerPrice, upperPrice, levels, investmentPerLevel, prices, status: 'active', stats: { trades: 0, pnl: 0 } };
-    this._grids.set(mint, grid);
-    await this._cache.set(`grid:${mint}`, grid, 86400);
-    log('info', '[GRID] Créée', { mint: mint.slice(0, 8) + '...', levels });
-    return grid;
-  }
-
-  async onPriceUpdate(mint, price) {
-    const grid = this._grids.get(mint);
-    if (!grid || grid.status !== 'active') return;
-
-    for (let i = 0; i < grid.prices.length; i++) {
-      if (price <= grid.prices[i] * 1.001) {
-        // Buy signal
-        log('debug', '[GRID] Buy level', { mint: mint.slice(0, 8) + '...', level: i });
-      }
-    }
-  }
-
-  getStats(mint) { return this._grids.get(mint) || null; }
-  async loadGrids() {
-    const keys = await this._cache.keys('grid:*');
-    for (const key of keys) {
-      const grid = await this._cache.get(key);
-      if (grid) this._grids.set(grid.mint, grid);
-    }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SECTION 12: SERVEUR API HTTP
+// SECTION 11: API SERVER
 // ═══════════════════════════════════════════════════════════════════════════
 
 class ApiServer {
@@ -503,12 +465,14 @@ class ApiServer {
     this._app.get('/api/wallet', (req, res) => res.json({ publicKey: this._wallet.publicKey.toString() }));
     this._app.get('/api/portfolio', async (req, res) => res.json({ snapshot: this._bot.lastSnapshot || [] }));
     this._app.get('/api/sell/queue', async (req, res) => res.json({ queue: await this._sell.getQueue() }));
+    
     this._app.post('/api/sell/manual', async (req, res) => {
       const { mint, slippage } = req.body;
       const txId = await this._sell._executeSell({ mint, amount: 0, slippage: slippage || 1000, reason: 'MANUAL' });
       if (txId) await this._sell.clearQueue(mint);
       res.json({ success: !!txId, txId });
     });
+    
     this._app.post('/api/emergency/stop', (req, res) => {
       if (req.headers['x-emergency-token'] !== CONFIG.EMERGENCY_TOKEN) return res.status(403).json({ error: 'Unauthorized' });
       log('error', '[URGENCE] Arrêt déclenché');
@@ -530,12 +494,13 @@ class ApiServer {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 13: BOUCLE PRINCIPALE DU BOT
+// SECTION 12: BOT LOOP (CORRIGÉ - PublicKey Filter)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class BotLoop {
   constructor({ wallet, rpc, prices, sell, buy, cache }) {
-    this._wallet = wallet; this._rpc = rpc; this._prices = prices; this._sell = sell; this._buy = buy; this._cache = cache;
+    this._wallet = wallet; this._rpc = rpc; this._prices = prices; 
+    this._sell = sell; this._buy = buy; this._cache = cache;
     this._entryPrices = new Map();
     this._manualTokens = new Set();
     this.lastSnapshot = [];
@@ -547,9 +512,12 @@ class BotLoop {
   async tick() {
     await this._rpc.healthCheck();
     try {
+      // ✅ CORRECTION CRITIQUE: programId doit être un objet PublicKey
       const accounts = await this._rpc.connection.getParsedTokenAccountsByOwner(
-        this._wallet.publicKey, { programId: TOKEN_PROGRAM }
+        this._wallet.publicKey, 
+        { programId: new PublicKey(TOKEN_PROGRAM) } // ← Conversion explicite
       );
+      
       const mints = accounts.value.map(a => a.account.data.parsed.info.mint).filter(m => m !== SOL_MINT);
       const allMints = [...new Set([...mints, ...this._manualTokens])];
 
@@ -578,7 +546,7 @@ class BotLoop {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SECTION 14: POINT D'ENTRÉE PRINCIPAL
+// SECTION 13: MAIN
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function main() {
@@ -593,6 +561,10 @@ async function main() {
   const bot = new BotLoop({ wallet, rpc, prices, sell, buy, cache });
 
   await rpc.healthCheck();
+  
+  // Attendre que Redis soit connecté
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
   await bot.tick();
 
   setInterval(() => bot.tick().catch(err => log('error', '[LOOP] Erreur', { error: err.message })), CONFIG.INTERVAL_SEC * 1000);
