@@ -129,7 +129,7 @@ async function getTokenPrice(mint) {
     if (!pair?.priceUsd) return null;
     
     const result = { price: parseFloat(pair.priceUsd), liquidity: pair.liquidity?.usd || 0, change24h: pair.priceChange?.h24 || 0 };
-    priceCache.set(mint, { result, ts: Date.now() });
+    priceCache.set(mint, { data: result, ts: Date.now() });
     return result;
   } catch (err) {
     log('debug', 'Prix non disponible', { mint: mint.slice(0, 8) + '...' });
