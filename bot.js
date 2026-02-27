@@ -1,6 +1,5 @@
 /**
- * 🤖 SolBot-Basic v1.2 — Take-Profit par Paliers (25% x 4)
- * Stratégie: Vendre 25% du token à chaque palier de profit atteint
+ * 🤖 SolBot-Basic v1.2 — Take-Profit par Paliers + Ventes Réelles Jupiter
  */
 'use strict';
 
@@ -14,19 +13,12 @@ const CONFIG = {
   PORT: parseInt(process.env.PORT) || 10000,
   INTERVAL_SEC: parseInt(process.env.INTERVAL_SEC) || 30,
   NODE_ENV: process.env.NODE_ENV || 'production',
-  const { Connection, Keypair, PublicKey, VersionedTransaction } = require('@solana/web3.js');
   
-  // 🎯 TAKE-PROFIT PAR PALIERS
   TAKE_PROFIT_ENABLED: process.env.TAKE_PROFIT_ENABLED === 'true',
   TAKE_PROFIT_TIERS: process.env.TAKE_PROFIT_TIERS 
     ? JSON.parse(process.env.TAKE_PROFIT_TIERS) 
-    : [  // Format: [{pnl: %, sell: %}, ...]
-        { pnl: 20, sell: 25 },   // +20% → vendre 25%
-        { pnl: 40, sell: 25 },   // +40% → vendre 25%
-        { pnl: 60, sell: 25 },   // +60% → vendre 25%
-        { pnl: 100, sell: 25 },  // +100% → vendre 25% (reste)
-      ],
-  TAKE_PROFIT_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'), // % de marge pour reset
+    : [{ pnl: 20, sell: 25 }, { pnl: 40, sell: 25 }, { pnl: 60, sell: 25 }, { pnl: 100, sell: 25 }],
+  TAKE_PROFIT_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
 };
 
 if (!CONFIG.PRIVATE_KEY) {
@@ -35,10 +27,10 @@ if (!CONFIG.PRIVATE_KEY) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DÉPENDANCES
+// DÉPENDANCES (IMPORTS — HORS DE CONFIG)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const { Connection, Keypair, PublicKey } = require('@solana/web3.js');
+const { Connection, Keypair, PublicKey, VersionedTransaction } = require('@solana/web3.js');
 const bs58 = require('bs58');
 const express = require('express');
 const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
@@ -145,47 +137,34 @@ async function getTokenPrice(mint) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🎯 TAKE-PROFIT MANAGER PAR PALIERS (NOUVEAU)
+// 🎯 TAKE-PROFIT MANAGER PAR PALIERS
 // ═══════════════════════════════════════════════════════════════════════════
 
 class TieredTakeProfitManager {
   constructor(tiers, hysteresis = 5) {
-    this.tiers = tiers.sort((a, b) => a.pnl - b.pnl); // Trier par PnL croissant
-    this.hysteresis = hysteresis; // Marge de sécurité pour éviter les flip-flop
-    
-    this.entryPrices = new Map();  // mint → { price, timestamp, originalBalance }
-    this.triggeredTiers = new Map(); // mint → Set of triggered tier indices
-    this.soldAmounts = new Map();  // mint → total amount already sold
+    this.tiers = tiers.sort((a, b) => a.pnl - b.pnl);
+    this.hysteresis = hysteresis;
+    this.entryPrices = new Map();
+    this.triggeredTiers = new Map();
+    this.soldAmounts = new Map();
   }
   
-  // Enregistrer le prix d'entrée et le balance initial pour un nouveau token
   trackEntry(mint, currentPrice, currentBalance) {
     if (!this.entryPrices.has(mint) && currentPrice > 0 && currentBalance > 0) {
-      this.entryPrices.set(mint, { 
-        price: currentPrice, 
-        timestamp: Date.now(),
-        originalBalance: currentBalance 
-      });
+      this.entryPrices.set(mint, { price: currentPrice, timestamp: Date.now(), originalBalance: currentBalance });
       this.triggeredTiers.set(mint, new Set());
       this.soldAmounts.set(mint, 0);
-      log('debug', 'Nouveau token tracké', { 
-        mint: mint.slice(0,8) + '...', 
-        entryPrice: currentPrice,
-        balance: currentBalance 
-      });
       return true;
     }
     return false;
   }
   
-  // Calculer le PnL actuel pour un token
   getPnl(mint, currentPrice) {
     const entry = this.entryPrices.get(mint);
     if (!entry || !currentPrice) return null;
     return ((currentPrice - entry.price) / entry.price) * 100;
   }
   
-  // Obtenir le balance restant (original - déjà vendu)
   getRemainingBalance(mint) {
     const entry = this.entryPrices.get(mint);
     const sold = this.soldAmounts.get(mint) || 0;
@@ -193,116 +172,66 @@ class TieredTakeProfitManager {
     return Math.max(0, entry.originalBalance - sold);
   }
   
-  // Vérifier quels paliers sont déclenchables
-  checkTiers(mint, currentPrice, currentBalance) {
+  checkTiers(mint, currentPrice) {
     const entry = this.entryPrices.get(mint);
     const triggered = this.triggeredTiers.get(mint);
     const pnl = this.getPnl(mint, currentPrice);
-    
     if (!entry || pnl === null || !triggered) return [];
     
     const availableTiers = [];
-    
     for (let i = 0; i < this.tiers.length; i++) {
       const tier = this.tiers[i];
-      
-      // Skip si déjà déclenché
       if (triggered.has(i)) continue;
-      
-      // Vérifier si le PnL atteint ce palier
       if (pnl >= tier.pnl) {
-        // Calculer le montant à vendre : % du balance ORIGINAL (pas du restant)
         const sellAmount = entry.originalBalance * (tier.sell / 100);
-        
         availableTiers.push({
-          tierIndex: i,
-          pnlTarget: tier.pnl,
-          sellPercent: tier.sell,
-          sellAmount: parseFloat(sellAmount.toFixed(6)),
-          currentPnl: parseFloat(pnl.toFixed(2)),
+          tierIndex: i, pnlTarget: tier.pnl, sellPercent: tier.sell,
+          sellAmount: parseFloat(sellAmount.toFixed(6)), currentPnl: parseFloat(pnl.toFixed(2))
         });
       }
     }
-    
     return availableTiers;
   }
   
-  // Marquer un palier comme exécuté et mettre à jour les soldes
   markTierExecuted(mint, tierIndex, amountSold) {
     const triggered = this.triggeredTiers.get(mint);
     if (!triggered) return;
-    
     triggered.add(tierIndex);
-    
     const prevSold = this.soldAmounts.get(mint) || 0;
     this.soldAmounts.set(mint, prevSold + amountSold);
-    
     log('info', 'Palier Take-Profit exécuté', {
-      mint: mint.slice(0,8) + '...',
-      tier: tierIndex + 1,
-      sold: amountSold.toFixed(4),
-      totalSold: this.soldAmounts.get(mint).toFixed(4),
-      remaining: this.getRemainingBalance(mint).toFixed(4)
+      mint: mint.slice(0,8) + '...', tier: tierIndex + 1,
+      sold: amountSold.toFixed(4), totalSold: this.soldAmounts.get(mint).toFixed(4)
     });
   }
   
-  // Reset complet pour un token (si on veut recommencer)
-  reset(mint) {
-    this.entryPrices.delete(mint);
-    this.triggeredTiers.delete(mint);
-    this.soldAmounts.delete(mint);
-  }
-  
-  // Reset un palier spécifique (si PnL redescend sous le seuil + hystérésis)
   maybeResetTier(mint, currentPnl, tierIndex) {
     const tier = this.tiers[tierIndex];
     const triggered = this.triggeredTiers.get(mint);
-    
     if (!triggered || !triggered.has(tierIndex)) return;
-    
-    // Si le PnL redescend de plus de l'hystérésis sous le seuil, on reset ce palier
     if (currentPnl < tier.pnl - this.hysteresis) {
       triggered.delete(tierIndex);
-      log('debug', 'Palier reset (hystérésis)', { 
-        mint: mint.slice(0,8) + '...', 
-        tier: tierIndex + 1, 
-        pnl: currentPnl.toFixed(2),
-        threshold: (tier.pnl - this.hysteresis).toFixed(2)
-      });
     }
   }
   
-  // Stats pour l'API
   getStats() {
     const entries = [];
     for (const [mint, entry] of this.entryPrices) {
       const triggered = this.triggeredTiers.get(mint) || new Set();
       entries.push({
-        mint: mint.slice(0,8) + '...',
-        entryPrice: entry.price,
-        originalBalance: entry.originalBalance,
-        sold: this.soldAmounts.get(mint) || 0,
+        mint: mint.slice(0,8) + '...', entryPrice: entry.price,
+        originalBalance: entry.originalBalance, sold: this.soldAmounts.get(mint) || 0,
         remaining: this.getRemainingBalance(mint),
-        triggeredTiers: Array.from(triggered).map(i => this.tiers[i].pnl + '%'),
-        age: Math.round((Date.now() - entry.timestamp) / 1000) + 's'
+        triggeredTiers: Array.from(triggered).map(i => this.tiers[i].pnl + '%')
       });
     }
-    
-    return {
-      enabled: true,
-      tiers: this.tiers.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })),
-      hysteresis: this.hysteresis + '%',
-      tracked: entries.length,
-      entries: entries
-    };
+    return { enabled: true, tiers: this.tiers.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })), hysteresis: this.hysteresis + '%', tracked: entries.length, entries };
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔄 SELL EXECUTOR — MODE RÉEL (Jupiter + Signature)
+// 🔄 SELL EXECUTOR — MODE RÉEL + SIMULATION
 // ═══════════════════════════════════════════════════════════════════════════
-
-const { VersionedTransaction } = require('@solana/web3.js'); // ← À ajouter en haut du fichier si pas déjà présent
 
 class SellExecutor {
   constructor(wallet, rpc) {
@@ -310,135 +239,78 @@ class SellExecutor {
     this.rpc = rpc;
   }
   
-  // ✅ Vente RÉELLE via Jupiter + Signature + Envoi
+  // Simulation pour tests
+  async simulateSell(mint, amount, reason, tier = null) {
+    const tierLabel = tier ? ` (Tier ${tier})` : '';
+    log('success', `🎯 [SIMULATION] Vente${tierLabel} — ${reason}`, {
+      mint: mint.slice(0,8) + '...', amount: parseFloat(amount).toFixed(4)
+    });
+    return { success: true, txId: `sim_${Date.now()}`, simulated: true };
+  }
+  
+  // Vente réelle via Jupiter
   async executeJupiterSell(mint, amount, slippageBps = 500) {
     try {
-      // Convertir amount en lamports (SOL a 9 décimales)
-      // Pour les tokens, adapter selon decimals (ici on suppose 6-9)
-      const tokenDecimals = 9; // À ajuster selon le token réel
+      const tokenDecimals = 9;
       const amountRaw = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
       
-      log('debug', 'Jupiter: Préparation quote', { 
-        mint: mint.slice(0,8) + '...', 
-        amount: amount.toFixed(4),
-        slippage: slippageBps + 'bps'
-      });
-      
-      // 1️⃣ Obtenir le quote depuis Jupiter
-      const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=So11111111111111111111111111111111111111112&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
-      
-      const quoteRes = await fetch(quoteUrl, { 
-        headers: { 'User-Agent': 'SolBot-Basic/1.2' },
-        signal: AbortSignal.timeout(30000) 
-      });
-      
-      if (!quoteRes.ok) {
-        const errText = await quoteRes.text().catch(() => 'Unknown');
-        throw new Error(`Quote HTTP ${quoteRes.status}: ${errText.slice(0,100)}`);
-      }
-      
+      // Quote
+      const quoteRes = await fetch(
+        `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`,
+        { headers: { 'User-Agent': 'SolBot-Basic/1.2' }, signal: AbortSignal.timeout(30000) }
+      );
+      if (!quoteRes.ok) throw new Error(`Quote HTTP ${quoteRes.status}`);
       const quote = await quoteRes.json();
+      if (!quote?.outAmount) throw new Error('No quote');
       
-      if (!quote?.outAmount) {
-        log('warn', 'Jupiter: Pas de quote disponible', { mint: mint.slice(0,8) + '...', error: quote?.error });
-        return { success: false, error: 'No quote or invalid response' };
-      }
-      
-      log('debug', 'Jupiter: Quote reçu', { 
-        inAmount: quote.inAmount, 
-        outAmount: quote.outAmount,
-        priceImpact: quote.priceImpactPct 
-      });
-      
-      // 2️⃣ Obtenir la transaction swap signable
+      // Swap
       const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SolBot-Basic/1.2' },
         body: JSON.stringify({
-          quoteResponse: quote,
-          userPublicKey: this.wallet.publicKey.toString(),
-          wrapAndUnwrapSol: true,
-          dynamicComputeUnitLimit: true,
-          prioritizationFeeLamports: 'auto', // Auto-priorisation pour inclusion rapide
+          quoteResponse: quote, userPublicKey: this.wallet.publicKey.toString(),
+          wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: 'auto'
         }),
         signal: AbortSignal.timeout(30000)
       });
-      
-      if (!swapRes.ok) {
-        const errText = await swapRes.text().catch(() => 'Unknown');
-        throw new Error(`Swap HTTP ${swapRes.status}: ${errText.slice(0,100)}`);
-      }
-      
+      if (!swapRes.ok) throw new Error(`Swap HTTP ${swapRes.status}`);
       const swapData = await swapRes.json();
+      if (!swapData?.swapTransaction) throw new Error('No swapTransaction');
       
-      if (!swapData?.swapTransaction) {
-        throw new Error('No swapTransaction in Jupiter response');
-      }
-      
-      // 3️⃣ Désérialiser, signer et envoyer la transaction
-      const transactionBuf = Buffer.from(swapData.swapTransaction, 'base64');
-      const transaction = VersionedTransaction.deserialize(transactionBuf);
-      
-      // Signer avec notre wallet
+      // Sign & Send
+      const transaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
       transaction.sign([this.wallet]);
-      
-      // Envoyer la transaction signée
       const txId = await this.rpc.connection.sendRawTransaction(transaction.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-        preflightCommitment: 'confirmed'
+        skipPreflight: false, maxRetries: 3, preflightCommitment: 'confirmed'
       });
       
-      log('info', 'Jupiter: Transaction envoyée', { 
-        mint: mint.slice(0,8) + '...', 
-        txId: txId.slice(0, 8) + '...' + txId.slice(-4) 
-      });
-      
-      // 4️⃣ Confirmer la transaction
+      // Confirm
       const latestBlockhash = await this.rpc.connection.getLatestBlockhash();
       const confirmation = await this.rpc.connection.confirmTransaction({
-        signature: txId,
-        blockhash: latestBlockhash.blockhash,
+        signature: txId, blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
       }, 'confirmed');
       
-      if (confirmation.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-      }
+      if (confirmation.value.err) throw new Error(`Tx failed: ${JSON.stringify(confirmation.value.err)}`);
       
       log('success', '🎯 Vente RÉELLE confirmée !', {
-        mint: mint.slice(0,8) + '...',
-        txId: `https://solscan.io/tx/${txId}`,
-        outAmount: quote.outAmount
+        mint: mint.slice(0,8) + '...', txUrl: `https://solscan.io/tx/${txId}`
       });
-      
-      return { 
-        success: true, 
-        txId, 
-        txUrl: `https://solscan.io/tx/${txId}`,
-        quote 
-      };
+      return { success: true, txId, txUrl: `https://solscan.io/tx/${txId}`, quote };
       
     } catch (err) {
-      log('error', '❌ Jupiter: Échec vente réelle', { 
-        error: err.message, 
-        mint: mint?.slice(0,8) + '...',
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-      });
+      log('error', '❌ Jupiter: Échec', { error: err.message, mint: mint?.slice(0,8) + '...' });
       return { success: false, error: err.message };
     }
   }
   
-  // Méthode principale: appelle executeJupiterSell pour vente réelle
-  async sell(mint, amount, reason, tier = null) {
+  // Méthode principale
+  async sell(mint, amount, reason, tier = null, useReal = true) {
+    if (!useReal) return await this.simulateSell(mint, amount, reason, tier);
     const tierLabel = tier ? ` (Tier ${tier})` : '';
-    
-    log('info', `🎯 Exécution vente${tierLabel} — ${reason}`, {
-      mint: mint.slice(0,8) + '...',
-      amount: parseFloat(amount).toFixed(4),
-      mode: 'REAL'
+    log('info', `🎯 Vente${tierLabel} — ${reason}`, {
+      mint: mint.slice(0,8) + '...', amount: parseFloat(amount).toFixed(4), mode: 'REAL'
     });
-    
     return await this.executeJupiterSell(mint, amount);
   }
 }
@@ -449,12 +321,7 @@ class SellExecutor {
 
 class BotLoop {
   constructor(wallet, rpc) {
-    this.wallet = wallet;
-    this.rpc = rpc;
-    this.portfolio = [];
-    this.startTime = Date.now();
-    
-    // 🎯 Initialise les managers avec config
+    this.wallet = wallet; this.rpc = rpc; this.portfolio = []; this.startTime = Date.now();
     this.takeProfit = new TieredTakeProfitManager(CONFIG.TAKE_PROFIT_TIERS, CONFIG.TAKE_PROFIT_HYSTERESIS);
     this.seller = new SellExecutor(wallet, rpc);
   }
@@ -462,18 +329,14 @@ class BotLoop {
   async tick() {
     try {
       await this.rpc.healthCheck();
-      
       const accounts = await this.rpc.connection.getParsedTokenAccountsByOwner(
-        this.wallet.publicKey,
-        { programId: new PublicKey(TOKEN_PROGRAM) }
+        this.wallet.publicKey, { programId: new PublicKey(TOKEN_PROGRAM) }
       );
       
       const tokens = [];
-      
       for (const acc of accounts.value) {
         const mint = acc.account.data.parsed.info.mint;
         if (mint === SOL_MINT) continue;
-        
         const balance = parseFloat(acc.account.data.parsed.info.tokenAmount.uiAmount);
         if (balance <= 0) continue;
         
@@ -481,55 +344,35 @@ class BotLoop {
         const price = priceData?.price || 0;
         const value = balance * price;
         
-        // 🎯 Track entry si nouveau token
         this.takeProfit.trackEntry(mint, price, balance);
         
-        // 🎯 Vérifier Take-Profit par paliers
         if (CONFIG.TAKE_PROFIT_ENABLED && price > 0) {
           const pnl = this.takeProfit.getPnl(mint, price);
-          
           if (pnl !== null) {
-            // Vérifier quels paliers sont déclenchables
-            const availableTiers = this.takeProfit.checkTiers(mint, price, balance);
-            
+            const availableTiers = this.takeProfit.checkTiers(mint, price);
             for (const tier of availableTiers) {
               log('warn', '🎯 PALIER TAKE-PROFIT DÉCLENCHÉ !', {
-                mint: mint.slice(0,8) + '...',
-                tier: tier.tierIndex + 1,
-                target: `+${tier.pnlTarget}%`,
-                currentPnl: `${tier.currentPnl}%`,
-                sellPercent: `${tier.sellPercent}%`,
-                sellAmount: tier.sellAmount.toFixed(4)
+                mint: mint.slice(0,8) + '...', tier: tier.tierIndex + 1,
+                target: `+${tier.pnlTarget}%`, currentPnl: `${tier.currentPnl}%`
               });
-              
-              // Exécuter la vente (simulation par défaut)
-              const USE_REAL_SELL = true; // ← Mettre à true pour activer Jupiter réel
-              await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex + 1);
-              
-              // Marquer le palier comme exécuté
+              await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex + 1, true);
               this.takeProfit.markTierExecuted(mint, tier.tierIndex, tier.sellAmount);
             }
-            
-            // 🎯 Gestion hystérésis: reset les paliers si PnL redescend trop
             for (let i = 0; i < CONFIG.TAKE_PROFIT_TIERS.length; i++) {
               this.takeProfit.maybeResetTier(mint, pnl, i);
             }
           }
         }
         
-        // Ajouter au portfolio pour l'API
         tokens.push({
-          mint: mint.slice(0, 8) + '...' + mint.slice(-4),
-          mintFull: mint,
+          mint: mint.slice(0, 8) + '...' + mint.slice(-4), mintFull: mint,
           balance: parseFloat(balance.toFixed(4)),
           price: price > 0 ? parseFloat(price.toFixed(6)) : null,
-          value: parseFloat(value.toFixed(2)),
-          liquidity: priceData?.liquidity || 0,
-          change24h: priceData?.change24h || 0,
-          pnl: this.takeProfit.getPnl(mint, price),
+          value: parseFloat(value.toFixed(2)), liquidity: priceData?.liquidity || 0,
+          change24h: priceData?.change24h || 0, pnl: this.takeProfit.getPnl(mint, price),
           entryPrice: this.takeProfit.entryPrices.get(mint)?.price || null,
           remainingBalance: this.takeProfit.getRemainingBalance(mint),
-          triggeredTiers: Array.from(this.takeProfit.triggeredTiers.get(mint) || []).map(i => CONFIG.TAKE_PROFIT_TIERS[i].pnl + '%'),
+          triggeredTiers: Array.from(this.takeProfit.triggeredTiers.get(mint) || []).map(i => CONFIG.TAKE_PROFIT_TIERS[i].pnl + '%')
         });
       }
       
@@ -547,15 +390,12 @@ class BotLoop {
     const totalValue = this.portfolio.reduce((sum, t) => sum + t.value, 0);
     return {
       uptime: Math.round((Date.now() - this.startTime) / 1000),
-      tokens: this.portfolio.length,
-      totalValue: parseFloat(totalValue.toFixed(2)),
+      tokens: this.portfolio.length, totalValue: parseFloat(totalValue.toFixed(2)),
       takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? {
-        enabled: true,
-        tiers: CONFIG.TAKE_PROFIT_TIERS.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })),
-        hysteresis: CONFIG.TAKE_PROFIT_HYSTERESIS + '%',
-        ...this.takeProfit.getStats()
+        enabled: true, tiers: CONFIG.TAKE_PROFIT_TIERS.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })),
+        hysteresis: CONFIG.TAKE_PROFIT_HYSTERESIS + '%', ...this.takeProfit.getStats()
       } : { enabled: false },
-      lastUpdate: new Date().toISOString(),
+      lastUpdate: new Date().toISOString()
     };
   }
 }
@@ -572,20 +412,16 @@ function startApi(bot, wallet) {
   app.get('/api/stats', (req, res) => res.json(bot.getStats()));
   app.get('/api/portfolio', (req, res) => res.json({ address: wallet.publicKey.toString(), tokens: bot.portfolio, timestamp: Date.now() }));
   app.get('/api/wallet', (req, res) => res.json({ address: wallet.publicKey.toString(), shortAddress: wallet.publicKey.toString().slice(0, 8) + '...' + wallet.publicKey.toString().slice(-4) }));
-  
-  // 🎯 Stats Take-Profit détaillées
   app.get('/api/take-profit', (req, res) => res.json(bot.takeProfit.getStats()));
   
-  // 🎯 Test de vente manuelle (debug)
   app.post('/api/sell/test', express.json(), async (req, res) => {
-    const { mint, amount, reason, tier } = req.body;
+    const { mint, amount, reason, tier, real } = req.body;
     if (!mint) return res.status(400).json({ error: 'mint required' });
-    const result = await bot.seller.simulateSell(mint, amount || 1, reason || 'MANUAL_TEST', tier);
+    const result = await bot.seller.sell(mint, amount || 1, reason || 'MANUAL_TEST', tier, real === true);
     res.json(result);
   });
   
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-  
   const port = CONFIG.PORT;
   app.listen(port, '0.0.0.0', () => log('info', 'API démarrée', { port }));
   return app;
@@ -597,38 +433,22 @@ function startApi(bot, wallet) {
 
 async function main() {
   log('info', `🤖 SolBot-Basic v${VERSION} — Démarrage`, { env: CONFIG.NODE_ENV });
-  
   const wallet = loadWallet();
   const rpc = getRpcConnection();
   const bot = new BotLoop(wallet, rpc);
   
   log('info', 'Premier cycle...');
   await bot.tick();
-  
   setInterval(() => bot.tick().catch(err => log('error', 'Erreur loop', { error: err.message })), CONFIG.INTERVAL_SEC * 1000);
-  
   startApi(bot, wallet);
   
   log('info', '✅ Bot actif', { 
     address: wallet.publicKey.toString().slice(0, 8) + '...',
-    interval: `${CONFIG.INTERVAL_SEC}s`,
-    takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? 'tiers: 25%x4' : 'disabled'
+    interval: `${CONFIG.INTERVAL_SEC}s`, takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? 'tiers: 25%x4' : 'disabled'
   });
   
-  // Gestion arrêt propre — CORRECTION ICI 👇
-  process.on('SIGINT', () => { 
-    log('info', '🛑 Arrêt'); 
-    process.exit(0); 
-  });
-  
-  // Gestion erreurs non capturées — CORRECTION ICI 👇
-  process.on('uncaughtException', (err) => 
-    log('error', '💥 Exception', { error: err.message })
-  )); // ← Deux parenthèses fermantes : )) 
+  process.on('SIGINT', () => { log('info', '🛑 Arrêt'); process.exit(0); });
+  process.on('uncaughtException', (err) => log('error', '💥 Exception', { error: err.message }));
 }
 
-// Lancer le bot
-main().catch(err => { 
-  console.error('🚨 Échec démarrage:', err.message); 
-  process.exit(1); 
-});
+main().catch(err => { console.error('🚨 Échec démarrage:', err.message); process.exit(1); });
