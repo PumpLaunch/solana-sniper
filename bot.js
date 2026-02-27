@@ -31,17 +31,18 @@ if (!CONFIG.PRIVATE_KEY) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const { Connection, Keypair, PublicKey, VersionedTransaction } = require('@solana/web3.js');
-const bs58 = require('bs58');
+const bs58   = require('bs58');
 const express = require('express');
-const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
+const path    = require('path');                                          // ← AJOUT
+const fetch   = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTES
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SOL_MINT = 'So11111111111111111111111111111111111111112';
+const SOL_MINT     = 'So11111111111111111111111111111111111111112';
 const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-const VERSION = '1.2.0';
+const VERSION      = '1.2.0';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGGER
@@ -128,7 +129,7 @@ async function getTokenPrice(mint) {
     if (!pair?.priceUsd) return null;
     
     const result = { price: parseFloat(pair.priceUsd), liquidity: pair.liquidity?.usd || 0, change24h: pair.priceChange?.h24 || 0 };
-    priceCache.set(mint, {  result, ts: Date.now() });
+    priceCache.set(mint, { result, ts: Date.now() });
     return result;
   } catch (err) {
     log('debug', 'Prix non disponible', { mint: mint.slice(0, 8) + '...' });
@@ -144,9 +145,9 @@ class TieredTakeProfitManager {
   constructor(tiers, hysteresis = 5) {
     this.tiers = tiers.sort((a, b) => a.pnl - b.pnl);
     this.hysteresis = hysteresis;
-    this.entryPrices = new Map();
+    this.entryPrices    = new Map();
     this.triggeredTiers = new Map();
-    this.soldAmounts = new Map();
+    this.soldAmounts    = new Map();
   }
   
   trackEntry(mint, currentPrice, currentBalance) {
@@ -167,15 +168,15 @@ class TieredTakeProfitManager {
   
   getRemainingBalance(mint) {
     const entry = this.entryPrices.get(mint);
-    const sold = this.soldAmounts.get(mint) || 0;
+    const sold  = this.soldAmounts.get(mint) || 0;
     if (!entry) return 0;
     return Math.max(0, entry.originalBalance - sold);
   }
   
   checkTiers(mint, currentPrice) {
-    const entry = this.entryPrices.get(mint);
+    const entry     = this.entryPrices.get(mint);
     const triggered = this.triggeredTiers.get(mint);
-    const pnl = this.getPnl(mint, currentPrice);
+    const pnl       = this.getPnl(mint, currentPrice);
     if (!entry || pnl === null || !triggered) return [];
     
     const availableTiers = [];
@@ -206,7 +207,7 @@ class TieredTakeProfitManager {
   }
   
   maybeResetTier(mint, currentPnl, tierIndex) {
-    const tier = this.tiers[tierIndex];
+    const tier      = this.tiers[tierIndex];
     const triggered = this.triggeredTiers.get(mint);
     if (!triggered || !triggered.has(tierIndex)) return;
     if (currentPnl < tier.pnl - this.hysteresis) {
@@ -225,25 +226,30 @@ class TieredTakeProfitManager {
         triggeredTiers: Array.from(triggered).map(i => this.tiers[i].pnl + '%')
       });
     }
-    return { enabled: true, tiers: this.tiers.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })), hysteresis: this.hysteresis + '%', tracked: entries.length, entries };
+    return {
+      enabled: true,
+      tiers: this.tiers.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })),
+      hysteresis: this.hysteresis + '%',
+      tracked: entries.length,
+      entries
+    };
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔄 SELL EXECUTOR — MODE RÉEL + SIMULATION
+// 🔄 SELL EXECUTOR — MODE RÉEL
 // ═══════════════════════════════════════════════════════════════════════════
 
 class SellExecutor {
   constructor(wallet, rpc) {
     this.wallet = wallet;
-    this.rpc = rpc;
+    this.rpc    = rpc;
   }
   
-  // Vente réelle via Jupiter
   async executeJupiterSell(mint, amount, slippageBps = 500) {
     try {
       const tokenDecimals = 9;
-      const amountRaw = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
+      const amountRaw     = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
       
       // Quote
       const quoteRes = await fetch(
@@ -277,7 +283,7 @@ class SellExecutor {
       
       // Confirm
       const latestBlockhash = await this.rpc.connection.getLatestBlockhash();
-      const confirmation = await this.rpc.connection.confirmTransaction({
+      const confirmation    = await this.rpc.connection.confirmTransaction({
         signature: txId, blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
       }, 'confirmed');
@@ -295,9 +301,8 @@ class SellExecutor {
     }
   }
   
-  // Méthode principale
   async sell(mint, amount, reason, tier = null, useReal = true) {
-    if (!useReal) return await this.simulateSell(mint, amount, reason, tier);
+    if (!useReal) return { success: false, error: 'simulation désactivée' };
     const tierLabel = tier ? ` (Tier ${tier})` : '';
     log('info', `🎯 Vente${tierLabel} — ${reason}`, {
       mint: mint.slice(0,8) + '...', amount: parseFloat(amount).toFixed(4), mode: 'REAL'
@@ -312,9 +317,12 @@ class SellExecutor {
 
 class BotLoop {
   constructor(wallet, rpc) {
-    this.wallet = wallet; this.rpc = rpc; this.portfolio = []; this.startTime = Date.now();
+    this.wallet     = wallet;
+    this.rpc        = rpc;
+    this.portfolio  = [];
+    this.startTime  = Date.now();
     this.takeProfit = new TieredTakeProfitManager(CONFIG.TAKE_PROFIT_TIERS, CONFIG.TAKE_PROFIT_HYSTERESIS);
-    this.seller = new SellExecutor(wallet, rpc);
+    this.seller     = new SellExecutor(wallet, rpc);
   }
   
   async tick() {
@@ -326,14 +334,14 @@ class BotLoop {
       
       const tokens = [];
       for (const acc of accounts.value) {
-        const mint = acc.account.data.parsed.info.mint;
+        const mint    = acc.account.data.parsed.info.mint;
         if (mint === SOL_MINT) continue;
         const balance = parseFloat(acc.account.data.parsed.info.tokenAmount.uiAmount);
         if (balance <= 0) continue;
         
         const priceData = await getTokenPrice(mint);
-        const price = priceData?.price || 0;
-        const value = balance * price;
+        const price     = priceData?.price || 0;
+        const value     = balance * price;
         
         this.takeProfit.trackEntry(mint, price, balance);
         
@@ -359,16 +367,18 @@ class BotLoop {
           mint: mint.slice(0, 8) + '...' + mint.slice(-4), mintFull: mint,
           balance: parseFloat(balance.toFixed(4)),
           price: price > 0 ? parseFloat(price.toFixed(6)) : null,
-          value: parseFloat(value.toFixed(2)), liquidity: priceData?.liquidity || 0,
-          change24h: priceData?.change24h || 0, pnl: this.takeProfit.getPnl(mint, price),
+          value: parseFloat(value.toFixed(2)),
+          liquidity: priceData?.liquidity || 0,
+          change24h: priceData?.change24h || 0,
+          pnl: this.takeProfit.getPnl(mint, price),
           entryPrice: this.takeProfit.entryPrices.get(mint)?.price || null,
           remainingBalance: this.takeProfit.getRemainingBalance(mint),
           triggeredTiers: Array.from(this.takeProfit.triggeredTiers.get(mint) || []).map(i => CONFIG.TAKE_PROFIT_TIERS[i].pnl + '%')
         });
       }
       
-      this.portfolio = tokens;
-      const totalValue = tokens.reduce((sum, t) => sum + t.value, 0);
+      this.portfolio       = tokens;
+      const totalValue     = tokens.reduce((sum, t) => sum + t.value, 0);
       log('debug', 'Cycle terminé', { tokens: tokens.length, totalValue: `$${totalValue.toFixed(2)}` });
       
     } catch (err) {
@@ -380,11 +390,14 @@ class BotLoop {
   getStats() {
     const totalValue = this.portfolio.reduce((sum, t) => sum + t.value, 0);
     return {
-      uptime: Math.round((Date.now() - this.startTime) / 1000),
-      tokens: this.portfolio.length, totalValue: parseFloat(totalValue.toFixed(2)),
+      uptime:     Math.round((Date.now() - this.startTime) / 1000),
+      tokens:     this.portfolio.length,
+      totalValue: parseFloat(totalValue.toFixed(2)),
       takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? {
-        enabled: true, tiers: CONFIG.TAKE_PROFIT_TIERS.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })),
-        hysteresis: CONFIG.TAKE_PROFIT_HYSTERESIS + '%', ...this.takeProfit.getStats()
+        enabled: true,
+        tiers: CONFIG.TAKE_PROFIT_TIERS.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })),
+        hysteresis: CONFIG.TAKE_PROFIT_HYSTERESIS + '%',
+        ...this.takeProfit.getStats()
       } : { enabled: false },
       lastUpdate: new Date().toISOString()
     };
@@ -398,14 +411,23 @@ class BotLoop {
 function startApi(bot, wallet) {
   const app = express();
   app.use(express.json());
+
+  // ─── Dashboard statique ────────────────────────────────────────────────
+  // Place index.html dans le même dossier que bot.js (ou définir STATIC_DIR)
+  const staticDir = process.env.STATIC_DIR || __dirname;          // ← AJOUT
+  app.use(express.static(staticDir));                              // ← AJOUT
+  app.get('/', (req, res) =>                                       // ← AJOUT
+    res.sendFile(path.join(staticDir, 'index.html'))               // ← AJOUT
+  );                                                               // ← AJOUT
+  // ──────────────────────────────────────────────────────────────────────
+
+  app.get('/health',         (req, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
+  app.get('/api/stats',      (req, res) => res.json(bot.getStats()));
+  app.get('/api/portfolio',  (req, res) => res.json({ address: wallet.publicKey.toString(), tokens: bot.portfolio, timestamp: Date.now() }));
+  app.get('/api/wallet',     (req, res) => res.json({ address: wallet.publicKey.toString(), shortAddress: wallet.publicKey.toString().slice(0, 8) + '...' + wallet.publicKey.toString().slice(-4) }));
+  app.get('/api/take-profit',(req, res) => res.json(bot.takeProfit.getStats()));
   
-  app.get('/health', (req, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
-  app.get('/api/stats', (req, res) => res.json(bot.getStats()));
-  app.get('/api/portfolio', (req, res) => res.json({ address: wallet.publicKey.toString(), tokens: bot.portfolio, timestamp: Date.now() }));
-  app.get('/api/wallet', (req, res) => res.json({ address: wallet.publicKey.toString(), shortAddress: wallet.publicKey.toString().slice(0, 8) + '...' + wallet.publicKey.toString().slice(-4) }));
-  app.get('/api/take-profit', (req, res) => res.json(bot.takeProfit.getStats()));
-  
-  app.post('/api/sell/test', express.json(), async (req, res) => {
+  app.post('/api/sell/test', async (req, res) => {
     const { mint, amount, reason, tier, real } = req.body;
     if (!mint) return res.status(400).json({ error: 'mint required' });
     const result = await bot.seller.sell(mint, amount || 1, reason || 'MANUAL_TEST', tier, real === true);
@@ -413,8 +435,9 @@ function startApi(bot, wallet) {
   });
   
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+
   const port = CONFIG.PORT;
-  app.listen(port, '0.0.0.0', () => log('info', 'API démarrée', { port }));
+  app.listen(port, '0.0.0.0', () => log('info', 'API + Dashboard démarrés', { port, url: `http://localhost:${port}` }));
   return app;
 }
 
@@ -425,8 +448,8 @@ function startApi(bot, wallet) {
 async function main() {
   log('info', `🤖 SolBot-Basic v${VERSION} — Démarrage`, { env: CONFIG.NODE_ENV });
   const wallet = loadWallet();
-  const rpc = getRpcConnection();
-  const bot = new BotLoop(wallet, rpc);
+  const rpc    = getRpcConnection();
+  const bot    = new BotLoop(wallet, rpc);
   
   log('info', 'Premier cycle...');
   await bot.tick();
@@ -434,12 +457,13 @@ async function main() {
   startApi(bot, wallet);
   
   log('info', '✅ Bot actif', { 
-    address: wallet.publicKey.toString().slice(0, 8) + '...',
-    interval: `${CONFIG.INTERVAL_SEC}s`, takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? 'tiers: 25%x4' : 'disabled'
+    address:    wallet.publicKey.toString().slice(0, 8) + '...',
+    interval:   `${CONFIG.INTERVAL_SEC}s`,
+    takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? 'tiers: 25%x4' : 'disabled'
   });
   
-  process.on('SIGINT', () => { log('info', '🛑 Arrêt'); process.exit(0); });
-  process.on('uncaughtException', (err) => log('error', '💥 Exception', { error: err.message }));
+  process.on('SIGINT',           () => { log('info', '🛑 Arrêt'); process.exit(0); });
+  process.on('uncaughtException', err => log('error', '💥 Exception', { error: err.message }));
 }
 
 main().catch(err => { console.error('🚨 Échec démarrage:', err.message); process.exit(1); });
