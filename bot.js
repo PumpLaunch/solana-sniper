@@ -503,7 +503,7 @@ class BotLoop {
               });
               
               // Exécuter la vente (simulation par défaut)
-              const USE_REAL_SELL = false; // ← Mettre à true pour activer Jupiter réel
+              const USE_REAL_SELL = true; // ← Mettre à true pour activer Jupiter réel
               await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex + 1);
               
               // Marquer le palier comme exécuté
