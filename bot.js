@@ -465,7 +465,7 @@ class BotLoop {
         tokens.push({
           mint: mint.slice(0, 8) + '...' + mint.slice(-4), mintFull: mint,
           balance: parseFloat(balance.toFixed(4)),
-          price: price > 0 ? parseFloat(price.toFixed(6)) : null,
+          price: price > 0 ? price : null,  // précision complète pour les micro-prix pump.fun
           value: parseFloat(value.toFixed(2)),
           liquidity: priceData?.liquidity || 0,
           change24h: priceData?.change24h || 0,
