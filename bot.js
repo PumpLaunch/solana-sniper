@@ -40,9 +40,10 @@ const fetch   = (...args) => import('node-fetch').then(({ default: f }) => f(...
 // CONSTANTES
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SOL_MINT     = 'So11111111111111111111111111111111111111112';
-const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-const VERSION      = '1.2.0';
+const SOL_MINT          = 'So11111111111111111111111111111111111111112';
+const TOKEN_PROGRAM      = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const TOKEN_PROGRAM_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'; // ← Token-2022
+const VERSION            = '1.2.0';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGGER
@@ -331,12 +332,19 @@ class BotLoop {
   async tick() {
     try {
       await this.rpc.healthCheck();
-      const accounts = await this.rpc.connection.getParsedTokenAccountsByOwner(
-        this.wallet.publicKey, { programId: new PublicKey(TOKEN_PROGRAM) }
-      );
+      // Récupère les deux programmes SPL en parallèle (Token + Token-2022)
+      const [accounts, accounts2022] = await Promise.all([
+        this.rpc.connection.getParsedTokenAccountsByOwner(
+          this.wallet.publicKey, { programId: new PublicKey(TOKEN_PROGRAM) }
+        ),
+        this.rpc.connection.getParsedTokenAccountsByOwner(
+          this.wallet.publicKey, { programId: new PublicKey(TOKEN_PROGRAM_2022) }
+        ),
+      ]);
+      const allAccounts = [...accounts.value, ...accounts2022.value];
       
       const tokens = [];
-      for (const acc of accounts.value) {
+      for (const acc of allAccounts) {
         const mint      = acc.account.data.parsed.info.mint;
         if (mint === SOL_MINT) continue;
         const tokenAmount = acc.account.data.parsed.info.tokenAmount;
