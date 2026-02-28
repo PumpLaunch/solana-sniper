@@ -1,0 +1,16 @@
+{
+  "name": "SolBot Terminal",
+  "short_name": "SolBot",
+  "description": "Solana Trading Bot Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06060e",
+  "theme_color": "#06060e",
+  "orientation": "portrait",
+  "icons": [{
+    "src": "icon-192.png",
+    "sizes": "192x192",
+    "type": "image/png",
+    "purpose": "any maskable"
+  }]
+}
