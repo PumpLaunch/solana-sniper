@@ -421,6 +421,34 @@
       margin-top: 2px;
     }
 
+    .token-logo-wrap {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--bg-deep);
+      border: 1px solid var(--line-bright);
+      overflow: hidden;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+
+    .token-logo-wrap img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .token-info-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .pnl-badge {
       display: inline-block;
       padding: 3px 8px;
@@ -917,7 +945,7 @@
 'use strict';
 
 // ── Config ──────────────────────────────────────────────
-const API_BASE = window.location.origin;
+const API_BASE = 'https://solana-sniper-7o8s.onrender.com';
 const REFRESH_MS = 10000;
 let autoRefresh = true;
 let logBuffer = [];
@@ -1036,11 +1064,18 @@ function updateAll(stats, portfolio, tp) {
         const allTiers  = tp.tiers || [];
         const done      = tok.triggeredTiers || [];
         const tpDots    = allTiers.map(t => `<div class="tp-dot ${done.includes(t.pnl) ? 'done' : 'wait'}"></div>`).join('');
+        const initials = (tok.symbol || tok.mint || '?').slice(0, 3).toUpperCase();
+        const logoHtml = tok.logo
+          ? `<img src="${tok.logo}" alt="${initials}" onerror="this.parentElement.textContent='${initials}'">`
+          : initials;
         return `
           <div class="token-row" style="animation-delay:${idx * 0.04}s">
-            <div>
-              <div class="token-name">${tok.mint}</div>
-              <div class="token-addr">${fmtAddr(tok.mintFull)}</div>
+            <div class="token-info-cell">
+              <div class="token-logo-wrap">${logoHtml}</div>
+              <div>
+                <div class="token-name">${tok.symbol || tok.mint}</div>
+                <div class="token-addr">${fmtAddr(tok.mintFull)}</div>
+              </div>
             </div>
             <div class="td right price-text">${tok.price ? fmtUSD(tok.price) : '—'}</div>
             <div class="td right value-text">${fmtUSD(tok.value)}</div>
