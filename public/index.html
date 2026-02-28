@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SolBot</title><style>body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:20px}
+.card{background:#1e293b;border-radius:8px;padding:16px;margin:8px 0}.ok{color:#22c55e}.err{color:#ef4444}</style></head>
+<body>
+<h1>🤖 SolBot Terminal</h1>
+<div class="card"><b>Wallet:</b> <span id="wallet">...</span></div>
+<div class="card"><b>Valeur:</b> <span id="value" class="ok">$0.00</span></div>
+<div class="card"><b>Tokens:</b> <span id="count">0</span></div>
+<div class="card"><b>Status:</b> <span id="status" class="ok">En ligne</span></div>
+<div class="card" id="tokens"></div>
+<script>
+const API='https://solana-sniper-7o8s.onrender.com';
+async function load(){try{
+  const[p,w,t]=await Promise.all([fetch(API+'/api/stats'),fetch(API+'/api/portfolio'),fetch(API+'/api/take-profit')].map(r=>r.then(r=>r.json())));
+  document.getElementById('wallet').textContent=w.address?.slice(0,8)+'...'+w.address?.slice(-4)||'N/A';
+  document.getElementById('value').textContent='$'+(p.totalValue||0).toFixed(2);
+  document.getElementById('count').textContent=p.tokens?.length||0;
+  document.getElementById('tokens').innerHTML=(w.tokens||[]).map(t=>`<div>${t.mint}: ${t.value?'$'+t.value.toFixed(2):'N/A'}</div>`).join('')||'Aucun token';
+}catch(e){document.getElementById('status').textContent='Hors ligne';document.getElementById('status').className='err';}}
+load();setInterval(load,10000);
+</script></body></html>
