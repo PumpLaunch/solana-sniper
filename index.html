@@ -954,7 +954,27 @@ const MAX_LOGS = 80;
 // ── Helpers ─────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const fmtN  = (n, d = 2) => parseFloat(n || 0).toFixed(d);
-const fmtUSD = n => '$' + fmtN(n, 2);
+
+// Formatage intelligent selon la magnitude du prix
+function fmtPrice(n) {
+  if (!n || n <= 0) return '—';
+  if (n >= 1000)   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (n >= 1)      return '$' + n.toFixed(4);
+  if (n >= 0.01)   return '$' + n.toFixed(5);
+  if (n >= 0.0001) return '$' + n.toFixed(7);
+  // Notation scientifique lisible pour les micro-prix pump.fun
+  // ex: $0.000000087 → $8.7e-8
+  const exp = Math.floor(Math.log10(n));
+  const mantissa = (n / Math.pow(10, exp)).toFixed(2);
+  return `$${mantissa}e${exp}`;
+}
+
+function fmtUSD(n) {
+  const v = parseFloat(n || 0);
+  if (v >= 0.01 || v <= -0.01) return '$' + v.toFixed(2);
+  if (v === 0) return '$0.00';
+  return fmtPrice(Math.abs(v));
+}
 const fmtAddr = a => a ? a.slice(0, 6) + '…' + a.slice(-4) : '—';
 const fmtTime = ts => new Date(ts).toLocaleTimeString('fr-FR');
 function fmtUptime(s) {
@@ -1077,7 +1097,7 @@ function updateAll(stats, portfolio, tp) {
                 <div class="token-addr">${fmtAddr(tok.mintFull)}</div>
               </div>
             </div>
-            <div class="td right price-text">${tok.price ? fmtUSD(tok.price) : '—'}</div>
+            <div class="td right price-text">${tok.price ? fmtPrice(tok.price) : '—'}</div>
             <div class="td right value-text">${fmtUSD(tok.value)}</div>
             <div class="td right balance-text">${fmtN(tok.balance, 4)}</div>
             <div class="td right"><span class="pnl-badge ${pnlClass}">${pnlText}</span></div>
@@ -1117,7 +1137,7 @@ function updateAll(stats, portfolio, tp) {
             <div class="tp-entry-top">
               <div>
                 <div class="tp-entry-mint">${e.mint}</div>
-                <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-dim);margin-top:2px;">entry ${fmtUSD(e.entryPrice)}</div>
+                <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-dim);margin-top:2px;">entry ${fmtPrice(e.entryPrice)}</div>
               </div>
               <div class="tp-entry-pnl" style="color:${pnlColor}">${pnlStr}</div>
             </div>
