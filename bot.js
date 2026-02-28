@@ -118,27 +118,113 @@ function getRpcConnection() {
 
 const priceCache = new Map();
 
-async function getTokenPrice(mint) {
-  const cached = priceCache.get(mint);
-  if (cached && Date.now() - cached.ts < 60000) return cached.data;
-  
+// ── Source 1 : DexScreener (données riches : logo, symbol, liquidité) ────────
+async function fetchDexScreener(mint) {
   try {
-    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(10000) });
+    const res = await fetch(
+      `https://api.dexscreener.com/latest/dex/tokens/${mint}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
     if (!res.ok) return null;
     const data = await res.json();
     const solanaPairs = data?.pairs?.filter(p => p.chainId === 'solana') || [];
     if (!solanaPairs.length) return null;
-    // Prendre la paire avec la meilleure liquidité (évite les faux pairs vides)
     const pair = solanaPairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
     if (!pair?.priceUsd) return null;
-    
-    const result = { price: parseFloat(pair.priceUsd), liquidity: pair.liquidity?.usd || 0, change24h: pair.priceChange?.h24 || 0, logo: pair.info?.imageUrl || null, symbol: pair.baseToken?.symbol || null, name: pair.baseToken?.name || null };
-    priceCache.set(mint, { data: result, ts: Date.now() });
-    return result;
-  } catch (err) {
-    log('debug', 'Prix non disponible', { mint: mint.slice(0, 8) + '...' });
-    return cached?.data || null;
+    return {
+      price:     parseFloat(pair.priceUsd),
+      liquidity: pair.liquidity?.usd   || 0,
+      change24h: pair.priceChange?.h24 || 0,
+      logo:      pair.info?.imageUrl   || null,
+      symbol:    pair.baseToken?.symbol || null,
+      name:      pair.baseToken?.name   || null,
+      source:    'dexscreener',
+    };
+  } catch { return null; }
+}
+
+// ── Source 2 : Jupiter Price API v2 (couverture maximale pump.fun) ────────────
+async function fetchJupiter(mint) {
+  try {
+    const res = await fetch(
+      `https://api.jup.ag/price/v2?ids=${mint}&showExtraInfo=true`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const item = data?.data?.[mint];
+    if (!item?.price) return null;
+    return {
+      price:     parseFloat(item.price),
+      liquidity: 0,
+      change24h: 0,
+      logo:      null,
+      symbol:    null,
+      name:      null,
+      source:    'jupiter',
+    };
+  } catch { return null; }
+}
+
+// ── Source 3 : Pump.fun API (tokens très récents sans pool DEX) ───────────────
+async function fetchPumpFun(mint) {
+  try {
+    const res = await fetch(
+      `https://frontend-api.pump.fun/coins/${mint}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) return null;
+    const coin = await res.json();
+    if (!coin?.usd_market_cap || !coin?.total_supply) return null;
+    const price = coin.usd_market_cap / coin.total_supply;
+    if (!price || price <= 0) return null;
+    return {
+      price,
+      liquidity: coin.virtual_sol_reserves ? coin.virtual_sol_reserves / 1e9 * 150 : 0,
+      change24h: 0,
+      logo:      coin.image_uri || null,
+      symbol:    coin.symbol    || null,
+      name:      coin.name      || null,
+      source:    'pumpfun',
+    };
+  } catch { return null; }
+}
+
+// ── Orchestrateur : cascade DexScreener → Jupiter → Pump.fun ─────────────────
+async function getTokenPrice(mint) {
+  const cached = priceCache.get(mint);
+  if (cached && Date.now() - cached.ts < 60000) return cached.data;
+
+  // Essai 1 : DexScreener (le plus riche en métadonnées)
+  let result = await fetchDexScreener(mint);
+
+  // Essai 2 : Jupiter (quasi-tous les tokens avec pool)
+  if (!result) {
+    result = await fetchJupiter(mint);
+    // Si Jupiter donne le prix mais pas le logo, on tente pump.fun pour les métadonnées
+    if (result && mint.endsWith('pump')) {
+      const meta = await fetchPumpFun(mint);
+      if (meta) {
+        result.logo   = meta.logo   || result.logo;
+        result.symbol = meta.symbol || result.symbol;
+        result.name   = meta.name   || result.name;
+      }
+    }
   }
+
+  // Essai 3 : Pump.fun direct (tokens bonding curve sans pool DEX)
+  if (!result && mint.endsWith('pump')) {
+    result = await fetchPumpFun(mint);
+  }
+
+  if (result) {
+    priceCache.set(mint, { data: result, ts: Date.now() });
+    log('debug', `Prix [${result.source}]`, { mint: mint.slice(0,8)+'...', price: result.price });
+  } else {
+    log('debug', 'Prix introuvable (3 sources)', { mint: mint.slice(0,8)+'...' });
+  }
+
+  return result || cached?.data || null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
