@@ -1,7 +1,7 @@
 {
-  "name": "SolBot Terminal",
+  "name": "SolBot Pro Terminal",
   "short_name": "SolBot",
-  "description": "Solana Trading Bot Dashboard",
+  "description": "Solana Trading Bot — Take-Profit Avancé + Dashboard Cyberpunk",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#06060e",
