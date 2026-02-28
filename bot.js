@@ -1,5 +1,5 @@
 /**
- * 🤖 SolBot-Basic v1.3 — Take-Profit + Notifications Push + Logos Tokens
+ * 🤖 SolBot-Basic v1.3.1 — Fix: Price Fetching + Error Logging
  */
 'use strict';
 
@@ -43,7 +43,7 @@ const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...ar
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_PROGRAM_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
-const VERSION = '1.3.0';
+const VERSION = '1.3.1';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGGER
@@ -113,7 +113,7 @@ function getRpcConnection() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PRIX + LOGOS (Multi-Sources)
+// PRIX + LOGOS (FIXED + ERROR LOGGING)
 // ═══════════════════════════════════════════════════════════════════════════
 
 const priceCache = new Map();
@@ -124,32 +124,56 @@ async function batchJupiterPrices(mints) {
   if (!mints.length) return {};
   try {
     const chunks = [];
-    for (let i = 0; i < mints.length; i += 100) chunks.push(mints.slice(i, i + 100));
+    for (let i = 0; i < mints.length; i += 50) chunks.push(mints.slice(i, i + 50)); // Réduit à 50 pour éviter rate limit
     const results = {};
-    await Promise.all(chunks.map(async chunk => {
-      const res = await fetch(`https://api.jup.ag/price/v2?ids=${chunk.join(',')}`, { signal: AbortSignal.timeout(15000) });
-      if (!res.ok) return;
-      const data = await res.json();
-      for (const [mint, item] of Object.entries(data?.data || {})) {
-        if (item?.price) results[mint] = { price: parseFloat(item.price) };
+    
+    for (const chunk of chunks) {
+      try {
+        // ✅ URL corrigée : PAS d'espace avant ${}
+        const url = `https://api.jup.ag/price/v2?ids=${chunk.join(',')}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
+        
+        if (!res.ok) {
+          log('warn', 'Jupiter price API error', { status: res.status, url: url.slice(0, 80) + '...' });
+          continue;
+        }
+        const data = await res.json();
+        for (const [mint, item] of Object.entries(data?.data || {})) {
+          if (item?.price) results[mint] = { price: parseFloat(item.price) };
+        }
+        // Petit délai entre chunks pour éviter rate limiting
+        if (chunks.length > 1) await new Promise(r => setTimeout(r, 200));
+      } catch (err) {
+        log('warn', 'Jupiter batch error', { error: err.message, chunk: chunk.slice(0, 3) });
       }
-    }));
+    }
     return results;
-  } catch { return {}; }
+  } catch (err) {
+    log('error', 'batchJupiterPrices failed', { error: err.message });
+    return {};
+  }
 }
 
 async function batchDexScreener(mints) {
   if (!mints.length) return {};
   try {
     const chunks = [];
-    for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+    for (let i = 0; i < mints.length; i += 20) chunks.push(mints.slice(i, i + 20)); // Réduit à 20
     const results = {};
+    
     for (const chunk of chunks) {
       try {
-        const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${chunk.join(',')}`, { signal: AbortSignal.timeout(15000) });
-        if (!res.ok) continue;
+        // ✅ URL corrigée
+        const url = `https://api.dexscreener.com/latest/dex/tokens/${chunk.join(',')}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
+        
+        if (!res.ok) {
+          log('warn', 'DexScreener API error', { status: res.status });
+          continue;
+        }
         const data = await res.json();
         const pairs = data?.pairs?.filter(p => p.chainId === 'solana') || [];
+        
         for (const pair of pairs) {
           const mint = pair.baseToken?.address;
           if (!mint || !pair.priceUsd) continue;
@@ -166,16 +190,23 @@ async function batchDexScreener(mints) {
             };
           }
         }
-        if (chunks.length > 1) await new Promise(r => setTimeout(r, 300));
-      } catch { continue; }
+        // Délai plus long pour DexScreener (rate limit strict)
+        if (chunks.length > 1) await new Promise(r => setTimeout(r, 500));
+      } catch (err) {
+        log('warn', 'DexScreener batch error', { error: err.message });
+      }
     }
     return results;
-  } catch { return {}; }
+  } catch (err) {
+    log('error', 'batchDexScreener failed', { error: err.message });
+    return {};
+  }
 }
 
 async function fetchPumpFun(mint) {
   try {
-    const res = await fetch(`https://frontend-api.pump.fun/coins/${mint}`, { signal: AbortSignal.timeout(8000) });
+    // ✅ URL corrigée
+    const res = await fetch(`https://frontend-api.pump.fun/coins/${mint}`, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) return null;
     const coin = await res.json();
     if (!coin?.usd_market_cap || !coin?.total_supply) return null;
@@ -190,13 +221,20 @@ async function fetchPumpFun(mint) {
       name: coin.name || null,
       source: 'pumpfun'
     };
-  } catch { return null; }
+  } catch (err) {
+    log('debug', 'PumpFun fetch error', { mint: mint.slice(0,8)+'...', error: err.message });
+    return null;
+  }
 }
 
 async function fetchJupiterTokenList() {
   try {
-    const res = await fetch('https://token.jup.ag/all', { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return new Map();
+    // ✅ URL corrigée : PAS d'espace avant la fermeture
+    const res = await fetch('https://token.jup.ag/all', { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) {
+      log('warn', 'Jupiter token list error', { status: res.status });
+      return new Map();
+    }
     const tokens = await res.json();
     const logoMap = new Map();
     for (const token of tokens) {
@@ -204,33 +242,53 @@ async function fetchJupiterTokenList() {
         logoMap.set(token.address, { logo: token.logoURI, symbol: token.symbol, name: token.name });
       }
     }
+    log('info', 'Jupiter Token List loaded', { count: logoMap.size });
     return logoMap;
-  } catch { return new Map(); }
+  } catch (err) {
+    log('warn', 'fetchJupiterTokenList failed', { error: err.message });
+    return new Map();
+  }
 }
 
 async function prefetchAllPrices(mints) {
   const toFetch = mints.filter(m => {
     const c = priceCache.get(m);
-    return !c || Date.now() - c.ts > 120000;
+    return !c || Date.now() - c.ts > 30000; // Cache 30 secondes
   });
   
-  if (!toFetch.length) return;
+  if (!toFetch.length) {
+    log('debug', 'Prix en cache', { cached: mints.length });
+    return;
+  }
+  
   log('debug', `Prefetch prix batch`, { total: toFetch.length });
 
+  // Charger Jupiter Token List une fois
   if (!jupiterTokenList) {
     jupiterTokenList = await fetchJupiterTokenList();
-    log('debug', 'Jupiter Token List chargé', { count: jupiterTokenList.size });
   }
 
+  // 1. Jupiter batch (prix)
   const jupPrices = await batchJupiterPrices(toFetch);
-  const dexData = await batchDexScreener(toFetch);
-  const stillMissing = toFetch.filter(m => !dexData[m]);
-  const pumpResults = {};
-  await Promise.all(stillMissing.slice(0, 10).map(async m => {
-    const r = await fetchPumpFun(m);
-    if (r) pumpResults[m] = r;
-  }));
+  log('debug', 'Jupiter prices', { found: Object.keys(jupPrices).length });
 
+  // 2. DexScreener batch (logos + métadonnées)
+  const dexData = await batchDexScreener(toFetch);
+  log('debug', 'DexScreener data', { found: Object.keys(dexData).length });
+
+  // 3. Pump.fun pour tokens manquants (limité à 5 pour éviter spam)
+  const stillMissing = toFetch.filter(m => !dexData[m] && !jupPrices[m]);
+  const pumpResults = {};
+  if (stillMissing.length > 0) {
+    log('debug', 'Fetching PumpFun for missing', { count: Math.min(stillMissing.length, 5) });
+    await Promise.all(stillMissing.slice(0, 5).map(async m => {
+      const r = await fetchPumpFun(m);
+      if (r) pumpResults[m] = r;
+    }));
+  }
+
+  // 4. Fusionner et mettre en cache
+  let withLogo = 0;
   for (const mint of toFetch) {
     const dex = dexData[mint];
     const jup = jupPrices[mint];
@@ -250,13 +308,21 @@ async function prefetchAllPrices(mints) {
 
     if (result) {
       priceCache.set(mint, {  result, ts: Date.now() });
-      if (result.logo) logoCache.set(mint, result.logo);
+      if (result.logo) { logoCache.set(mint, result.logo); withLogo++; }
     }
   }
 
   const found = toFetch.filter(m => priceCache.get(m)?.data).length;
-  const withLogo = toFetch.filter(m => priceCache.get(m)?.data?.logo).length;
-  log('debug', `Prix récupérés`, { found, total: toFetch.length, withLogo });
+  log('debug', `Prix récupérés`, { found, total: toFetch.length, withLogo, missing: toFetch.length - found });
+  
+  // Log d'alerte si 0 trouvé
+  if (found === 0 && toFetch.length > 0) {
+    log('warn', '⚠️ AUCUN PRIX RÉCUPÉRÉ — Vérifier les APIs ou rate limits', { 
+      jupCount: Object.keys(jupPrices).length,
+      dexCount: Object.keys(dexData).length,
+      pumpCount: Object.keys(pumpResults).length
+    });
+  }
 }
 
 function getTokenPrice(mint) {
@@ -269,7 +335,7 @@ function getTokenLogo(mint) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TAKE-PROFIT MANAGER
+// TAKE-PROFIT MANAGER (inchangé)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class TieredTakeProfitManager {
@@ -368,7 +434,7 @@ class TieredTakeProfitManager {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SELL EXECUTOR
+// SELL EXECUTOR (inchangé)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class SellExecutor {
@@ -545,6 +611,14 @@ class BotLoop {
 function startApi(bot, wallet) {
   const app = express();
   app.use(express.json());
+  
+  // CORS headers pour le frontend
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+  });
+  
   app.use(express.static(path.join(__dirname, 'public')));
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
   app.get('/health', (req, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
