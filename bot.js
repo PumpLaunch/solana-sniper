@@ -118,55 +118,75 @@ function getRpcConnection() {
 
 const priceCache = new Map();
 
-// ── Source 1 : DexScreener (données riches : logo, symbol, liquidité) ────────
-async function fetchDexScreener(mint) {
+// ── Batch Jupiter : 1 appel pour tous les mints non-cachés ───────────────────
+async function batchJupiterPrices(mints) {
+  if (!mints.length) return {};
   try {
-    const res = await fetch(
-      `https://api.dexscreener.com/latest/dex/tokens/${mint}`,
-      { signal: AbortSignal.timeout(10000) }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const solanaPairs = data?.pairs?.filter(p => p.chainId === 'solana') || [];
-    if (!solanaPairs.length) return null;
-    const pair = solanaPairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-    if (!pair?.priceUsd) return null;
-    return {
-      price:     parseFloat(pair.priceUsd),
-      liquidity: pair.liquidity?.usd   || 0,
-      change24h: pair.priceChange?.h24 || 0,
-      logo:      pair.info?.imageUrl   || null,
-      symbol:    pair.baseToken?.symbol || null,
-      name:      pair.baseToken?.name   || null,
-      source:    'dexscreener',
-    };
-  } catch { return null; }
+    // Jupiter accepte jusqu'à 100 ids par appel
+    const chunks = [];
+    for (let i = 0; i < mints.length; i += 100)
+      chunks.push(mints.slice(i, i + 100));
+
+    const results = {};
+    await Promise.all(chunks.map(async chunk => {
+      const res = await fetch(
+        `https://api.jup.ag/price/v2?ids=${chunk.join(',')}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      for (const [mint, item] of Object.entries(data?.data || {})) {
+        if (item?.price) results[mint] = parseFloat(item.price);
+      }
+    }));
+    return results;
+  } catch { return {}; }
 }
 
-// ── Source 2 : Jupiter Price API v2 (couverture maximale pump.fun) ────────────
-async function fetchJupiter(mint) {
+// ── Batch DexScreener : enrichit logo/symbol/liquidité (max 30 par appel) ────
+async function batchDexScreener(mints) {
+  if (!mints.length) return {};
   try {
-    const res = await fetch(
-      `https://api.jup.ag/price/v2?ids=${mint}&showExtraInfo=true`,
-      { signal: AbortSignal.timeout(10000) }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const item = data?.data?.[mint];
-    if (!item?.price) return null;
-    return {
-      price:     parseFloat(item.price),
-      liquidity: 0,
-      change24h: 0,
-      logo:      null,
-      symbol:    null,
-      name:      null,
-      source:    'jupiter',
-    };
-  } catch { return null; }
+    const chunks = [];
+    for (let i = 0; i < mints.length; i += 30)
+      chunks.push(mints.slice(i, i + 30));
+
+    const results = {};
+    // Séquentiel pour respecter le rate limit DexScreener
+    for (const chunk of chunks) {
+      try {
+        const res = await fetch(
+          `https://api.dexscreener.com/latest/dex/tokens/${chunk.join(',')}`,
+          { signal: AbortSignal.timeout(15000) }
+        );
+        if (!res.ok) continue;
+        const data = await res.json();
+        const pairs = data?.pairs?.filter(p => p.chainId === 'solana') || [];
+        // Garder la meilleure paire (+ liquide) par mint
+        for (const pair of pairs) {
+          const mint = pair.baseToken?.address;
+          if (!mint || !pair.priceUsd) continue;
+          const existing = results[mint];
+          if (!existing || (pair.liquidity?.usd || 0) > (existing.liquidity || 0)) {
+            results[mint] = {
+              price:     parseFloat(pair.priceUsd),
+              liquidity: pair.liquidity?.usd   || 0,
+              change24h: pair.priceChange?.h24 || 0,
+              logo:      pair.info?.imageUrl   || null,
+              symbol:    pair.baseToken?.symbol || null,
+              name:      pair.baseToken?.name   || null,
+            };
+          }
+        }
+        // Pause courte entre chunks pour éviter le rate limit
+        if (chunks.length > 1) await new Promise(r => setTimeout(r, 300));
+      } catch { continue; }
+    }
+    return results;
+  } catch { return {}; }
 }
 
-// ── Source 3 : Pump.fun API (tokens très récents sans pool DEX) ───────────────
+// ── Pump.fun individuel (tokens bonding curve uniquement) ─────────────────────
 async function fetchPumpFun(mint) {
   try {
     const res = await fetch(
@@ -190,41 +210,63 @@ async function fetchPumpFun(mint) {
   } catch { return null; }
 }
 
-// ── Orchestrateur : cascade DexScreener → Jupiter → Pump.fun ─────────────────
-async function getTokenPrice(mint) {
-  const cached = priceCache.get(mint);
-  if (cached && Date.now() - cached.ts < 60000) return cached.data;
+// ── Pré-chargement batch de tous les prix en début de cycle ──────────────────
+async function prefetchAllPrices(mints) {
+  const toFetch = mints.filter(m => {
+    const c = priceCache.get(m);
+    return !c || Date.now() - c.ts > 60000;
+  });
+  if (!toFetch.length) return;
 
-  // Essai 1 : DexScreener (le plus riche en métadonnées)
-  let result = await fetchDexScreener(mint);
+  log('debug', `Prefetch prix batch`, { total: toFetch.length });
 
-  // Essai 2 : Jupiter (quasi-tous les tokens avec pool)
-  if (!result) {
-    result = await fetchJupiter(mint);
-    // Si Jupiter donne le prix mais pas le logo, on tente pump.fun pour les métadonnées
-    if (result && mint.endsWith('pump')) {
-      const meta = await fetchPumpFun(mint);
-      if (meta) {
-        result.logo   = meta.logo   || result.logo;
-        result.symbol = meta.symbol || result.symbol;
-        result.name   = meta.name   || result.name;
-      }
+  // 1. Jupiter batch (prix pour tous)
+  const jupPrices = await batchJupiterPrices(toFetch);
+
+  // 2. DexScreener batch (métadonnées : logo, symbol, liquidité)
+  const dexData = await batchDexScreener(toFetch);
+
+  // 3. Pump.fun individuel pour les tokens encore introuvables
+  const stillMissing = toFetch.filter(m => !jupPrices[m] && !dexData[m] && m.endsWith('pump'));
+  const pumpResults = {};
+  await Promise.all(stillMissing.map(async m => {
+    const r = await fetchPumpFun(m);
+    if (r) pumpResults[m] = r;
+  }));
+
+  // 4. Fusionner et mettre en cache
+  for (const mint of toFetch) {
+    const dex  = dexData[mint];
+    const jup  = jupPrices[mint];
+    const pump = pumpResults[mint];
+
+    let result = null;
+    if (dex) {
+      result = { ...dex, source: 'dexscreener' };
+    } else if (jup) {
+      result = { price: jup, liquidity: 0, change24h: 0,
+                 logo: null, symbol: null, name: null, source: 'jupiter' };
+      // Enrichir avec pump.fun si disponible
+      if (pump) { result.logo = pump.logo; result.symbol = pump.symbol; result.name = pump.name; }
+    } else if (pump) {
+      result = pump;
+    }
+
+    if (result) {
+      priceCache.set(mint, { data: result, ts: Date.now() });
+    } else {
+      log('debug', 'Prix introuvable', { mint: mint.slice(0,8)+'...' });
     }
   }
 
-  // Essai 3 : Pump.fun direct (tokens bonding curve sans pool DEX)
-  if (!result && mint.endsWith('pump')) {
-    result = await fetchPumpFun(mint);
-  }
+  const found = toFetch.filter(m => priceCache.get(m)?.data).length;
+  log('debug', `Prix récupérés`, { found, total: toFetch.length, missing: toFetch.length - found });
+}
 
-  if (result) {
-    priceCache.set(mint, { data: result, ts: Date.now() });
-    log('debug', `Prix [${result.source}]`, { mint: mint.slice(0,8)+'...', price: result.price });
-  } else {
-    log('debug', 'Prix introuvable (3 sources)', { mint: mint.slice(0,8)+'...' });
-  }
-
-  return result || cached?.data || null;
+// ── Lecture du cache (après prefetch) ────────────────────────────────────────
+function getTokenPrice(mint) {
+  const cached = priceCache.get(mint);
+  return cached?.data || null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -428,17 +470,29 @@ class BotLoop {
         ),
       ]);
       const allAccounts = [...accounts.value, ...accounts2022.value];
+
+      // Extraire tous les mints valides
+      const validAccounts = allAccounts.filter(acc => {
+        const mint = acc.account.data.parsed.info.mint;
+        if (mint === SOL_MINT) return false;
+        const ta = acc.account.data.parsed.info.tokenAmount;
+        const balance = parseFloat(ta.uiAmount ?? ta.uiAmountString ?? '0');
+        return balance > 0;
+      });
+
+      // Pré-charger tous les prix en batch (1-2 appels API au lieu de 84)
+      const allMints = validAccounts.map(acc => acc.account.data.parsed.info.mint);
+      await prefetchAllPrices(allMints);
       
       const tokens = [];
-      for (const acc of allAccounts) {
+      for (const acc of validAccounts) {
         const mint      = acc.account.data.parsed.info.mint;
-        if (mint === SOL_MINT) continue;
         const tokenAmount = acc.account.data.parsed.info.tokenAmount;
         // uiAmount est null pour certains tokens pump.fun → fallback sur uiAmountString
         const balance = parseFloat(tokenAmount.uiAmount ?? tokenAmount.uiAmountString ?? '0');
         if (!balance || balance <= 0) continue;
         
-        const priceData = await getTokenPrice(mint);
+        const priceData = getTokenPrice(mint);  // synchrone — déjà en cache
         const price     = priceData?.price || 0;
         const value     = balance * price;
         
@@ -462,128 +516,4 @@ class BotLoop {
           }
         }
         
-        tokens.push({
-          mint: mint.slice(0, 8) + '...' + mint.slice(-4), mintFull: mint,
-          balance: parseFloat(balance.toFixed(4)),
-          price: price > 0 ? price : null,  // précision complète pour les micro-prix pump.fun
-          value: parseFloat(value.toFixed(2)),
-          liquidity: priceData?.liquidity || 0,
-          change24h: priceData?.change24h || 0,
-          logo:      priceData?.logo || null,
-          symbol:    priceData?.symbol || null,
-          name:      priceData?.name || null,
-          pnl: this.takeProfit.getPnl(mint, price),
-          entryPrice: this.takeProfit.entryPrices.get(mint)?.price || null,
-          remainingBalance: this.takeProfit.getRemainingBalance(mint),
-          triggeredTiers: Array.from(this.takeProfit.triggeredTiers.get(mint) || []).map(i => CONFIG.TAKE_PROFIT_TIERS[i].pnl + '%')
-        });
-      }
-      
-      this.portfolio       = tokens;
-      const totalValue     = tokens.reduce((sum, t) => sum + t.value, 0);
-      log('debug', 'Cycle terminé', { tokens: tokens.length, totalValue: `$${totalValue.toFixed(2)}` });
-      
-    } catch (err) {
-      log('error', 'Erreur cycle', { error: err.message });
-      this.rpc.failover();
-    }
-  }
-  
-  getStats() {
-    const totalValue = this.portfolio.reduce((sum, t) => sum + t.value, 0);
-    return {
-      uptime:     Math.round((Date.now() - this.startTime) / 1000),
-      tokens:     this.portfolio.length,
-      totalValue: parseFloat(totalValue.toFixed(2)),
-      takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? {
-        enabled: true,
-        tiers: CONFIG.TAKE_PROFIT_TIERS.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })),
-        hysteresis: CONFIG.TAKE_PROFIT_HYSTERESIS + '%',
-        ...this.takeProfit.getStats()
-      } : { enabled: false },
-      lastUpdate: new Date().toISOString()
-    };
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// API SERVER
-// ═══════════════════════════════════════════════════════════════════════════
-
-function startApi(bot, wallet) {
-  const app = express();
-  app.use(express.json());
-
-  // ─── CORS — autorise GitHub Pages ─────────────────────────────────────
-  app.use((req, res, next) => {
-    const allowed = [
-      'https://pumplaunch.github.io',
-      'http://localhost:3000',
-      'http://localhost:10000',
-    ];
-    const origin = req.headers.origin;
-    if (!origin || allowed.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin || '*');
-    }
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.sendStatus(204);
-    next();
-  });
-  // ──────────────────────────────────────────────────────────────────────
-
-  // ─── Dashboard statique ────────────────────────────────────────────────
-  // Place index.html dans le même dossier que bot.js (ou définir STATIC_DIR)
-  const staticDir = process.env.STATIC_DIR || __dirname;          // ← AJOUT
-  app.use(express.static(staticDir));                              // ← AJOUT
-  app.get('/', (req, res) =>                                       // ← AJOUT
-    res.sendFile(path.join(staticDir, 'index.html'))               // ← AJOUT
-  );                                                               // ← AJOUT
-  // ──────────────────────────────────────────────────────────────────────
-
-  app.get('/health',         (req, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
-  app.get('/api/stats',      (req, res) => res.json(bot.getStats()));
-  app.get('/api/portfolio',  (req, res) => res.json({ address: wallet.publicKey.toString(), tokens: bot.portfolio, timestamp: Date.now() }));
-  app.get('/api/wallet',     (req, res) => res.json({ address: wallet.publicKey.toString(), shortAddress: wallet.publicKey.toString().slice(0, 8) + '...' + wallet.publicKey.toString().slice(-4) }));
-  app.get('/api/take-profit',(req, res) => res.json(bot.takeProfit.getStats()));
-  
-  app.post('/api/sell/test', async (req, res) => {
-    const { mint, amount, reason, tier, real } = req.body;
-    if (!mint) return res.status(400).json({ error: 'mint required' });
-    const result = await bot.seller.sell(mint, amount || 1, reason || 'MANUAL_TEST', tier, real === true);
-    res.json(result);
-  });
-  
-  app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-
-  const port = CONFIG.PORT;
-  app.listen(port, '0.0.0.0', () => log('info', 'API + Dashboard démarrés', { port, url: `http://localhost:${port}` }));
-  return app;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MAIN
-// ═══════════════════════════════════════════════════════════════════════════
-
-async function main() {
-  log('info', `🤖 SolBot-Basic v${VERSION} — Démarrage`, { env: CONFIG.NODE_ENV });
-  const wallet = loadWallet();
-  const rpc    = getRpcConnection();
-  const bot    = new BotLoop(wallet, rpc);
-  
-  log('info', 'Premier cycle...');
-  await bot.tick();
-  setInterval(() => bot.tick().catch(err => log('error', 'Erreur loop', { error: err.message })), CONFIG.INTERVAL_SEC * 1000);
-  startApi(bot, wallet);
-  
-  log('info', '✅ Bot actif', { 
-    address:    wallet.publicKey.toString().slice(0, 8) + '...',
-    interval:   `${CONFIG.INTERVAL_SEC}s`,
-    takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? 'tiers: 25%x4' : 'disabled'
-  });
-  
-  process.on('SIGINT',           () => { log('info', '🛑 Arrêt'); process.exit(0); });
-  process.on('uncaughtException', err => log('error', '💥 Exception', { error: err.message }));
-}
-
-main().catch(err => { console.error('🚨 Échec démarrage:', err.message); process.exit(1); });
+ 
