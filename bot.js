@@ -515,5 +515,146 @@ class BotLoop {
             }
           }
         }
-        
+
+                // Ajouter au portfolio pour l'API
+        tokens.push({
+          mint: mint.slice(0, 8) + '...' + mint.slice(-4), 
+          mintFull: mint,
+          balance: parseFloat(balance.toFixed(4)),
+          price: price ? parseFloat(price.toFixed(6)) : null,
+          value: parseFloat(value.toFixed(2)), 
+          liquidity: priceData?.liquidity || 0,
+          change24h: priceData?.change24h || 0, 
+          pnl: this.takeProfit.getPnl(mint, price),
+          entryPrice: this.takeProfit.entryPrices.get(mint)?.price || null,
+          remainingBalance: this.takeProfit.getRemainingBalance(mint),
+          triggeredTiers: Array.from(this.takeProfit.triggeredTiers.get(mint) || [])
+            .map(i => CONFIG.TAKE_PROFIT_TIERS[i].pnl + '%'),
+          logo: priceData?.logo || null,
+          symbol: priceData?.symbol || null,
+          name: priceData?.name || null,
+        });
+      }
+      
+      this.portfolio = tokens;
+      const totalValue = tokens.reduce((sum, t) => sum + (t.value || 0), 0);
+      log('debug', 'Cycle terminé', { tokens: tokens.length, totalValue: `$${totalValue.toFixed(2)}` });
+      
+    } catch (err) {
+      log('error', 'Erreur cycle', { error: err.message });
+      this.rpc.failover();
+    }
+  }
+  
+  getStats() {
+    const totalValue = this.portfolio.reduce((sum, t) => sum + (t.value || 0), 0);
+    return {
+      uptime: Math.round((Date.now() - this.startTime) / 1000),
+      tokens: this.portfolio.length, 
+      totalValue: parseFloat(totalValue.toFixed(2)),
+      takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? {
+        enabled: true, 
+        tiers: CONFIG.TAKE_PROFIT_TIERS.map((t, i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })),
+        hysteresis: CONFIG.TAKE_PROFIT_HYSTERESIS + '%', 
+        ...this.takeProfit.getStats()
+      } : { enabled: false },
+      lastUpdate: new Date().toISOString()
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API SERVER
+// ═══════════════════════════════════════════════════════════════════════════
+
+function startApi(bot, wallet) {
+  const app = express();
+  app.use(express.json());
+  
+  // Servir les fichiers statiques du dossier public/
+  app.use(express.static(path.join(__dirname, 'public')));
+  
+  // Route root → Dashboard
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/index.html'));
+  });
+  
+  // Routes API
+  app.get('/health', (req, res) => 
+    res.json({ status: 'ok', version: VERSION, uptime: process.uptime() })
+  );
+  
+  app.get('/api/stats', (req, res) => res.json(bot.getStats()));
+  
+  app.get('/api/portfolio', (req, res) => 
+    res.json({ address: wallet.publicKey.toString(), tokens: bot.portfolio, timestamp: Date.now() })
+  );
+  
+  app.get('/api/wallet', (req, res) => 
+    res.json({ 
+      address: wallet.publicKey.toString(), 
+      shortAddress: wallet.publicKey.toString().slice(0, 8) + '...' + wallet.publicKey.toString().slice(-4) 
+    })
+  );
+  
+  app.get('/api/take-profit', (req, res) => res.json(bot.takeProfit.getStats()));
+  
+  // Test sell endpoint
+  app.post('/api/sell/test', express.json(), async (req, res) => {
+    const { mint, amount, reason, tier, real } = req.body;
+    if (!mint) return res.status(400).json({ error: 'mint required' });
+    const result = await bot.seller.sell(mint, amount || 1, reason || 'MANUAL_TEST', tier, real === true);
+    res.json(result);
+  });
+  
+  // 404 handler
+  app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+  
+  // Start server
+  const port = CONFIG.PORT;
+  app.listen(port, '0.0.0.0', () => log('info', 'API démarrée', { port }));
+  return app;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function main() {
+  log('info', `🤖 SolBot-Basic v${VERSION} — Démarrage`, { env: CONFIG.NODE_ENV });
+  
+  const wallet = loadWallet();
+  const rpc = getRpcConnection();
+  const bot = new BotLoop(wallet, rpc);
+  
+  log('info', 'Premier cycle...');
+  await bot.tick();
+  
+  setInterval(() => bot.tick().catch(err => log('error', 'Erreur loop', { error: err.message })), CONFIG.INTERVAL_SEC * 1000);
+  
+  startApi(bot, wallet);
+  
+  log('info', '✅ Bot actif', { 
+    address: wallet.publicKey.toString().slice(0, 8) + '...',
+    interval: `${CONFIG.INTERVAL_SEC}s`, 
+    takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? 'tiers: 25%x4' : 'disabled'
+  });
+  
+  // Gestion arrêt propre
+  process.on('SIGINT', () => { 
+    log('info', '🛑 Arrêt'); 
+    process.exit(0); 
+  });
+  
+  // Gestion erreurs non capturées
+  process.on('uncaughtException', (err) => 
+    log('error', '💥 Exception', { error: err.message })
+  );
+}
+
+// Lancer le bot
+main().catch(err => { 
+  console.error('🚨 Échec démarrage:', err.message); 
+  process.exit(1); 
+});
  
