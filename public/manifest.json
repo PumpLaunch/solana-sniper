@@ -1,16 +1,10 @@
 {
   "name": "SolBot Pro Terminal",
   "short_name": "SolBot",
-  "description": "Solana Trading Bot — Take-Profit Avancé + Dashboard Cyberpunk",
+  "description": "Solana Trading Bot — Take-Profit Avancé",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#06060e",
   "theme_color": "#06060e",
-  "orientation": "portrait",
-  "icons": [{
-    "src": "icon-192.png",
-    "sizes": "192x192",
-    "type": "image/png",
-    "purpose": "any maskable"
-  }]
+  "icons": [{"src":"icon-192.png","sizes":"192x192","type":"image/png"}]
 }
