@@ -60,12 +60,15 @@
     .count-badge { font-family: var(--font-mono); font-size: 0.65rem; background: var(--cyan-dim); color: var(--cyan); padding: 3px 8px; border-radius: 4px; }
     .panel-body { padding: 16px 20px; }
     .token-rows { display: flex; flex-direction: column; gap: 4px; max-height: 500px; overflow-y: auto; }
-    .token-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 60px; gap: 12px; padding: 12px 14px; background: var(--bg-card); border-left: 2px solid var(--line-bright); align-items: center; animation: rowIn 0.35s ease; }
+    .token-row { display: grid; grid-template-columns: auto 2fr 1fr 1fr 1fr 1fr 60px; gap: 12px; padding: 12px 14px; background: var(--bg-card); border-left: 2px solid var(--line-bright); align-items: center; animation: rowIn 0.35s ease; }
     @keyframes rowIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
     .token-row:hover { border-left-color: var(--cyan); background: var(--bg-hover); }
     .td { font-size: 0.88rem; }
     .td.right { text-align: right; }
     .td.mono { font-family: var(--font-mono); font-size: 0.78rem; }
+    .token-info { display: flex; align-items: center; gap: 10px; }
+    .token-logo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--bg-deep); border: 1px solid var(--line-bright); flex-shrink: 0; }
+    .token-logo-placeholder { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--cyan-dim), var(--purple-dim)); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: var(--cyan); flex-shrink: 0; border: 1px solid var(--line-bright); }
     .token-name { font-family: var(--font-display); font-weight: 700; }
     .token-addr { font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-dim); }
     .pnl-badge { display: inline-block; padding: 3px 8px; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; border-radius: 2px; }
@@ -93,7 +96,7 @@
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-thumb { background: var(--line-bright); border-radius: 2px; }
     @media (max-width: 1000px) { .content-grid { grid-template-columns: 1fr; } .right-col { display: grid; grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 700px) { .metrics-row { grid-template-columns: repeat(2, 1fr); } .token-row { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 700px) { .metrics-row { grid-template-columns: repeat(2, 1fr); } .token-row { grid-template-columns: auto 1fr 1fr 1fr; } .td:nth-child(n+5) { display: none; } }
   </style>
 </head>
 <body>
@@ -101,7 +104,7 @@
     <div class="topbar bracket">
       <div class="brand">
         <h1 class="brand-title">SolBot <span>Terminal</span></h1>
-        <div class="brand-sub">Solana Trading v1.2</div>
+        <div class="brand-sub">Solana Trading v1.3</div>
       </div>
       <div class="topbar-right">
         <div class="live-indicator"><div class="live-dot"></div><span>LIVE</span></div>
@@ -161,7 +164,7 @@
     </div>
 
     <div class="footer-bar">
-      <div>SolBot-Basic v1.2 • Auto-refresh: <span id="footerRefresh">ON</span></div>
+      <div>SolBot-Basic v1.3 • Auto-refresh: <span id="footerRefresh">ON</span></div>
       <div>Dernière MAJ: <span id="footerLastUpdate">--:--:--</span></div>
     </div>
   </div>
@@ -170,7 +173,6 @@
     const API = window.location.origin.includes('onrender.com') ? 'https://solana-sniper-7o8s.onrender.com' : window.location.origin;
     let autoRefresh = true, prevTPCount = 0, prevTPData = [];
 
-    // 🔔 NOTIFICATIONS PUSH
     async function requestNotificationPermission() {
       if (!('Notification' in window)) return false;
       if (Notification.permission === 'granted') { updateNotifStatus(true); return true; }
@@ -189,14 +191,13 @@
 
     function sendPush(title, body, icon) {
       if (Notification.permission !== 'granted') return;
-      new Notification(title, { body, icon: `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${icon||'🤖'}</text></svg>`, vibrate: [200,100,200] });
+      new Notification(title, { body, icon: `image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${icon||'🤖'}</text></svg>`, vibrate: [200,100,200] });
     }
 
     function notifyTP(mint, tier, pnl, value) {
       sendPush(`🎯 TP #${tier} Déclenché !`, `${mint.slice(0,8)}... | +${pnl.toFixed(2)}% | $${value.toFixed(2)}`, '🎯');
     }
 
-    // FORMAT HELPERS
     function fmtAddr(a) { return a ? a.slice(0,6)+'...'+a.slice(-4) : 'N/A'; }
     function fmtNum(n,d=2) { const x=parseFloat(n); return isNaN(x)?'0.00':x.toFixed(d); }
     function fmtCurr(n) { return '$'+fmtNum(n,2); }
@@ -204,7 +205,6 @@
     function fmtTime(t) { return t?new Date(t).toLocaleTimeString('fr-FR'):'--:--:--'; }
     function copyWallet() { const a=document.getElementById('walletAddr')?.textContent; if(a&&a!=='N/A')navigator.clipboard.writeText(a).then(()=>alert('✅ Copié')); }
 
-    // FETCH DATA
     async function fetchData() {
       try {
         const [stats, portfolio, tp] = await Promise.all([
@@ -213,7 +213,6 @@
           fetch(`${API}/api/take-profit`).then(r=>r.json())
         ]);
 
-        // Update metrics
         document.getElementById('totalValue').textContent = fmtCurr(stats.totalValue||0);
         document.getElementById('tokenCount').textContent = stats.tokens||0;
         document.getElementById('uptime').textContent = fmtUptime(stats.uptime);
@@ -221,7 +220,6 @@
         document.getElementById('walletAddr').textContent = fmtAddr(portfolio.address);
         document.getElementById('tokenBadge').textContent = portfolio.tokens?.length||0;
 
-        // 🔔 Check new TP for notifications
         const newTPCount = tp.entries?.reduce((s,e)=>s+(e.triggeredTiers?.length||0),0)||0;
         if (newTPCount > prevTPCount && Notification.permission === 'granted') {
           const newTP = tp.entries.find(e => (e.triggeredTiers?.length||0) > (prevTPData.find(p=>p.mint===e.mint)?.triggeredTiers?.length||0));
@@ -235,22 +233,31 @@
         prevTPCount = newTPCount;
         prevTPData = JSON.parse(JSON.stringify(tp.entries||[]));
 
-        // Tokens table
         const rows = document.getElementById('tokenRows');
         if (portfolio.tokens?.length > 0) {
-          rows.innerHTML = portfolio.tokens.map(t => `
-            <div class="token-row">
-              <div><div class="token-name">${t.mint||'???'}</div><div class="token-addr">${fmtAddr(t.mintFull)}</div></div>
-              <div class="td right mono">${fmtNum(t.balance,4)}</div>
-              <div class="td right mono">${t.price?fmtCurr(t.price):'N/A'}</div>
-              <div class="td right mono" style="color:var(--amber)">${fmtCurr(t.value)}</div>
-              <div class="td right"><span class="pnl-badge ${t.pnl>0?'pnl-pos':t.pnl<0?'pnl-neg':'pnl-neu'}">${t.pnl!=null?(t.pnl>=0?'+':'')+fmtNum(t.pnl,2)+'%':'N/A'}</span></div>
-              <div class="td right"><div class="tp-mini">${(t.triggeredTiers||[]).map((_,i)=>`<div class="tp-dot ${i<(t.triggeredTiers?.length||0)?'done':'wait'}"></div>`).join('')}</div></div>
-            </div>
-          `).join('');
+          rows.innerHTML = portfolio.tokens.map(t => {
+            const logoHtml = t.logo ? `<img src="${t.logo}" alt="${t.symbol||'Token'}" class="token-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : '';
+            const placeholderHtml = t.symbol ? `<div class="token-logo-placeholder" style="display:${t.logo?'none':'flex'}">${t.symbol.slice(0,2).toUpperCase()}</div>` : `<div class="token-logo-placeholder" style="display:${t.logo?'none':'flex'}">?</div>`;
+            return `
+              <div class="token-row">
+                <div class="token-info">
+                  ${logoHtml}
+                  ${placeholderHtml}
+                  <div>
+                    <div class="token-name">${t.symbol || t.mint || '???'}</div>
+                    <div class="token-addr">${fmtAddr(t.mintFull)}</div>
+                  </div>
+                </div>
+                <div class="td right mono">${fmtNum(t.balance,4)}</div>
+                <div class="td right mono">${t.price?fmtCurr(t.price):'N/A'}</div>
+                <div class="td right mono" style="color:var(--amber)">${fmtCurr(t.value)}</div>
+                <div class="td right"><span class="pnl-badge ${t.pnl>0?'pnl-pos':t.pnl<0?'pnl-neg':'pnl-neu'}">${t.pnl!=null?(t.pnl>=0?'+':'')+fmtNum(t.pnl,2)+'%':'N/A'}</span></div>
+                <div class="td right"><div class="tp-mini">${(t.triggeredTiers||[]).map((_,i)=>`<div class="tp-dot ${i<(t.triggeredTiers?.length||0)?'done':'wait'}"></div>`).join('')}</div></div>
+              </div>
+            `;
+          }).join('');
         } else rows.innerHTML = '<div class="empty-state">Aucun token</div>';
 
-        // TP entries
         const tpDiv = document.getElementById('tpEntries');
         if (tp.entries?.length > 0) {
           tpDiv.innerHTML = tp.entries.map(e => `
@@ -269,7 +276,6 @@
           `).join('');
         } else tpDiv.innerHTML = '<div class="empty-state">Aucun TP actif</div>';
 
-        // Logs
         const now = new Date();
         document.getElementById('logsBody').innerHTML = [
           {t:now,l:'SUCCESS',m:`${portfolio.tokens?.length||0} tokens`},
@@ -277,7 +283,6 @@
           {t:new Date(now-60000),l:'INFO',m:'Bot actif'}
         ].map(x=>`<div style="padding:4px;border-left:2px solid ${x.l==='SUCCESS'?'var(--green)':'var(--text-dim)'}"><span style="color:var(--text-dim);font-size:0.65rem">${fmtTime(x.t)}</span> <span style="color:${x.l==='SUCCESS'?'var(--green)':'var(--text-dim)'};font-weight:700;font-size:0.65rem">[${x.l}]</span> <span style="color:var(--text-secondary)">${x.m}</span></div>`).join('');
 
-        // Footer
         document.getElementById('sysLastUpdate').textContent = fmtTime(Date.now());
         document.getElementById('footerLastUpdate').textContent = fmtTime(Date.now());
 
