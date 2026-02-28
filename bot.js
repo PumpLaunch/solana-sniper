@@ -1,5 +1,5 @@
 /**
- * 🤖 SolBot-Basic v1.2 — Take-Profit par Paliers + Ventes Réelles + Notifications Push
+ * 🤖 SolBot-Basic v1.3 — Take-Profit + Notifications Push + Logos Tokens
  */
 'use strict';
 
@@ -19,9 +19,6 @@ const CONFIG = {
     ? JSON.parse(process.env.TAKE_PROFIT_TIERS) 
     : [{ pnl: 20, sell: 25 }, { pnl: 40, sell: 25 }, { pnl: 60, sell: 25 }, { pnl: 100, sell: 25 }],
   TAKE_PROFIT_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
-  
-  // Notifications Push (via navigateur)
-  PUSH_NOTIFICATIONS_ENABLED: process.env.PUSH_NOTIFICATIONS_ENABLED === 'true',
 };
 
 if (!CONFIG.PRIVATE_KEY) {
@@ -46,7 +43,7 @@ const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...ar
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_PROGRAM_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGGER
@@ -116,10 +113,12 @@ function getRpcConnection() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PRIX + CACHE (Batch Optimized)
+// PRIX + LOGOS (Multi-Sources)
 // ═══════════════════════════════════════════════════════════════════════════
 
 const priceCache = new Map();
+const logoCache = new Map();
+let jupiterTokenList = null;
 
 async function batchJupiterPrices(mints) {
   if (!mints.length) return {};
@@ -132,7 +131,7 @@ async function batchJupiterPrices(mints) {
       if (!res.ok) return;
       const data = await res.json();
       for (const [mint, item] of Object.entries(data?.data || {})) {
-        if (item?.price) results[mint] = parseFloat(item.price);
+        if (item?.price) results[mint] = { price: parseFloat(item.price) };
       }
     }));
     return results;
@@ -160,9 +159,10 @@ async function batchDexScreener(mints) {
               price: parseFloat(pair.priceUsd),
               liquidity: pair.liquidity?.usd || 0,
               change24h: pair.priceChange?.h24 || 0,
-              logo: pair.info?.imageUrl || null,
+              logo: pair.info?.imageUrl || pair.baseToken?.logoUri || null,
               symbol: pair.baseToken?.symbol || null,
               name: pair.baseToken?.name || null,
+              source: 'dexscreener'
             };
           }
         }
@@ -182,43 +182,90 @@ async function fetchPumpFun(mint) {
     const price = coin.usd_market_cap / coin.total_supply;
     if (!price || price <= 0) return null;
     return {
-      price, liquidity: coin.virtual_sol_reserves ? coin.virtual_sol_reserves / 1e9 * 150 : 0,
-      change24h: 0, logo: coin.image_uri || null, symbol: coin.symbol || null, name: coin.name || null, source: 'pumpfun'
+      price,
+      liquidity: coin.virtual_sol_reserves ? coin.virtual_sol_reserves / 1e9 * 150 : 0,
+      change24h: 0,
+      logo: coin.image_uri || null,
+      symbol: coin.symbol || null,
+      name: coin.name || null,
+      source: 'pumpfun'
     };
   } catch { return null; }
+}
+
+async function fetchJupiterTokenList() {
+  try {
+    const res = await fetch('https://token.jup.ag/all', { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return new Map();
+    const tokens = await res.json();
+    const logoMap = new Map();
+    for (const token of tokens) {
+      if (token?.address && token?.logoURI) {
+        logoMap.set(token.address, { logo: token.logoURI, symbol: token.symbol, name: token.name });
+      }
+    }
+    return logoMap;
+  } catch { return new Map(); }
 }
 
 async function prefetchAllPrices(mints) {
   const toFetch = mints.filter(m => {
     const c = priceCache.get(m);
-    return !c || Date.now() - c.ts > 60000;
+    return !c || Date.now() - c.ts > 120000;
   });
+  
   if (!toFetch.length) return;
   log('debug', `Prefetch prix batch`, { total: toFetch.length });
+
+  if (!jupiterTokenList) {
+    jupiterTokenList = await fetchJupiterTokenList();
+    log('debug', 'Jupiter Token List chargé', { count: jupiterTokenList.size });
+  }
+
   const jupPrices = await batchJupiterPrices(toFetch);
   const dexData = await batchDexScreener(toFetch);
-  const stillMissing = toFetch.filter(m => !jupPrices[m] && !dexData[m]);
+  const stillMissing = toFetch.filter(m => !dexData[m]);
   const pumpResults = {};
-  await Promise.all(stillMissing.map(async m => {
+  await Promise.all(stillMissing.slice(0, 10).map(async m => {
     const r = await fetchPumpFun(m);
     if (r) pumpResults[m] = r;
   }));
+
   for (const mint of toFetch) {
-    const dex = dexData[mint], jup = jupPrices[mint], pump = pumpResults[mint];
+    const dex = dexData[mint];
+    const jup = jupPrices[mint];
+    const pump = pumpResults[mint];
+    const jupMeta = jupiterTokenList?.get(mint);
+
     let result = null;
-    if (dex) result = { ...dex, source: 'dexscreener' };
-    else if (jup) result = { price: jup, liquidity: 0, change24h: 0, logo: null, symbol: null, name: null, source: 'jupiter' };
-    else if (pump) result = pump;
-    if (result) priceCache.set(mint, { data: result, ts: Date.now() });
-    else log('debug', 'Prix introuvable', { mint: mint.slice(0,8)+'...' });
+    if (dex) result = { ...dex };
+    else if (pump) result = { ...pump };
+    else if (jup) result = { price: jup.price, liquidity: 0, change24h: 0, source: 'jupiter' };
+
+    if (result && jupMeta) {
+      result.logo = result.logo || jupMeta.logo;
+      result.symbol = result.symbol || jupMeta.symbol;
+      result.name = result.name || jupMeta.name;
+    }
+
+    if (result) {
+      priceCache.set(mint, {  result, ts: Date.now() });
+      if (result.logo) logoCache.set(mint, result.logo);
+    }
   }
+
   const found = toFetch.filter(m => priceCache.get(m)?.data).length;
-  log('debug', `Prix récupérés`, { found, total: toFetch.length, missing: toFetch.length - found });
+  const withLogo = toFetch.filter(m => priceCache.get(m)?.data?.logo).length;
+  log('debug', `Prix récupérés`, { found, total: toFetch.length, withLogo });
 }
 
 function getTokenPrice(mint) {
   const cached = priceCache.get(mint);
   return cached?.data || null;
+}
+
+function getTokenLogo(mint) {
+  return logoCache.get(mint) || null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -287,7 +334,7 @@ class TieredTakeProfitManager {
     const value = amountSold * price;
     log('info', 'Palier Take-Profit exécuté', {
       mint: mint.slice(0,8) + '...', tier: tierIndex + 1,
-      sold: amountSold.toFixed(4), totalSold: this.soldAmounts.get(mint).toFixed(4)
+      sold: amountSold.toFixed(4)
     });
     return { pnl, value };
   }
@@ -321,7 +368,7 @@ class TieredTakeProfitManager {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SELL EXECUTOR (Jupiter Real Trades)
+// SELL EXECUTOR
 // ═══════════════════════════════════════════════════════════════════════════
 
 class SellExecutor {
@@ -337,14 +384,14 @@ class SellExecutor {
       const amountRaw = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
       const quoteRes = await fetch(
         `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`,
-        { headers: { 'User-Agent': 'SolBot-Basic/1.2' }, signal: AbortSignal.timeout(30000) }
+        { headers: { 'User-Agent': 'SolBot-Basic/1.3' }, signal: AbortSignal.timeout(30000) }
       );
       if (!quoteRes.ok) throw new Error(`Quote HTTP ${quoteRes.status}`);
       const quote = await quoteRes.json();
       if (!quote?.outAmount) throw new Error('No quote');
       const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'SolBot-Basic/1.2' },
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'SolBot-Basic/1.3' },
         body: JSON.stringify({
           quoteResponse: quote, userPublicKey: this.wallet.publicKey.toString(),
           wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: 'auto'
@@ -364,10 +411,8 @@ class SellExecutor {
         signature: txId, blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
       }, 'confirmed');
-      if (confirmation.value.err) throw new Error(`Tx failed: ${JSON.stringify(confirmation.value.err)}`);
-      log('success', '🎯 Vente RÉELLE confirmée !', {
-        mint: mint.slice(0,8) + '...', txUrl: `https://solscan.io/tx/${txId}`
-      });
+      if (confirmation.value.err) throw new Error(`Tx failed`);
+      log('success', '🎯 Vente RÉELLE confirmée !', { mint: mint.slice(0,8) + '...', txUrl: `https://solscan.io/tx/${txId}` });
       return { success: true, txId, txUrl: `https://solscan.io/tx/${txId}`, quote };
     } catch (err) {
       log('error', '❌ Jupiter: Échec', { error: err.message, mint: mint?.slice(0,8) + '...' });
@@ -378,9 +423,7 @@ class SellExecutor {
   async sell(mint, amount, reason, tier = null, useReal = true) {
     if (!useReal) return { success: false, error: 'simulation only' };
     const tierLabel = tier ? ` (Tier ${tier})` : '';
-    log('info', `🎯 Vente${tierLabel} — ${reason}`, {
-      mint: mint.slice(0,8) + '...', amount: parseFloat(amount).toFixed(4), mode: 'REAL'
-    });
+    log('info', `🎯 Vente${tierLabel} — ${reason}`, { mint: mint.slice(0,8) + '...', amount: parseFloat(amount).toFixed(4) });
     return await this.executeJupiterSell(mint, amount);
   }
 }
@@ -420,7 +463,6 @@ class BotLoop {
       await prefetchAllPrices(allMints);
       
       const tokens = [];
-      const prevTPState = new Map(this.tpNotifications);
       
       for (const acc of validAccounts) {
         const mint = acc.account.data.parsed.info.mint;
@@ -440,17 +482,10 @@ class BotLoop {
           if (pnl !== null) {
             const availableTiers = this.takeProfit.checkTiers(mint, price);
             for (const tier of availableTiers) {
-              log('warn', '🎯 PALIER TAKE-PROFIT DÉCLENCHÉ !', {
-                mint: mint.slice(0,8) + '...', tier: tier.tierIndex + 1,
-                target: `+${tier.pnlTarget}%`, currentPnl: `${tier.currentPnl}%`
-              });
-              const result = await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex + 1, true);
+              log('warn', '🎯 PALIER TAKE-PROFIT DÉCLENCHÉ !', { mint: mint.slice(0,8) + '...', tier: tier.tierIndex + 1, pnl: `${tier.currentPnl}%` });
+              await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex + 1, true);
               const execResult = this.takeProfit.markTierExecuted(mint, tier.tierIndex, tier.sellAmount, price);
-              
-              // Store for push notification detection
-              this.tpNotifications.set(`${mint}-${tier.tierIndex}`, {
-                mint, tier: tier.tierIndex + 1, pnl: execResult.pnl, value: execResult.value, timestamp: Date.now()
-              });
+              this.tpNotifications.set(`${mint}-${tier.tierIndex}`, { mint, tier: tier.tierIndex + 1, pnl: execResult.pnl, value: execResult.value, timestamp: Date.now() });
             }
             for (let i = 0; i < CONFIG.TAKE_PROFIT_TIERS.length; i++) {
               this.takeProfit.maybeResetTier(mint, pnl, i);
@@ -467,7 +502,9 @@ class BotLoop {
           entryPrice: this.takeProfit.entryPrices.get(mint)?.price || null,
           remainingBalance: this.takeProfit.getRemainingBalance(mint),
           triggeredTiers: Array.from(this.takeProfit.triggeredTiers.get(mint) || []).map(i => CONFIG.TAKE_PROFIT_TIERS[i].pnl + '%'),
-          logo: priceData?.logo || null, symbol: priceData?.symbol || null, name: priceData?.name || null,
+          logo: priceData?.logo || getTokenLogo(mint) || null,
+          symbol: priceData?.symbol || null,
+          name: priceData?.name || null,
         });
       }
       
@@ -496,9 +533,7 @@ class BotLoop {
   
   getNewTPNotifications() {
     const notifications = [];
-    for (const [key, data] of this.tpNotifications) {
-      notifications.push(data);
-    }
+    for (const [key, data] of this.tpNotifications) notifications.push(data);
     return notifications;
   }
 }
@@ -510,45 +545,21 @@ class BotLoop {
 function startApi(bot, wallet) {
   const app = express();
   app.use(express.json());
-  
-  // Servir les fichiers statiques
   app.use(express.static(path.join(__dirname, 'public')));
-  
-  // Route root
-  app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public/index.html'));
-  });
-  
-  // Health
+  app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
   app.get('/health', (req, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
-  
-  // Stats
   app.get('/api/stats', (req, res) => res.json(bot.getStats()));
-  
-  // Portfolio
   app.get('/api/portfolio', (req, res) => res.json({ address: wallet.publicKey.toString(), tokens: bot.portfolio, timestamp: Date.now() }));
-  
-  // Wallet
   app.get('/api/wallet', (req, res) => res.json({ address: wallet.publicKey.toString(), shortAddress: wallet.publicKey.toString().slice(0, 8) + '...' + wallet.publicKey.toString().slice(-4) }));
-  
-  // Take-Profit
   app.get('/api/take-profit', (req, res) => res.json(bot.takeProfit.getStats()));
-  
-  // New TP Notifications (for push detection)
   app.get('/api/notifications/tp', (req, res) => res.json({ notifications: bot.getNewTPNotifications() }));
-  
-  // Test sell
   app.post('/api/sell/test', express.json(), async (req, res) => {
     const { mint, amount, reason, tier, real } = req.body;
     if (!mint) return res.status(400).json({ error: 'mint required' });
     const result = await bot.seller.sell(mint, amount || 1, reason || 'MANUAL_TEST', tier, real === true);
     res.json(result);
   });
-  
-  // 404
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-  
-  // Start
   const port = CONFIG.PORT;
   app.listen(port, '0.0.0.0', () => log('info', 'API démarrée', { port }));
   return app;
@@ -567,7 +578,7 @@ async function main() {
   await bot.tick();
   setInterval(() => bot.tick().catch(err => log('error', 'Erreur loop', { error: err.message })), CONFIG.INTERVAL_SEC * 1000);
   startApi(bot, wallet);
-  log('info', '✅ Bot actif', { address: wallet.publicKey.toString().slice(0, 8) + '...', interval: `${CONFIG.INTERVAL_SEC}s`, takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? 'tiers: 25%x4' : 'disabled' });
+  log('info', '✅ Bot actif', { address: wallet.publicKey.toString().slice(0, 8) + '...', interval: `${CONFIG.INTERVAL_SEC}s` });
   process.on('SIGINT', () => { log('info', '🛑 Arrêt'); process.exit(0); });
   process.on('uncaughtException', (err) => log('error', '💥 Exception', { error: err.message }));
 }
