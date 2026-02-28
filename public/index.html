@@ -14,7 +14,6 @@
   --surface2:   #181a26;
   --border:     rgba(255,255,255,0.06);
   --border2:    rgba(255,255,255,0.10);
-
   --blue:       #2563eb;
   --blue-light: #3b82f6;
   --blue-glow:  rgba(37,99,235,0.15);
@@ -24,21 +23,16 @@
   --red-glow:   rgba(239,68,68,0.12);
   --amber:      #f59e0b;
   --amber-glow: rgba(245,158,11,0.12);
-
   --t1: #f1f5f9;
   --t2: #94a3b8;
   --t3: #475569;
   --t4: #1e293b;
-
   --mono: "IBM Plex Mono", monospace;
   --sans: "IBM Plex Sans", sans-serif;
-
   --r: 3px;
 }
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 14px; }
-
 body {
   font-family: var(--sans);
   background: var(--void);
@@ -46,8 +40,6 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
 }
-
-/* Subtle noise texture */
 body::before {
   content: "";
   position: fixed; inset: 0; z-index: 0;
@@ -56,10 +48,7 @@ body::before {
   background-size: 200px 200px;
   pointer-events: none;
 }
-
 .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
-
-/* ═══════ TOPNAV ═══════ */
 .topnav {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 24px; height: 52px;
@@ -68,9 +57,7 @@ body::before {
   position: sticky; top: 0; z-index: 100;
   backdrop-filter: blur(12px);
 }
-.nav-brand {
-  display: flex; align-items: center; gap: 10px;
-}
+.nav-brand { display: flex; align-items: center; gap: 10px; }
 .nav-logo {
   width: 28px; height: 28px; background: var(--blue); border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
@@ -121,8 +108,6 @@ body::before {
   font-size: 12px; padding: 1px 4px; transition: color .15s;
 }
 .wallet-copy:hover { color: var(--blue-light); }
-
-/* ═══════ KPI BAR ═══════ */
 .kpi-bar {
   display: grid; grid-template-columns: repeat(6, 1fr);
   border-bottom: 1px solid var(--border);
@@ -159,8 +144,6 @@ body::before {
 .kpi-value.red   { color: var(--red); }
 .kpi-value.amber { color: var(--amber); }
 .kpi-sub { font-size: 10px; color: var(--t3); font-family: var(--mono); }
-
-/* ═══════ MAIN ═══════ */
 .main {
   display: grid; grid-template-columns: 1fr 300px;
   flex: 1; min-height: 0;
@@ -171,8 +154,6 @@ body::before {
   min-width: 0;
 }
 .col-right { display: flex; flex-direction: column; overflow-y: auto; }
-
-/* ═══════ SECTION HEADER ═══════ */
 .section-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 20px; height: 44px;
@@ -185,8 +166,6 @@ body::before {
   text-transform: uppercase; color: var(--t3);
 }
 .section-actions { display: flex; align-items: center; gap: 8px; }
-
-/* ═══════ TABS ═══════ */
 .tabs { display: flex; height: 100%; align-items: flex-end; gap: 0; }
 .tab-btn {
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
@@ -204,8 +183,6 @@ body::before {
   background: var(--surface2); color: var(--t3);
 }
 .tab-btn.active .tab-n { background: rgba(59,130,246,.15); color: var(--blue-light); }
-
-/* ═══════ TOOLBAR ═══════ */
 .toolbar {
   display: flex; align-items: center; gap: 10px; padding: 8px 16px;
   border-bottom: 1px solid var(--border);
@@ -239,8 +216,6 @@ body::before {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 20px; color: var(--t2); white-space: nowrap;
 }
-
-/* ═══════ TABLE ═══════ */
 .table-wrap { overflow-y: auto; flex: 1; }
 .t-head {
   display: grid; gap: 0;
@@ -254,7 +229,6 @@ body::before {
   letter-spacing: 0.16em; text-transform: uppercase; color: var(--t3);
 }
 .th.r { text-align: right; }
-
 .t-row {
   display: grid; gap: 0; padding: 0 16px; align-items: center;
   height: 52px;
@@ -269,8 +243,6 @@ body::before {
 .t-row.row-hot { border-left: 2px solid var(--green); padding-left: 14px; }
 .t-row.row-sold { border-left: 2px solid var(--t4); opacity: .75; }
 .t-row.row-sold:hover { opacity: 1; }
-
-/* Token identity cell */
 .tok-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .tok-logo {
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
@@ -286,13 +258,9 @@ body::before {
 .tok-addr { font-family: var(--mono); font-size: 9px; color: var(--t3); margin-top: 1px; }
 .tok-addr a { color: inherit; text-decoration: none; transition: color .15s; }
 .tok-addr a:hover { color: var(--blue-light); }
-
-/* Data cells */
 .price-c { font-family: var(--mono); font-size: 11px; color: var(--t2); text-align: right; }
 .value-c { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--t1); text-align: right; }
 .bal-c   { font-family: var(--mono); font-size: 11px; color: var(--t3); text-align: right; }
-
-/* PnL cell */
 .pnl-c { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .pnl-chip {
   font-family: var(--mono); font-size: 11px; font-weight: 500;
@@ -306,19 +274,13 @@ body::before {
 .pnl-fill { height: 100%; border-radius: 1px; transition: width .5s ease; }
 .pnl-fill.pos { background: var(--green); }
 .pnl-fill.neg { background: var(--red); }
-
-/* TP dots */
 .tp-dots { display: flex; gap: 3px; justify-content: flex-end; }
 .tp-dot { width: 8px; height: 8px; border-radius: 2px; }
 .tp-dot.d { background: var(--green); }
 .tp-dot.w { background: var(--surface2); border: 1px solid var(--border2); }
-
-/* Empty state */
 .empty { padding: 48px 0; text-align: center; }
 .empty-icon { font-size: 24px; margin-bottom: 10px; }
 .empty-text { font-size: 12px; color: var(--t3); }
-
-/* ═══════ RIGHT PANEL ═══════ */
 .rp-section { border-bottom: 1px solid var(--border); }
 .rp-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -330,8 +292,6 @@ body::before {
   background: var(--surface); border: 1px solid var(--border); border-radius: 20px; color: var(--t2);
 }
 .rp-badge.g { background: rgba(16,185,129,.08); border-color: rgba(16,185,129,.2); color: var(--green); }
-
-/* Spotlight */
 .spotlight { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
 .sp-card { padding: 14px 16px; }
 .sp-card:first-child { border-right: 1px solid var(--border); }
@@ -339,8 +299,6 @@ body::before {
 .sp-sym { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
 .sp-pnl { font-family: var(--mono); font-size: 13px; font-weight: 500; }
 .sp-val { font-family: var(--mono); font-size: 10px; color: var(--t3); margin-top: 3px; }
-
-/* TP entries */
 .tp-list { display: flex; flex-direction: column; gap: 0; }
 .tp-card {
   padding: 12px 16px;
@@ -374,8 +332,6 @@ body::before {
 .tp-bar-lbl.active { color: var(--amber); }
 .tp-bar-lbl.wait   { color: var(--t4); }
 .tp-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--t3); }
-
-/* Config / System */
 .kv-list { }
 .kv {
   display: flex; justify-content: space-between; align-items: center;
@@ -386,7 +342,6 @@ body::before {
 .kv-v { font-family: var(--mono); font-size: 11px; color: var(--t2); }
 .kv-v.on  { color: var(--green); }
 .kv-v.off { color: var(--red); }
-
 .tier-row { display: flex; gap: 6px; padding: 10px 16px; flex-wrap: wrap; }
 .tier-badge {
   display: flex; align-items: center; gap: 5px;
@@ -396,8 +351,6 @@ body::before {
 }
 .tier-cible { color: var(--t1); font-weight: 600; }
 .tier-sell  { color: var(--amber); }
-
-/* Log panel */
 .log-body {
   padding: 8px; max-height: 160px; overflow-y: auto;
   display: flex; flex-direction: column; gap: 1px;
@@ -416,8 +369,6 @@ body::before {
 .log-entry.error .log-l { color: var(--red); }
 .log-entry.ok    .log-l { color: var(--green); }
 .log-entry.debug .log-l { color: var(--t3); }
-
-/* Footer */
 .footer {
   border-top: 1px solid var(--border);
   display: flex; justify-content: space-between; align-items: center;
@@ -426,22 +377,16 @@ body::before {
 }
 .footer-l, .footer-r { font-family: var(--mono); font-size: 9px; color: var(--t3); letter-spacing: 0.08em; display: flex; gap: 16px; }
 .footer-l span, .footer-r span { color: var(--t2); }
-
-/* Btn */
 .btn-icon {
   background: none; border: 1px solid var(--border); color: var(--t3);
   font-family: var(--mono); font-size: 10px; padding: 4px 10px;
   border-radius: var(--r); cursor: pointer; transition: all .15s;
 }
 .btn-icon:hover { border-color: var(--border2); color: var(--t2); background: var(--surface); }
-
-/* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--t4); }
-
-/* Responsive */
 @media(max-width: 1100px) {
   .kpi-bar { grid-template-columns: repeat(3, 1fr); }
   .main { grid-template-columns: 1fr; }
@@ -519,11 +464,7 @@ body::before {
 
 <!-- MAIN -->
 <div class="main">
-
-  <!-- LEFT COL -->
   <div class="col-left">
-
-    <!-- Tabs + toolbar -->
     <div class="section-head">
       <div class="tabs">
         <button class="tab-btn active" data-tab="active" onclick="switchTab('active')">Actifs <span class="tab-n" id="tnActive">0</span></button>
@@ -548,11 +489,7 @@ body::before {
         <button class="sort-pill"    id="sp-name"    onclick="setSort('name')">Nom</button>
       </div>
     </div>
-
-    <!-- Table -->
     <div class="table-wrap">
-
-      <!-- Pane active -->
       <div id="pane-active">
         <div class="t-head t-head-active">
           <span class="th">TOKEN</span>
@@ -564,8 +501,6 @@ body::before {
         </div>
         <div id="rows-active"><div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Chargement...</div></div></div>
       </div>
-
-      <!-- Pane sold -->
       <div id="pane-sold" style="display:none">
         <div class="t-head t-head-sold">
           <span class="th">TOKEN</span>
@@ -576,8 +511,6 @@ body::before {
         </div>
         <div id="rows-sold"><div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Aucune position enti&#232;rement vendue</div></div></div>
       </div>
-
-      <!-- Pane all -->
       <div id="pane-all" style="display:none">
         <div class="t-head t-head-active">
           <span class="th">TOKEN</span>
@@ -589,15 +522,10 @@ body::before {
         </div>
         <div id="rows-all"></div>
       </div>
+    </div>
+  </div>
 
-    </div><!-- /table-wrap -->
-
-  </div><!-- /col-left -->
-
-  <!-- RIGHT COL -->
   <div class="col-right">
-
-    <!-- Spotlight -->
     <div class="rp-section">
       <div class="rp-head"><span class="rp-title">Spotlight</span></div>
       <div class="spotlight">
@@ -615,8 +543,6 @@ body::before {
         </div>
       </div>
     </div>
-
-    <!-- TP Live -->
     <div class="rp-section" style="flex:1">
       <div class="rp-head">
         <span class="rp-title">Take-Profit Engine</span>
@@ -626,8 +552,6 @@ body::before {
         <div class="empty"><div class="empty-text">Aucun palier actif</div></div>
       </div>
     </div>
-
-    <!-- Config -->
     <div class="rp-section">
       <div class="rp-head">
         <span class="rp-title">Configuration</span>
@@ -635,8 +559,6 @@ body::before {
       </div>
       <div class="tier-row" id="tiersRow"></div>
     </div>
-
-    <!-- System -->
     <div class="rp-section">
       <div class="rp-head"><span class="rp-title">Syst&#232;me</span></div>
       <div class="kv-list">
@@ -644,23 +566,20 @@ body::before {
         <div class="kv"><span class="kv-k">R&#233;seau</span><span class="kv-v">MAINNET-BETA</span></div>
         <div class="kv"><span class="kv-k">Intervalle</span><span class="kv-v" id="sysInterval">30s</span></div>
         <div class="kv"><span class="kv-k">Hyst&#233;r&#233;sis</span><span class="kv-v" id="sysHyst">&#8212;</span></div>
-        <div class="kv"><span class="kv-k">Version</span><span class="kv-v">v1.2.0</span></div>
+        <div class="kv"><span class="kv-k">Version</span><span class="kv-v">v1.3.0</span></div>
         <div class="kv"><span class="kv-k">Auto-refresh</span><span class="kv-v on" id="sysAuto">ON</span></div>
       </div>
     </div>
-
-    <!-- Logs -->
     <div class="rp-section">
       <div class="rp-head"><span class="rp-title">Journal</span></div>
       <div class="log-body" id="logBody"></div>
     </div>
-
-  </div><!-- /col-right -->
-</div><!-- /main -->
+  </div>
+</div>
 
 <footer class="footer">
   <div class="footer-l">
-    <span>SOLBOT <span>v1.2.0</span></span>
+    <span>SOLBOT <span>v1.3.0</span></span>
     <span>SOLANA MAINNET</span>
     <span>JUPITER DEX</span>
   </div>
@@ -670,11 +589,11 @@ body::before {
   </div>
 </footer>
 
-</div><!-- /app -->
+</div>
 
 <script>
 "use strict";
-const API_BASE   = "https://solana-sniper-7o8s.onrender.com";
+const API_BASE = "https://solana-sniper-7o8s.onrender.com";
 const REFRESH_MS = 10000;
 let autoRefresh = true, logBuffer = [], currentTab = "active", sortKey = "value", sortAsc = false, lastTokens = [], lastTp = {};
 const MAX_LOGS = 60;
@@ -698,20 +617,17 @@ function pnlCls(p){ return p===null?"pnl-neu":p>=0?"pnl-pos":"pnl-neg"; }
 function pnlTxt(p){ return p===null?"N/A":(p>=0?"+":"")+fmtN(p,2)+"%"; }
 function pnlClr(p){ return p===null?"var(--t3)":p>=0?"var(--green)":"var(--red)"; }
 
-// Copy wallet
 $("copyBtn").addEventListener("click", ()=>{
   const addr = $("copyBtn").dataset.full || $("walletAddr").textContent;
   navigator.clipboard.writeText(addr).then(()=>{ $("copyBtn").textContent="✓"; setTimeout(()=>{ $("copyBtn").textContent="⎘"; },1200); });
 });
 
-// Logs
 function pushLog(level, msg){
   logBuffer.unshift({ t: fmtTime(Date.now()), level, msg });
   if(logBuffer.length>MAX_LOGS) logBuffer.pop();
   $("logBody").innerHTML = logBuffer.map(l=>`<div class="log-entry ${l.level}"><span class="log-t">${l.t}</span><span class="log-l">${l.level}</span><span class="log-m">${esc(l.msg)}</span></div>`).join("");
 }
 
-// Tabs
 function switchTab(tab){
   currentTab = tab;
   document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active", b.dataset.tab===tab));
@@ -719,12 +635,12 @@ function switchTab(tab){
   renderTable();
 }
 
-// Sort
 function setSort(key){
   if(sortKey===key){ sortAsc=!sortAsc; } else { sortKey=key; sortAsc=false; }
   document.querySelectorAll(".sort-pill").forEach(b=>{ b.classList.toggle("on",b.id==="sp-"+key); b.classList.toggle("asc",b.id==="sp-"+key&&sortAsc); });
   renderTable();
 }
+
 function sortArr(arr){
   return [...arr].sort((a,b)=>{
     let av,bv;
@@ -736,7 +652,6 @@ function sortArr(arr){
   });
 }
 
-// Logo
 function logoEl(tok, size=30){
   const ini=(tok.symbol||tok.mint||"?").slice(0,3).toUpperCase();
   const img=tok.logo?`<img src="${tok.logo}" alt="${ini}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`:"";
@@ -744,7 +659,6 @@ function logoEl(tok, size=30){
   return `<div class="tok-logo" style="width:${size}px;height:${size}px">${img}${fallback}</div>`;
 }
 
-// Row builders
 function buildActiveRow(tok, idx, allTiers){
   const done  = tok.triggeredTiers||[];
   const dots  = allTiers.map(t=>`<div class="tp-dot ${done.includes(t.pnl)?"d":"w"}"></div>`).join("");
@@ -795,51 +709,40 @@ function buildSoldRow(entry, allTiers, tokMap, idx){
     </div>`;
 }
 
-// Main render
 function renderTable(){
   const q       = ($("searchInput").value||"").toLowerCase();
   const tiers   = lastTp.tiers||[];
   const entries = lastTp.entries||[];
   const tokMap  = {};
   lastTokens.forEach(t=>{ if(t.mintFull) tokMap[t.mintFull.slice(0,6)]=t; });
-
   const filt = t => !q||(t.symbol||"").toLowerCase().includes(q)||(t.name||"").toLowerCase().includes(q)||(t.mintFull||"").toLowerCase().includes(q);
   const active = sortArr(lastTokens.filter(filt));
   const sold   = entries.filter(e=>e.remaining<=0&&e.sold>0).filter(e=>!q||e.mint.toLowerCase().includes(q)||(tokMap[e.mint.replace("...","").slice(0,6)]?.symbol||"").toLowerCase().includes(q));
-
   $("tnActive").textContent = active.length;
   $("tnSold").textContent   = sold.length;
   $("tnAll").textContent    = active.length;
   $("sBadge").textContent   = `${active.length} actifs · ${sold.length} vendus`;
-
   const emptyActive = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Aucune position ouverte</div></div>`;
-  const emptySold   = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucune position enti&egrave;rement vendue</div></div>`;
+  const emptySold   = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucune position entièrement vendue</div></div>`;
   $("rows-active").innerHTML = active.length ? active.map((t,i)=>buildActiveRow(t,i,tiers)).join("") : emptyActive;
   $("rows-sold").innerHTML   = sold.length   ? sold.map((e,i)=>buildSoldRow(e,tiers,tokMap,i)).join("") : emptySold;
   $("rows-all").innerHTML    = active.length ? active.map((t,i)=>buildActiveRow(t,i,tiers)).join("") : emptyActive;
 }
 
-// Update all
 function updateAll(stats, portfolio, tp){
   lastTokens = portfolio.tokens||[];
   lastTp     = tp;
   const tokens  = lastTokens;
   const entries = tp.entries||[];
   const tiers   = tp.tiers||stats.takeProfit?.tiers||[];
-
-  // Wallet
   $("walletAddr").textContent = fmtAddr(portfolio.address);
   $("copyBtn").dataset.full   = portfolio.address||"";
-
-  // KPIs
   $("kTotalValue").textContent = fmtUSD(stats.totalValue);
   $("kTokens").textContent     = stats.tokens??"—";
   $("kTpCount").textContent    = entries.reduce((s,e)=>s+(e.triggeredTiers?.length||0),0);
   $("kUptime").textContent     = fmtUptime(stats.uptime||0);
   $("kLastUpdate").textContent = "MAJ "+fmtTime(Date.now());
   $("footerTime").textContent  = fmtTime(Date.now());
-
-  // Best/Worst
   const withPnl = tokens.filter(t=>t.pnl!==null&&t.pnl!==undefined);
   if(withPnl.length){
     const best  = withPnl.reduce((a,b)=>a.pnl>b.pnl?a:b);
@@ -855,8 +758,6 @@ function updateAll(stats, portfolio, tp){
     $("spWorstPnl").textContent = fmtN(worst.pnl,2)+"%";
     $("spWorstVal").textContent = fmtUSD(worst.value);
   }
-
-  // Config
   const tpEnabled = tp.enabled||stats.takeProfit?.enabled;
   $("tpStatusBadge").textContent = tpEnabled?"ON":"OFF";
   $("tpStatusBadge").className   = "kv-v "+(tpEnabled?"on":"off");
@@ -868,12 +769,8 @@ function updateAll(stats, portfolio, tp){
       <span style="color:var(--t3);font-size:9px">&#8594;</span>
       <span class="tier-sell">${t.sell}</span>
     </div>`).join("");
-
-  // System
   $("sysStatus").textContent = "ONLINE";
   $("sysStatus").className   = "kv-v on";
-
-  // TP Live
   const tokMap = {};
   tokens.forEach(t=>{ if(t.mintFull) tokMap[t.mintFull.slice(0,6)]=t; });
   const liveEntries = entries.filter(e=>e.remaining>0||e.sold>0);
@@ -885,7 +782,7 @@ function updateAll(stats, portfolio, tp){
     const livePnl = match?.pnl??null;
     const isOut   = e.remaining<=0&&e.sold>0;
     const ini     = (tok.symbol||e.mint).slice(0,3).toUpperCase();
-    const lgo     = tok.logo?`<img src="${tok.logo}" alt="${ini}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`:""
+    const lgo     = tok.logo?`<img src="${tok.logo}" alt="${ini}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`:"";
     const fall    = `<span style="display:${tok.logo?"none":"flex"};width:100%;height:100%;align-items:center;justify-content:center">${ini}</span>`;
     const barsHtml = tiers.map(t=>{
       const isDone  = e.triggeredTiers?.includes(t.pnl);
@@ -911,11 +808,9 @@ function updateAll(stats, portfolio, tp){
         </div>
       </div>`;
   }).join("") : `<div class="empty" style="padding:24px"><div class="empty-text">Aucun palier actif</div></div>`;
-
   renderTable();
 }
 
-// Fetch
 async function fetchAll(){
   try {
     const [sR, pR, tR] = await Promise.all([
@@ -935,7 +830,6 @@ async function fetchAll(){
   }
 }
 
-// Visibility
 document.addEventListener("visibilitychange", ()=>{
   autoRefresh = !document.hidden;
   const v = autoRefresh?"ON":"OFF";
@@ -948,4 +842,4 @@ pushLog("info", "SolBot Terminal initialisé");
 fetchAll();
 </script>
 </body>
-</html> 
+</html>
