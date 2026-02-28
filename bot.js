@@ -128,7 +128,7 @@ async function getTokenPrice(mint) {
     const pair = data?.pairs?.find(p => p.chainId === 'solana');
     if (!pair?.priceUsd) return null;
     
-    const result = { price: parseFloat(pair.priceUsd), liquidity: pair.liquidity?.usd || 0, change24h: pair.priceChange?.h24 || 0 };
+    const result = { price: parseFloat(pair.priceUsd), liquidity: pair.liquidity?.usd || 0, change24h: pair.priceChange?.h24 || 0, logo: pair.info?.imageUrl || null, symbol: pair.baseToken?.symbol || null, name: pair.baseToken?.name || null };
     priceCache.set(mint, { data: result, ts: Date.now() });
     return result;
   } catch (err) {
@@ -370,6 +370,9 @@ class BotLoop {
           value: parseFloat(value.toFixed(2)),
           liquidity: priceData?.liquidity || 0,
           change24h: priceData?.change24h || 0,
+          logo:      priceData?.logo || null,
+          symbol:    priceData?.symbol || null,
+          name:      priceData?.name || null,
           pnl: this.takeProfit.getPnl(mint, price),
           entryPrice: this.takeProfit.entryPrices.get(mint)?.price || null,
           remainingBalance: this.takeProfit.getRemainingBalance(mint),
@@ -411,6 +414,24 @@ class BotLoop {
 function startApi(bot, wallet) {
   const app = express();
   app.use(express.json());
+
+  // ─── CORS — autorise GitHub Pages ─────────────────────────────────────
+  app.use((req, res, next) => {
+    const allowed = [
+      'https://pumplaunch.github.io',
+      'http://localhost:3000',
+      'http://localhost:10000',
+    ];
+    const origin = req.headers.origin;
+    if (!origin || allowed.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+  // ──────────────────────────────────────────────────────────────────────
 
   // ─── Dashboard statique ────────────────────────────────────────────────
   // Place index.html dans le même dossier que bot.js (ou définir STATIC_DIR)
