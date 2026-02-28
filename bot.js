@@ -1,5 +1,5 @@
 /**
- * 🤖 SolBot-Basic v1.3.6 — Fix: Jupiter API Headers + Real Trades
+ * 🤖 SolBot-Basic v1.3.8 — Jupiter Debug + Raydium Fallback
  */
 'use strict';
 
@@ -18,10 +18,6 @@ const CONFIG = {
 
 if (!CONFIG.PRIVATE_KEY) { console.error('❌ PRIVATE_KEY non définie'); process.exit(1); }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DÉPENDANCES
-// ═══════════════════════════════════════════════════════════════════════════
-
 const { Connection, Keypair, PublicKey, VersionedTransaction } = require('@solana/web3.js');
 const bs58 = require('bs58');
 const express = require('express');
@@ -31,18 +27,10 @@ let fetch;
 if (typeof global.fetch === 'function') { fetch = global.fetch; } 
 else { fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args)); }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// CONSTANTES
-// ═══════════════════════════════════════════════════════════════════════════
-
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_PROGRAM_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
-const VERSION = '1.3.6';
-
-// ═══════════════════════════════════════════════════════════════════════════
-// LOGGER
-// ═══════════════════════════════════════════════════════════════════════════
+const VERSION = '1.3.8-DEBUG';
 
 function log(level, msg, data = null) {
   const ts = new Date().toISOString();
@@ -51,10 +39,6 @@ function log(level, msg, data = null) {
   const safeData = data ? JSON.stringify(data).slice(0, 400) : '';
   console.log(`${icon} [${ts}] [${level.toUpperCase()}] ${safeMsg} ${safeData}`.trim());
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// WALLET
-// ═══════════════════════════════════════════════════════════════════════════
 
 function loadWallet() {
   try {
@@ -67,15 +51,10 @@ function loadWallet() {
   } catch (err) { log('error', 'Clé invalide', { error: err.message }); process.exit(1); }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// RPC MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
-
 function getRpcConnection() {
   const endpoints = [
     CONFIG.HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${CONFIG.HELIUS_API_KEY}` : null,
     'https://api.mainnet-beta.solana.com',
-    'https://solana-mainnet.public.blastapi.io',
   ].filter(Boolean);
   let index = 0;
   return {
@@ -84,8 +63,8 @@ function getRpcConnection() {
       for (let i = 0; i < endpoints.length; i++) {
         try {
           const slot = await new Connection(endpoints[i], { commitment: 'confirmed' }).getSlot();
-          if (slot > 0) { index = i; return true; }
-        } catch {}
+          if (slot > 0) { index = i; log('info', 'RPC OK', { slot, source: i === 0 && CONFIG.HELIUS_API_KEY ? 'Helius' : 'Public' }); return true; }
+        } catch (e) {}
       }
       return false;
     },
@@ -93,51 +72,25 @@ function getRpcConnection() {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PRIX — DEXSCREENER UNIQUEMENT (Fonctionne ✅)
-// ═══════════════════════════════════════════════════════════════════════════
-
 async function fetchPriceFromDexScreener(mint) {
   const cleanMint = String(mint || '').trim();
   if (!cleanMint || cleanMint.length < 32 || cleanMint === SOL_MINT) return null;
-  
   try {
     const url = `https://api.dexscreener.com/latest/dex/tokens/${cleanMint}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    
     if (!res.ok) return null;
-    
     const data = await res.json();
-    const pair = data?.pairs?.find(p => 
-      p.chainId === 'solana' && 
-      p.baseToken?.address?.toLowerCase() === cleanMint.toLowerCase()
-    );
-    
+    const pair = data?.pairs?.find(p => p.chainId === 'solana' && p.baseToken?.address?.toLowerCase() === cleanMint.toLowerCase());
     if (!pair || !pair.priceUsd) return null;
-    
     let price = null;
-    if (typeof pair.priceUsd === 'number' && isFinite(pair.priceUsd) && pair.priceUsd > 0) {
-      price = pair.priceUsd;
-    } else if (typeof pair.priceUsd === 'string') {
+    if (typeof pair.priceUsd === 'number' && isFinite(pair.priceUsd) && pair.priceUsd > 0) price = pair.priceUsd;
+    else if (typeof pair.priceUsd === 'string') {
       const parsed = parseFloat(pair.priceUsd.trim());
       if (isFinite(parsed) && parsed > 0) price = parsed;
     }
-    
     if (!price) return null;
-    
-    return {
-      price,
-      liquidity: pair.liquidity?.usd || 0,
-      change24h: pair.priceChange?.h24 || 0,
-      logo: pair.info?.imageUrl || pair.baseToken?.logoUri || null,
-      symbol: pair.baseToken?.symbol || null,
-      name: pair.baseToken?.name || null,
-      source: 'dexscreener'
-    };
-    
-  } catch (err) {
-    return null;
-  }
+    return { price, liquidity: pair.liquidity?.usd || 0, change24h: pair.priceChange?.h24 || 0, logo: pair.info?.imageUrl || pair.baseToken?.logoUri || null, symbol: pair.baseToken?.symbol || null, name: pair.baseToken?.name || null, source: 'dexscreener' };
+  } catch (err) { return null; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -186,14 +139,18 @@ class TieredTakeProfitManager {
     }
     return availableTiers;
   }
-  markTierExecuted(mint, tierIndex, amountSold, price) {
+  markTierExecuted(mint, tierIndex, amountSold, price, soldSuccessfully = true) {
     const triggered = this.triggeredTiers.get(mint);
     if (!triggered) return;
     triggered.add(tierIndex);
     const prevSold = this.soldAmounts.get(mint) || 0;
     this.soldAmounts.set(mint, prevSold + amountSold);
     const pnl = this.getPnl(mint, price), value = amountSold * price;
-    log('info', 'Palier Take-Profit exécuté', { mint: mint.slice(0,8)+'...', tier: tierIndex+1, sold: amountSold.toFixed(4) });
+    if (soldSuccessfully) {
+      log('info', 'Palier Take-Profit exécuté + VENDU', { mint: mint.slice(0,8)+'...', tier: tierIndex+1, sold: amountSold.toFixed(4) });
+    } else {
+      log('warn', 'Palier Take-Profit exécuté (vente échouée)', { mint: mint.slice(0,8)+'...', tier: tierIndex+1, sold: amountSold.toFixed(4) });
+    }
     return { pnl, value };
   }
   maybeResetTier(mint, currentPnl, tierIndex) {
@@ -212,7 +169,7 @@ class TieredTakeProfitManager {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔄 SELL EXECUTOR — FIX JUPITER HEADERS ✅
+// 🔄 SELL EXECUTOR — JUPITER + RAYDIUM + DEBUG
 // ═══════════════════════════════════════════════════════════════════════════
 
 class SellExecutor {
@@ -222,123 +179,105 @@ class SellExecutor {
   }
   
   async executeJupiterSell(mint, amount, slippageBps = 500) {
+    const cleanMint = String(mint||'').trim();
+    const tokenDecimals = 9;
+    const amountRaw = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
+    
+    log('debug', '🔎 JUPITER: Starting quote request', { mint: cleanMint.slice(0,10)+'...', amount });
+    
+    const jupiterHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Origin': 'https://jup.ag',
+      'Referer': 'https://jup.ag/',
+    };
+    
     try {
-      const tokenDecimals = 9;
-      const amountRaw = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
-      const cleanMint = String(mint||'').trim();
-      
-      // ✅ HEADERS JUPITER CORRIGÉS — C'EST ICI LE FIX !
-      const jupiterHeaders = {
-        'User-Agent': 'Mozilla/5.0 (compatible; SolBot/1.3.6; +https://solana.local)',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Content-Type': 'application/json',
-        'Origin': 'https://jup.ag',
-        'Referer': 'https://jup.ag/'
-      };
-      
-      // 1. Get Quote
+      // 1. Quote
       const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${cleanMint}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
+      log('debug', '🔎 JUPITER: Quote URL', { url: quoteUrl.slice(0,150) });
       
-      log('debug', '🔎 Jupiter Quote', { mint: cleanMint.slice(0,10)+'...', amount, url: quoteUrl.slice(0,100) });
-      
-      const quoteRes = await fetch(quoteUrl, {
-        headers: jupiterHeaders,
-        signal: AbortSignal.timeout(30000)
-      });
+      const quoteRes = await fetch(quoteUrl, { headers: jupiterHeaders, signal: AbortSignal.timeout(30000) });
+      log('debug', '📡 JUPITER: Quote response', { status: quoteRes.status, statusText: quoteRes.statusText });
       
       if (!quoteRes.ok) {
         const body = await quoteRes.text().catch(() => 'N/A');
-        log('error', '❌ Jupiter Quote HTTP error', { status: quoteRes.status, body: body.slice(0,200) });
-        throw new Error(`Quote HTTP ${quoteRes.status}: ${body.slice(0,100)}`);
+        log('error', '❌ JUPITER: Quote FAILED', { status: quoteRes.status, body: body.slice(0,300) });
+        throw new Error(`Jupiter Quote ${quoteRes.status}: ${body.slice(0,100)}`);
       }
       
       const quote = await quoteRes.json();
-      if (!quote?.outAmount) throw new Error('No quote outAmount');
+      log('debug', '✅ JUPITER: Quote OK', { outAmount: quote.outAmount, priceImpact: quote.priceImpactPct });
       
-      log('debug', '✅ Jupiter Quote OK', { outAmount: quote.outAmount, priceImpact: quote.priceImpactPct });
+      if (!quote?.outAmount) throw new Error('No outAmount in quote');
       
-      // 2. Get Swap Transaction
+      // 2. Swap
       const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
         method: 'POST',
-        headers: jupiterHeaders,
-        body: JSON.stringify({
-          quoteResponse: quote,
-          userPublicKey: this.wallet.publicKey.toString(),
-          wrapAndUnwrapSol: true,
-          dynamicComputeUnitLimit: true,
-          prioritizationFeeLamports: 'auto'
-        }),
+        headers: { ...jupiterHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteResponse: quote, userPublicKey: this.wallet.publicKey.toString(), wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: 'auto' }),
         signal: AbortSignal.timeout(30000)
       });
+      log('debug', '📡 JUPITER: Swap response', { status: swapRes.status });
       
       if (!swapRes.ok) {
         const body = await swapRes.text().catch(() => 'N/A');
-        log('error', '❌ Jupiter Swap HTTP error', { status: swapRes.status, body: body.slice(0,200) });
-        throw new Error(`Swap HTTP ${swapRes.status}: ${body.slice(0,100)}`);
+        log('error', '❌ JUPITER: Swap FAILED', { status: swapRes.status, body: body.slice(0,300) });
+        throw new Error(`Jupiter Swap ${swapRes.status}`);
       }
       
       const swapData = await swapRes.json();
-      if (!swapData?.swapTransaction) throw new Error('No swapTransaction in response');
+      if (!swapData?.swapTransaction) throw new Error('No swapTransaction');
       
-      // 3. Deserialize, Sign & Send
+      // 3. Sign & Send
       const transaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
       transaction.sign([this.wallet]);
       
-      const txId = await this.rpc.connection.sendRawTransaction(transaction.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-        preflightCommitment: 'confirmed'
-      });
-      
-      log('debug', '📤 Transaction envoyée', { txId });
+      const txId = await this.rpc.connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false, maxRetries: 3, preflightCommitment: 'confirmed' });
+      log('debug', '📤 JUPITER: Transaction sent', { txId: txId.slice(0,20)+'...' });
       
       // 4. Confirm
       const latestBlockhash = await this.rpc.connection.getLatestBlockhash();
-      const confirmation = await this.rpc.connection.confirmTransaction({
-        signature: txId,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-      }, 'confirmed');
+      const confirmation = await this.rpc.connection.confirmTransaction({ signature: txId, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight }, 'confirmed');
       
-      if (confirmation.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-      }
+      if (confirmation.value.err) throw new Error(`Tx failed: ${JSON.stringify(confirmation.value.err)}`);
       
-      log('success', '🎉 VENTE RÉELLE CONFIRMÉE !', { 
-        mint: cleanMint.slice(0,8)+'...', 
-        txUrl: `https://solscan.io/tx/${txId}`,
-        amountSold: amount.toFixed(4)
-      });
-      
-      return { 
-        success: true, 
-        txId, 
-        txUrl: `https://solscan.io/tx/${txId}`,
-        quote 
-      };
+      log('success', '🎉 JUPITER: VENTE CONFIRMÉE !', { txUrl: `https://solscan.io/tx/${txId}` });
+      return { success: true, txId, txUrl: `https://solscan.io/tx/${txId}` };
       
     } catch (err) {
-      log('error', '❌ Jupiter sell failed', { 
-        error: err.message, 
-        mint: String(mint||'').slice(0,8)+'...',
-        stack: err.stack?.slice(0,300)
-      });
-      return { success: false, error: err.message };
+      log('error', '❌ JUPITER: Sell failed', { error: err.message, mint: cleanMint.slice(0,10)+'...' });
+      return { success: false, error: err.message, provider: 'jupiter' };
     }
+  }
+  
+  async executeRaydiumSell(mint, amount, slippageBps = 500) {
+    log('debug', '🔎 RAYDIUM: Attempting fallback sell', { mint: String(mint||'').slice(0,10)+'...' });
+    // Raydium API nécessite une intégration plus complexe (SDK)
+    // Pour l'instant, on log juste que Jupiter a échoué
+    log('warn', '⚠️ RAYDIUM: Fallback not implemented yet - manual sell required', { mint: String(mint||'').slice(0,10)+'...' });
+    return { success: false, error: 'Raydium fallback not implemented', provider: 'raydium' };
   }
   
   async sell(mint, amount, reason, tier = null, useReal = true) {
     if (!useReal) return { success: false, error: 'simulation only' };
+    
     const tierLabel = tier ? ` (Tier ${tier})` : '';
-    log('info', `🎯 Vente${tierLabel} — ${reason}`, { 
-      mint: String(mint||'').slice(0,8)+'...', 
-      amount: parseFloat(amount).toFixed(4),
-      mode: 'REAL'
-    });
-    return await this.executeJupiterSell(mint, amount);
+    log('info', `🎯 Vente${tierLabel} — ${reason}`, { mint: String(mint||'').slice(0,8)+'...', amount: parseFloat(amount).toFixed(4), mode: 'REAL' });
+    
+    // Try Jupiter first
+    const jupiterResult = await this.executeJupiterSell(mint, amount);
+    
+    if (jupiterResult.success) {
+      return jupiterResult;
+    }
+    
+    // Fallback to Raydium (not implemented yet, but structure is here)
+    log('warn', '⚠️ Jupiter failed, attempting Raydium fallback...', { mint: String(mint||'').slice(0,8)+'...' });
+    const raydiumResult = await this.executeRaydiumSell(mint, amount);
+    
+    return raydiumResult;
   }
 }
 
@@ -365,18 +304,18 @@ class BotLoop {
       const tokens = [];
       let totalValue = 0;
       let withPrice = 0;
+      let tpTriggered = 0;
+      let tpSold = 0;
       
       for (const acc of allAccounts) {
         const mintRaw = acc.account.data.parsed.info.mint;
         const mint = String(mintRaw || '').trim();
-        
         if (!mint || mint === SOL_MINT) continue;
         
         const ta = acc.account.data.parsed.info.tokenAmount;
         const balance = parseFloat(ta.uiAmount ?? ta.uiAmountString ?? '0');
         if (balance <= 0) continue;
         
-        // Fetch price from DexScreener
         const priceData = await fetchPriceFromDexScreener(mint);
         const price = priceData?.price || 0;
         const value = balance * price;
@@ -386,21 +325,24 @@ class BotLoop {
         
         this.takeProfit.trackEntry(mint, price, balance);
         
-        // Check Take-Profit
         if (CONFIG.TAKE_PROFIT_ENABLED && price > 0) {
           const pnl = this.takeProfit.getPnl(mint, price);
           if (pnl !== null) {
             const availableTiers = this.takeProfit.checkTiers(mint, price);
             for (const tier of availableTiers) {
-              log('warn', '🎯 PALIER TAKE-PROFIT DÉCLENCHÉ !', { 
-                mint: mint.slice(0,8)+'...', 
-                tier: tier.tierIndex+1, 
-                target: `+${tier.pnlTarget}%`, 
-                currentPnl: `${tier.currentPnl}%` 
-              });
-              // ✅ Vente réelle avec Jupiter (headers fixés)
-              await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex+1, true);
-              this.takeProfit.markTierExecuted(mint, tier.tierIndex, tier.sellAmount, price);
+              tpTriggered++;
+              log('warn', '🎯 PALIER TAKE-PROFIT DÉCLENCHÉ !', { mint: mint.slice(0,8)+'...', tier: tier.tierIndex+1, target: `+${tier.pnlTarget}%`, currentPnl: `${tier.currentPnl}%` });
+              
+              const sellResult = await this.seller.sell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex+1, true);
+              
+              // Mark as executed even if sell failed (avoids infinite loop)
+              this.takeProfit.markTierExecuted(mint, tier.tierIndex, tier.sellAmount, price, sellResult.success);
+              
+              if (sellResult.success) {
+                tpSold++;
+              } else {
+                log('warn', '⚠️ Vente échouée (Jupiter 401 probablement)', { mint: mint.slice(0,8)+'...', error: sellResult.error });
+              }
             }
             for (let i = 0; i < CONFIG.TAKE_PROFIT_TIERS.length; i++) {
               this.takeProfit.maybeResetTier(mint, pnl, i);
@@ -424,7 +366,6 @@ class BotLoop {
           liquidity: priceData?.liquidity || 0,
         });
         
-        // Petit délai pour éviter rate limiting
         await new Promise(r => setTimeout(r, 150));
       }
       
@@ -433,7 +374,10 @@ class BotLoop {
       log('info', '✅ Cycle terminé', { 
         tokens: tokens.length, 
         withPrice, 
-        totalValue: `$${totalValue.toFixed(2)}` 
+        totalValue: `$${totalValue.toFixed(2)}`,
+        tpTriggered,
+        tpSold,
+        tpFailed: tpTriggered - tpSold
       });
       
     } catch (err) {
@@ -464,11 +408,7 @@ class BotLoop {
 function startApi(bot, wallet) {
   const app = express();
   app.use(express.json());
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    next();
-  });
+  app.use((req, res, next) => { res.header('Access-Control-Allow-Origin', '*'); res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept'); next(); });
   app.use(express.static(path.join(__dirname, 'public')));
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
   app.get('/health', (req, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
@@ -493,7 +433,7 @@ function startApi(bot, wallet) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function main() {
-  log('info', `🤖 SolBot-Basic v${VERSION} — Jupiter Fix`, { env: CONFIG.NODE_ENV });
+  log('info', `🤖 SolBot-Basic v${VERSION} — Jupiter Debug`, { env: CONFIG.NODE_ENV });
   const wallet = loadWallet();
   const rpc = getRpcConnection();
   const bot = new BotLoop(wallet, rpc);
