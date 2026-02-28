@@ -125,7 +125,10 @@ async function getTokenPrice(mint) {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(10000) });
     if (!res.ok) return null;
     const data = await res.json();
-    const pair = data?.pairs?.find(p => p.chainId === 'solana');
+    const solanaPairs = data?.pairs?.filter(p => p.chainId === 'solana') || [];
+    if (!solanaPairs.length) return null;
+    // Prendre la paire avec la meilleure liquidité (évite les faux pairs vides)
+    const pair = solanaPairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
     if (!pair?.priceUsd) return null;
     
     const result = { price: parseFloat(pair.priceUsd), liquidity: pair.liquidity?.usd || 0, change24h: pair.priceChange?.h24 || 0, logo: pair.info?.imageUrl || null, symbol: pair.baseToken?.symbol || null, name: pair.baseToken?.name || null };
@@ -334,10 +337,12 @@ class BotLoop {
       
       const tokens = [];
       for (const acc of accounts.value) {
-        const mint    = acc.account.data.parsed.info.mint;
+        const mint      = acc.account.data.parsed.info.mint;
         if (mint === SOL_MINT) continue;
-        const balance = parseFloat(acc.account.data.parsed.info.tokenAmount.uiAmount);
-        if (balance <= 0) continue;
+        const tokenAmount = acc.account.data.parsed.info.tokenAmount;
+        // uiAmount est null pour certains tokens pump.fun → fallback sur uiAmountString
+        const balance = parseFloat(tokenAmount.uiAmount ?? tokenAmount.uiAmountString ?? '0');
+        if (!balance || balance <= 0) continue;
         
         const priceData = await getTokenPrice(mint);
         const price     = priceData?.price || 0;
