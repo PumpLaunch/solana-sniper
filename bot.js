@@ -521,23 +521,50 @@ class PositionManager {
     log('info', 'Positions restaurées', { count: this.entryPrices.size });
   }
 
+  // forcedEntryPrice: prix réel du swap (depuis /api/buy)
+  // Si absent → position "bootstrappée" (bot redémarré sur token existant)
+  //   → entryPrice = prix marché courant MAIS bootstrapped=true
+  //   → TP est désactivé pour ce token jusqu'à ce qu'on fixe le vrai prix
   trackEntry(mint, currentPrice, currentBalance, forcedEntryPrice = null) {
     if (this.entryPrices.has(mint)) return false;
-    // Use forcedEntryPrice (from actual swap) when available, else use current market price
     const entryPrice = (forcedEntryPrice && forcedEntryPrice > 0) ? forcedEntryPrice : currentPrice;
     if (!entryPrice || entryPrice <= 0 || !currentBalance) return false;
+    const isBootstrapped = !(forcedEntryPrice > 0);
     this.entryPrices.set(mint, {
       price: entryPrice, ts: Date.now(),
       originalBalance: currentBalance,
       triggeredTiers: [], soldAmount: 0, peakPnl: 0,
+      bootstrapped: isBootstrapped, // TP désactivé jusqu'à correction manuelle ou scan chain
     });
     this.triggeredTiers.set(mint, new Set());
     this.soldAmounts.set(mint, 0);
     this.peakPnl.set(mint, 0);
-    log('info', 'Position ouverte', {
-      mint: mint.slice(0,8),
-      entryPrice: entryPrice.toPrecision(6),
-      forced: forcedEntryPrice > 0,
+    if (!isBootstrapped) {
+      log('info', '✅ Position enregistrée (swap réel)', {
+        mint: mint.slice(0,8), entryPrice: entryPrice.toPrecision(6),
+      });
+    }
+    // Positions bootstrappées : loggées silencieusement (évite spam au démarrage)
+    return true;
+  }
+
+  /** Corrige le prix d'entrée d'une position bootstrappée ou existante */
+  setEntryPrice(mint, newPrice, newBalance = null) {
+    const existing = this.entryPrices.get(mint);
+    if (!existing) return false;
+    const oldPrice = existing.price;
+    existing.price = newPrice;
+    existing.bootstrapped = false;
+    // Reset triggered tiers when entry price is corrected
+    this.triggeredTiers.set(mint, new Set());
+    existing.triggeredTiers = [];
+    if (newBalance && newBalance > 0) {
+      existing.originalBalance = newBalance;
+      this.soldAmounts.set(mint, 0);
+      existing.soldAmount = 0;
+    }
+    log('info', '📌 Prix d\'entrée corrigé', {
+      mint: mint.slice(0,8), old: oldPrice.toPrecision(6), new: newPrice.toPrecision(6),
     });
     return true;
   }
@@ -565,12 +592,14 @@ class PositionManager {
     }
   }
 
-  /** Take-profit paliers */
+  /** Take-profit paliers — ignoré si position bootstrappée sans vrai prix */
   checkTakeProfitTiers(mint, currentPrice) {
     const entry     = this.entryPrices.get(mint);
     const triggered = this.triggeredTiers.get(mint);
     const pnl       = this.getPnl(mint, currentPrice);
     if (!entry || pnl === null || !triggered) return [];
+    // Skip TP for bootstrapped positions (entry = arbitrary market price, not real buy price)
+    if (entry.bootstrapped) return [];
 
     const toExecute = [];
     for (let i = 0; i < this.tiers.length; i++) {
@@ -590,6 +619,8 @@ class PositionManager {
   checkStopLoss(mint, currentPrice) {
     if (!CONFIG.STOP_LOSS_ENABLED) return null;
     if (this.stopLossHit.has(mint) || this.slPending.has(mint)) return null;
+    const entry = this.entryPrices.get(mint);
+    if (entry?.bootstrapped) return null; // pas de SL sur position sans vrai prix d'entrée
     const pnl = this.getPnl(mint, currentPrice);
     if (pnl === null || pnl > CONFIG.STOP_LOSS_PCT) return null;
     const remaining = this.getRemainingBalance(mint);
@@ -1086,18 +1117,6 @@ class BotLoop {
         if (pnl !== null) this.positions.updatePeak(mint, pnl);
 
         if (price > 0) {
-          // ── Log TP diagnostic chaque cycle ─────────────────────────────
-          if (CONFIG.TAKE_PROFIT_ENABLED && pnl !== null) {
-            const triggered  = this.positions.triggeredTiers.get(mint) || new Set();
-            const remaining  = this.positions.getRemainingBalance(mint);
-            const nextTier   = CONFIG.TAKE_PROFIT_TIERS.find((t, i) => !triggered.has(i) && pnl < t.pnl);
-            log('debug', `📊 TP check ${priceData?.symbol || mint.slice(0,8)}`, {
-              pnl: pnl.toFixed(1) + '%',
-              nextTier: nextTier ? `+${nextTier.pnl}%` : 'tous déclenché',
-              remaining: remaining.toFixed(4),
-              cbFails: this.swap.sellFailures,
-            });
-          }
           // ── Anti-rug (priorité maximale) ──────────────────────────────
           const rugAlert = this.positions.checkAntiRug(mint, price);
           if (rugAlert) {
@@ -1541,6 +1560,125 @@ function startApi(bot, wallet) {
     bot.swap.sellFailures = 0;
     log('info', 'Circuit-breaker réinitialisé');
     res.json({ success: true });
+  });
+
+  // ─── POSITION MANAGEMENT ─────────────────────────────────────────────────
+
+  app.get('/api/positions', (req, res) => {
+    const positions = [];
+    for (const [mint, data] of bot.positions.entryPrices) {
+      const tok      = bot.portfolio.find(t => t.mintFull === mint);
+      const pd       = getTokenPrice(mint);
+      const curPrice = tok?.price || pd?.price || 0;
+      const pnl      = data.price > 0 && curPrice > 0
+        ? ((curPrice - data.price) / data.price) * 100 : null;
+      positions.push({
+        mint,
+        symbol:          tok?.symbol || pd?.symbol || null,
+        entryPrice:      data.price,
+        currentPrice:    curPrice,
+        pnl:             pnl !== null ? +pnl.toFixed(2) : null,
+        bootstrapped:    !!data.bootstrapped,
+        originalBalance: data.originalBalance,
+        remaining:       bot.positions.getRemainingBalance(mint),
+        soldAmount:      bot.positions.soldAmounts.get(mint) || 0,
+        triggeredTiers:  Array.from(bot.positions.triggeredTiers.get(mint) || []),
+        stopLossHit:     bot.positions.stopLossHit.has(mint),
+        peakPnl:         bot.positions.peakPnl.get(mint) || 0,
+        entryTs:         data.ts,
+      });
+    }
+    const booted = positions.filter(p => p.bootstrapped).length;
+    res.json({ count: positions.length, bootstrapped: booted, real: positions.length - booted,
+      positions: positions.sort((a, b) => (b.pnl || 0) - (a.pnl || 0)) });
+  });
+
+  app.post('/api/positions/set-entry', (req, res) => {
+    const { mint, entryPrice, balance } = req.body;
+    if (!mint || entryPrice === undefined) return res.status(400).json({ error: 'mint et entryPrice requis' });
+    const price = parseFloat(entryPrice);
+    if (isNaN(price) || price <= 0) return res.status(400).json({ error: 'entryPrice invalide' });
+    const bal = balance !== undefined ? parseFloat(balance) : null;
+    let ok = bot.positions.setEntryPrice(mint, price, bal);
+    if (!ok) {
+      const tok = bot.portfolio.find(t => t.mintFull === mint);
+      if (!tok) return res.status(404).json({ error: 'Token non trouvé' });
+      bot.positions.trackEntry(mint, price, bal || tok.balance, price);
+    }
+    bot._persist();
+    const entry = bot.positions.entryPrices.get(mint);
+    res.json({ success: true, mint, entryPrice: entry.price, bootstrapped: !!entry.bootstrapped,
+      message: 'Prix fixe — TP/SL actifs' });
+  });
+
+  app.get('/api/positions/scan-history', async (req, res) => {
+    if (!CONFIG.HELIUS_API_KEY) return res.status(400).json({ error: 'HELIUS_API_KEY requis' });
+    const bootstrapped = [];
+    for (const [mint, data] of bot.positions.entryPrices) {
+      if (data.bootstrapped) bootstrapped.push(mint);
+    }
+    if (!bootstrapped.length) return res.json({ message: 'Aucune position bootstrappée', fixed: 0 });
+    log('info', 'Scan Helius ' + bootstrapped.length + ' positions');
+    const walletAddress = wallet.publicKey.toString();
+    const results = [];
+    for (const mint of bootstrapped) {
+      try {
+        const url = 'https://api.helius.xyz/v0/addresses/' + walletAddress +
+          '/transactions?api-key=' + CONFIG.HELIUS_API_KEY + '&limit=100&type=SWAP';
+        const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (!r.ok) { results.push({ mint, status: 'error', error: 'HTTP ' + r.status }); continue; }
+        const txs = await r.json();
+        let found = null;
+        for (const tx of (Array.isArray(txs) ? txs : [])) {
+          const recv = (tx.tokenTransfers || []).find(t =>
+            t.mint === mint && t.toUserAccount === walletAddress && t.tokenAmount > 0);
+          if (!recv) continue;
+          const solOut = (tx.nativeTransfers || [])
+            .filter(n => n.fromUserAccount === walletAddress)
+            .reduce((s, n) => s + (n.amount || 0), 0) / 1e9;
+          if (solOut > 0 && recv.tokenAmount > 0) {
+            found = { solSpent: solOut, tokReceived: recv.tokenAmount,
+              entryPrice: solOut / recv.tokenAmount, tx: tx.signature, ts: tx.timestamp };
+            break;
+          }
+        }
+        if (found && found.entryPrice > 0) {
+          const old = bot.positions.entryPrices.get(mint)?.price;
+          bot.positions.setEntryPrice(mint, found.entryPrice);
+          if (!bot.costBasis.has(mint)) {
+            bot.costBasis.set(mint, { solSpent: found.solSpent, tokBought: found.tokReceived,
+              buyTs: (found.ts || Date.now()/1000) * 1000 });
+          }
+          results.push({ mint: mint.slice(0,8), symbol: getTokenPrice(mint)?.symbol,
+            status: 'fixed', entryPrice: found.entryPrice, priceBefore: old, solSpent: found.solSpent });
+          log('success', 'Prix retrouvé ' + mint.slice(0,8), { price: found.entryPrice.toPrecision(4) });
+        } else {
+          results.push({ mint: mint.slice(0,8), status: 'not_found' });
+        }
+        await sleep(250);
+      } catch (err) {
+        results.push({ mint: mint.slice(0,8), status: 'error', error: err.message });
+      }
+    }
+    const fixed = results.filter(r => r.status === 'fixed').length;
+    if (fixed > 0) bot._persist();
+    log('info', 'Scan terminé: ' + fixed + '/' + bootstrapped.length);
+    res.json({ total: bootstrapped.length, fixed, results });
+  });
+
+  app.post('/api/positions/delete', (req, res) => {
+    const { mint } = req.body;
+    if (!mint) return res.status(400).json({ error: 'mint requis' });
+    if (!bot.positions.entryPrices.has(mint)) return res.status(404).json({ error: 'Position non trouvée' });
+    bot.positions.entryPrices.delete(mint);
+    bot.positions.triggeredTiers.delete(mint);
+    bot.positions.soldAmounts.delete(mint);
+    bot.positions.peakPnl.delete(mint);
+    bot.positions.stopLossHit.delete(mint);
+    bot.positions.slPending.delete(mint);
+    bot._persist();
+    log('info', 'Position supprimée', { mint: mint.slice(0,8) });
+    res.json({ success: true, mint });
   });
 
   // ── LEGACY ───────────────────────────────────────────────────────────────
