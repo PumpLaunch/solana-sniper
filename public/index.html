@@ -90,7 +90,7 @@ body{font-family:var(--sans);background:var(--void);color:var(--t1);min-height:1
 <body>
 <div class="app">
 <nav class="topnav">
-  <div class="nav-brand"><div class="nav-logo">SB</div><span class="nav-name">Sol<em>Bot</em> Pro</span><span class="nav-tag">v1.4.1</span></div>
+  <div class="nav-brand"><div class="nav-logo">SB</div><span class="nav-name">Sol<em>Bot</em> Pro</span><span class="nav-tag">v2.1.0</span></div>
   <div class="nav-right">
     <div class="status-pill"><div class="status-dot"></div><span id="navStatus">LIVE</span></div>
     <div class="wallet-display"><span class="wallet-label">WALLET</span><code class="wallet-addr" id="walletAddr">—</code><button class="wallet-copy" id="copyBtn">📋</button></div>
@@ -128,15 +128,16 @@ body{font-family:var(--sans);background:var(--void);color:var(--t1);min-height:1
   <div class="col-right">
     <div class="rp-section"><div class="rp-head"><span class="rp-title">Take-Profit</span><span class="kv-v on" id="tpBadge">0</span></div><div class="tp-list" id="tpList"></div></div>
     <div class="rp-section"><div class="rp-head"><span class="rp-title">Analytics</span></div><div id="tpStats" style="padding:12px 16px;font-family:var(--mono);font-size:11px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="color:var(--t3);font-size:9px">Déclenchés</div><div id="tpTotalTriggered" style="color:var(--green)">—</div></div><div><div style="color:var(--t3);font-size:9px">Réussis</div><div id="tpTotalSold" style="color:var(--green)">—</div></div></div><div id="tpRecent" style="margin-top:8px;max-height:100px;overflow-y:auto"></div></div></div>
-    <div class="rp-section"><div class="rp-head"><span class="rp-title">Système</span></div><div class="kv"><span class="kv-k">Statut</span><span class="kv-v on" id="sysStatus">ONLINE</span></div><div class="kv"><span class="kv-k">RPC</span><span class="kv-v" id="sysRpc">—</span></div><div class="kv"><span class="kv-k">Intervalle</span><span class="kv-v" id="sysInterval">30s</span></div><div class="kv"><span class="kv-k">Hysteresis</span><span class="kv-v" id="sysHyst">5%</span></div><div class="kv"><span class="kv-k">Version</span><span class="kv-v">v1.4.1</span></div></div>
+    <div class="rp-section"><div class="rp-head"><span class="rp-title">Système</span></div><div class="kv"><span class="kv-k">Statut</span><span class="kv-v on" id="sysStatus">ONLINE</span></div><div class="kv"><span class="kv-k">RPC</span><span class="kv-v" id="sysRpc">—</span></div><div class="kv"><span class="kv-k">Intervalle</span><span class="kv-v" id="sysInterval">30s</span></div><div class="kv"><span class="kv-k">Hysteresis</span><span class="kv-v" id="sysHyst">5%</span></div><div class="kv"><span class="kv-k">Version</span><span class="kv-v">v2.1.0</span></div></div>
     <div class="rp-section"><div class="rp-head"><span class="rp-title">Config TP</span></div><div class="tier-row" id="tiersRow"></div></div>
     <div class="rp-section"><div class="rp-head"><span class="rp-title">Logs</span></div><div class="log-body" id="logBody"></div></div>
   </div>
 </div>
-<footer class="footer"><div>SOLBOT v1.4.1</div><div id="footerTime">—</div></footer>
+<footer class="footer"><div>SOLBOT v2.1.0</div><div id="footerTime">—</div></footer>
 </div>
 
 <script>
+// ✅ CORRECTION : PAS d'espace à la fin de l'URL !
 const API_BASE = "https://solana-sniper-7o8s.onrender.com";
 let autoRefresh = true, logBuffer = [], currentTab = "active", sortKey = "value", sortAsc = false, lastTokens = [], lastTp = {};
 const $ = id => document.getElementById(id);
@@ -224,8 +225,6 @@ function updateAll(stats, portfolio, tp) {
   
   $("sysStatus").textContent = "ONLINE";
   $("sysStatus").className = "kv-v on";
-  
-  // ✅ CORRECTION ICI : Utiliser stats.rpcSource au lieu de CONFIG
   $("sysRpc").textContent = stats.rpcSource || "Public";
   
   const liveEntries = (tp.entries||[]).filter(e=>e.remaining>0||e.sold>0);
