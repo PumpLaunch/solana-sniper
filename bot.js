@@ -1083,16 +1083,11 @@ function startApi(bot, wallet) {
   const app = express();
   app.use(express.json({ limit: '128kb' }));
 
-  // CORS
-  const ORIGINS = new Set([
-    'https://pumplaunch.github.io',
-    'http://localhost:3000', 'http://localhost:10000',
-    ...CONFIG.EXTRA_ORIGINS.split(',').map(s => s.trim()).filter(Boolean),
-  ]);
+  // CORS — wildcard: API publique sans auth ni cookies.
+  // Nécessaire car Render sleep envoie ses propres pages HTML sans header CORS,
+  // et le strict matching par origine bloque le dashboard GitHub Pages.
   app.use((req, res, next) => {
-    const orig  = req.headers.origin;
-    const allow = !orig || ORIGINS.has(orig) ? (orig || '*') : null;
-    if (allow) res.setHeader('Access-Control-Allow-Origin', allow);
+    res.setHeader('Access-Control-Allow-Origin',  '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
