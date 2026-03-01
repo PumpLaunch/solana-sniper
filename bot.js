@@ -281,7 +281,7 @@ function saveState(state) {
 
 const priceCache   = new Map(); // mint → { data, ts }
 const decimalsCache = new Map();
-const batchedSet   = new Set(); // tokens déjà tentés en batch DexScreener (évite retries inutiles)
+// batchedSet est maintenant LOCAL dans prefetchAllPrices (réinitialisé chaque cycle)
 
 async function getTokenDecimals(mint, connection) {
   if (decimalsCache.has(mint)) return decimalsCache.get(mint);
@@ -329,11 +329,12 @@ async function batchDexScreener(mints) {
             symbol:    pair.baseToken?.symbol  || null,
             name:      pair.baseToken?.name    || null,
             dexId:     pair.dexId              || null,
+            source:    'dexscreener',
           };
         }
       }
-      chunk.forEach(m => batchedSet.add(m));
-    } catch { chunk.forEach(m => batchedSet.add(m)); }
+      // NE PAS ajouter à batchedSet ici — géré localement dans prefetchAllPrices
+    } catch { /* chunk raté — individuel prendra le relais */ }
     if (chunks.length > 1) await sleep(380);
   }
   return results;
@@ -396,24 +397,30 @@ async function prefetchAllPrices(mints) {
 
   log('debug', 'Prefetch prix', { total: toFetch.length });
 
+  // batchedSet LOCAL — réinitialisé à chaque cycle pour permettre les retries
+  // (évite le bug où batchedSet global bloque l'étape individuelle pour toujours)
+  const triedIndividually = new Set();
+
   // ── Étape 1 : DexScreener batch (tous les tokens d'un coup) ──
   const dexData = await batchDexScreener(toFetch);
+  const afterBatch = Object.keys(dexData).length;
+  log('debug', 'DexScreener batch', { asked: toFetch.length, found: afterBatch });
 
   // ── Étape 2 : DexScreener individuel pour les tokens absents du batch
-  //    (tokens très récents non encore indexés dans le batch)
-  const missing1 = toFetch.filter(m => !dexData[m] && !batchedSet.has(m));
+  //    Tous les tokens non trouvés passent ici — batchedSet global supprimé
+  const missing1 = toFetch.filter(m => !dexData[m]);
   if (missing1.length) {
-    const lim = pLimit(6);
+    const lim = pLimit(5);
     await Promise.all(missing1.map(m => lim(async () => {
+      triedIndividually.add(m);
       try {
         const r = await fetch(
           `https://api.dexscreener.com/latest/dex/tokens/${m}`,
           { signal: AbortSignal.timeout(8000) }
         );
-        if (!r.ok) { batchedSet.add(m); return; }
+        if (!r.ok) return;
         const d     = await r.json();
         const pairs = (d?.pairs || []).filter(p => p.chainId === 'solana');
-        batchedSet.add(m);
         if (!pairs.length) return;
         const best = pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
         if (!best?.priceUsd) return;
@@ -425,9 +432,12 @@ async function prefetchAllPrices(mints) {
           logo:      best.info?.imageUrl    || null,
           symbol:    best.baseToken?.symbol || null,
           name:      best.baseToken?.name   || null,
+          source:    'dexscreener-ind',
         };
-      } catch { batchedSet.add(m); }
+      } catch { /* timeout/erreur réseau — pump.fun prendra le relais */ }
     })));
+    const foundInd = missing1.filter(m => dexData[m]).length;
+    if (foundInd > 0) log('debug', 'DexScreener individuel', { tried: missing1.length, found: foundInd });
   }
 
   // ── Étape 3 : Pump.fun pour TOUS les tokens encore manquants
