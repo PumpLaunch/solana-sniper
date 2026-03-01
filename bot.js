@@ -713,18 +713,32 @@ class SwapEngine {
     this.lastBuyTs    = 0;   // cooldown achats
   }
 
-  /** Quote Jupiter v6 — retourne le raw quote object */
+  /** Quote Jupiter — essaie plusieurs endpoints (quote-api.jup.ag bloqué sur Render free tier) */
   async getQuote({ inputMint, outputMint, amountRaw, slippageBps }) {
-    const url = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
-    const r = await fetch(url, {
-      headers: { 'User-Agent': `SolBot/${VERSION}` },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!r.ok) throw new Error(`Quote HTTP ${r.status}`);
-    const q = await r.json();
-    if (q.error) throw new Error(q.error);
-    if (!q.outAmount) throw new Error(`Aucun devis pour ce token (${inputMint.slice(0,8)})`);
-    return q;
+    const params = `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
+    const QUOTE_ENDPOINTS = [
+      `https://lite-api.jup.ag/swap/v1/quote?${params}`,   // endpoint léger, moins bloqué
+      `https://api.jup.ag/swap/v1/quote?${params}`,         // nouvel endpoint unifié
+      `https://quote-api.jup.ag/v6/quote?${params}`,        // ancien endpoint (bloqué Render)
+    ];
+    let lastErr = null;
+    for (const url of QUOTE_ENDPOINTS) {
+      try {
+        const r = await fetch(url, {
+          headers: { 'User-Agent': `SolBot/${VERSION}`, 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!r.ok) { lastErr = new Error(`Quote HTTP ${r.status} (${url.split('/')[2]})`); continue; }
+        const q = await r.json();
+        if (q.error) { lastErr = new Error(q.error); continue; }
+        if (!q.outAmount) { lastErr = new Error(`Aucun devis (${inputMint.slice(0,8)})`); continue; }
+        return q;
+      } catch (err) {
+        lastErr = err;
+        log('debug', 'Quote endpoint failed', { url: url.split('/')[2], err: err.message });
+      }
+    }
+    throw lastErr || new Error('Tous les endpoints Jupiter quote ont échoué');
   }
 
   /**
@@ -737,21 +751,40 @@ class SwapEngine {
       // Refetch quote à chaque tentative (évite "quote expired")
       const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
 
-      const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
-        body: JSON.stringify({
-          quoteResponse:             quote,
-          userPublicKey:             this.wallet.publicKey.toString(),
-          wrapAndUnwrapSol:          true,
-          dynamicComputeUnitLimit:   true,
-          prioritizationFeeLamports: 'auto',
-        }),
-        signal: AbortSignal.timeout(30000),
+      // Swap — même cascade d'endpoints que le quote
+      const SWAP_ENDPOINTS = [
+        'https://lite-api.jup.ag/swap/v1/swap',
+        'https://api.jup.ag/swap/v1/swap',
+        'https://quote-api.jup.ag/v6/swap',
+      ];
+      let swapData = null;
+      let swapErr  = null;
+      const swapBody = JSON.stringify({
+        quoteResponse:             quote,
+        userPublicKey:             this.wallet.publicKey.toString(),
+        wrapAndUnwrapSol:          true,
+        dynamicComputeUnitLimit:   true,
+        prioritizationFeeLamports: 'auto',
       });
-      if (!swapRes.ok) throw new Error(`Swap HTTP ${swapRes.status}`);
-      const swapData = await swapRes.json();
-      if (!swapData?.swapTransaction) throw new Error('swapTransaction manquant');
+      for (const swapUrl of SWAP_ENDPOINTS) {
+        try {
+          const swapRes = await fetch(swapUrl, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
+            body:    swapBody,
+            signal:  AbortSignal.timeout(30000),
+          });
+          if (!swapRes.ok) { swapErr = new Error(`Swap HTTP ${swapRes.status}`); continue; }
+          swapData = await swapRes.json();
+          if (swapData?.swapTransaction) break; // succès
+          swapErr  = new Error('swapTransaction manquant');
+          swapData = null;
+        } catch (err) {
+          swapErr = err;
+          log('debug', 'Swap endpoint failed', { url: swapUrl.split('/')[2], err: err.message });
+        }
+      }
+      if (!swapData?.swapTransaction) throw swapErr || new Error('Swap échoué sur tous les endpoints');
 
       const tx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
 
