@@ -1,71 +1,196 @@
 /**
- * 🤖 SolBot-Pro v1.4.2 — Take-Profit Avancé + Dashboard Cyberpunk
- * ✅ Correction: getRemainingBalance() ajoutée
- * ✅ rpcSource exposé pour le dashboard
- * ✅ DexScreener cache persistant
- * ✅ Jupiter headers complets
+ * SolBot v2.1 — Production-Grade Solana Trading Bot
+ *
+ * Fixes vs v2.0:
+ *  [BUG] batchJupiterPrices: fallback v6 sautait si un chunk réussissait
+ *  [BUG] Blockhash extrait du tx Jupiter (tx.message.recentBlockhash) et non refetch
+ *  [BUG] stopLossHit désormais persisté — évite double-vente après redémarrage
+ *  [BUG] Retry _executeSwap refetch le quote (quotes Jupiter expirent en ~60s)
+ *  [BUG] Stop-loss marque "pending" même si la vente échoue (évite retry infini)
+ *  [PERF] DexScreener individuel ignoré si token déjà traité par le batch (sans résultat)
+ *  [FEAT] Trailing stop-loss (TRAILING_STOP_PCT)
+ *  [FEAT] Achat DCA (split en N chunks, intervalles configurables)
+ *  [FEAT] Webhook notifications Discord/Telegram sur TP, SL, anti-rug
+ *  [FEAT] Détection anti-rug (chute soudaine > ANTI_RUG_PCT en un cycle)
+ *  [FEAT] GET /api/config pour lire la config courante
+ *  [FEAT] Statistiques PnL globales dans /api/stats
  */
 'use strict';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPERS D'AMORÇAGE (avant CONFIG pour hoisting sûr)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function safeParseJson(str, fallback) {
+  try { return JSON.parse(str); } catch { return fallback; }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
 const CONFIG = {
-  PRIVATE_KEY: process.env.PRIVATE_KEY,
+  // Clés / réseau
+  PRIVATE_KEY:    process.env.PRIVATE_KEY,
   HELIUS_API_KEY: process.env.HELIUS_API_KEY,
-  PORT: parseInt(process.env.PORT) || 10000,
-  INTERVAL_SEC: parseInt(process.env.INTERVAL_SEC) || 30,
-  NODE_ENV: process.env.NODE_ENV || 'production',
-  
-  TAKE_PROFIT_ENABLED: process.env.TAKE_PROFIT_ENABLED === 'true',
-  TAKE_PROFIT_TIERS: process.env.TAKE_PROFIT_TIERS 
-    ? JSON.parse(process.env.TAKE_PROFIT_TIERS) 
-    : [{ pnl: 20, sell: 25 }, { pnl: 40, sell: 25 }, { pnl: 60, sell: 25 }, { pnl: 100, sell: 25 }],
+  PORT:           parseInt(process.env.PORT) || 10000,
+  INTERVAL_SEC:   parseInt(process.env.INTERVAL_SEC) || 30,
+  NODE_ENV:       process.env.NODE_ENV || 'production',
+  DATA_FILE:      process.env.DATA_FILE || './bot_state.json',
+
+  // Take-profit par paliers
+  TAKE_PROFIT_ENABLED:    process.env.TAKE_PROFIT_ENABLED === 'true',
+  TAKE_PROFIT_TIERS:      safeParseJson(process.env.TAKE_PROFIT_TIERS,
+    [{ pnl: 20, sell: 25 }, { pnl: 40, sell: 25 }, { pnl: 60, sell: 25 }, { pnl: 100, sell: 25 }]),
   TAKE_PROFIT_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
-  
+
+  // Stop-loss fixe
+  STOP_LOSS_ENABLED: process.env.STOP_LOSS_ENABLED === 'true',
+  STOP_LOSS_PCT:     parseFloat(process.env.STOP_LOSS_PCT || '-50'),  // ex: -50 = -50%
+
+  // Trailing stop-loss (s'active uniquement si TRAILING_STOP_PCT est défini)
   TRAILING_STOP_ENABLED: process.env.TRAILING_STOP_ENABLED === 'true',
-  TRAILING_STOP_DROP: parseFloat(process.env.TRAILING_STOP_DROP || '10'),
-  TIME_FALLBACK_ENABLED: process.env.TIME_FALLBACK_ENABLED === 'true',
-  TIME_FALLBACK_HOURS: parseInt(process.env.TIME_FALLBACK_HOURS || '24'),
-  PER_TOKEN_CONFIG: process.env.PER_TOKEN_CONFIG ? JSON.parse(process.env.PER_TOKEN_CONFIG) : {},
-  SLIPPAGE_BPS: parseInt(process.env.SLIPPAGE_BPS || '500'),
+  TRAILING_STOP_PCT:     parseFloat(process.env.TRAILING_STOP_PCT || '20'), // recule de X% depuis le pic
+
+  // Anti-rug : vend immédiatement si la valeur chute de X% en UN seul cycle
+  ANTI_RUG_ENABLED: process.env.ANTI_RUG_ENABLED === 'true',
+  ANTI_RUG_PCT:     parseFloat(process.env.ANTI_RUG_PCT || '60'),  // ex: 60 = chute 60%+ en 1 cycle
+
+  // Garde-fous trading
+  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE  || '0.05'), // SOL minimum gardé en réserve
+  MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES   || '3'),
+  DEFAULT_SLIPPAGE: parseInt(process.env.DEFAULT_SLIPPAGE   || '500'),  // bps (5%)
+  PRICE_TTL_MS:     parseInt(process.env.PRICE_TTL_MS       || '40000'), // 40s TTL < 30s intervalle
+  BUY_COOLDOWN_MS:  parseInt(process.env.BUY_COOLDOWN_MS    || '5000'),  // 5s entre achats
+
+  // Webhook (Discord/Telegram ou URL custom)
+  WEBHOOK_URL:     process.env.WEBHOOK_URL    || null,
+  WEBHOOK_TYPE:    process.env.WEBHOOK_TYPE   || 'discord', // 'discord' | 'telegram' | 'raw'
+  TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || null,
+
+  // Origines CORS autorisées (séparées par virgule)
+  EXTRA_ORIGINS: process.env.EXTRA_ORIGINS || '',
+  DASHBOARD_URL: process.env.DASHBOARD_URL || null, // ex: https://pumplaunch.github.io/solbot
 };
 
-if (!CONFIG.PRIVATE_KEY) { console.error('❌ PRIVATE_KEY non définie'); process.exit(1); }
+if (!CONFIG.PRIVATE_KEY) {
+  console.error('❌ PRIVATE_KEY non définie'); process.exit(1);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DÉPENDANCES
 // ═══════════════════════════════════════════════════════════════════════════
 
 const { Connection, Keypair, PublicKey, VersionedTransaction } = require('@solana/web3.js');
-const bs58 = require('bs58');
+const bs58    = require('bs58');
 const express = require('express');
-const path = require('path');
-
-let fetch;
-if (typeof global.fetch === 'function') { fetch = global.fetch; } 
-else { fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args)); }
+const path    = require('path');
+const fs      = require('fs');
+const fetch   = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTES
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SOL_MINT = 'So11111111111111111111111111111111111111112';
-const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const SOL_MINT           = 'So11111111111111111111111111111111111111112';
+const TOKEN_PROGRAM      = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_PROGRAM_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
-const VERSION = '1.4.2';
+const VERSION            = '2.1.0';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGGER
 // ═══════════════════════════════════════════════════════════════════════════
 
+const LEVEL_ICONS = { info: 'ℹ️ ', warn: '⚠️ ', error: '❌', debug: '🔍', success: '✅' };
+
 function log(level, msg, data = null) {
-  const ts = new Date().toISOString();
-  const icon = { info: 'ℹ️', warn: '⚠️', error: '❌', debug: '🔍', success: '✅' }[level] || 'ℹ️';
-  const safeMsg = String(msg).replace(/PRIVATE_KEY[=:]\S+/gi, '[REDACTED]').replace(/api-key=[^&\s]+/gi, '[REDACTED]');
+  const ts       = new Date().toISOString();
+  const icon     = LEVEL_ICONS[level] || 'ℹ️ ';
+  const safeMsg  = String(msg)
+    .replace(/PRIVATE_KEY[=:]\S+/gi, 'PRIVATE_KEY=[REDACTED]')
+    .replace(/api-key=[^&\s]+/gi,    'api-key=[REDACTED]');
   const safeData = data ? JSON.stringify(data).slice(0, 400) : '';
-  console.log(`${icon} [${ts}] [${level.toUpperCase()}] ${safeMsg} ${safeData}`.trim());
+  console.log(`${icon} [${ts}] [${level.toUpperCase()}] ${safeMsg} ${safeData}`.trimEnd());
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UTILITAIRES
+// ═══════════════════════════════════════════════════════════════════════════
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/** Retry exponentiel — refetch le quote si fourni en callback */
+async function withRetry(fn, { retries = 2, baseMs = 600, label = '' } = {}) {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try { return await fn(i); }
+    catch (err) {
+      lastErr = err;
+      if (i < retries) {
+        const wait = baseMs * Math.pow(2, i);
+        log('warn', `${label} retry ${i+1}/${retries} dans ${wait}ms`, { error: err.message });
+        await sleep(wait);
+      }
+    }
+  }
+  throw lastErr;
+}
+
+/** Concurrence limitée (p-limit maison, sans dépendance npm) */
+function pLimit(concurrency) {
+  let active = 0;
+  const queue = [];
+  const run = () => {
+    while (active < concurrency && queue.length) {
+      active++;
+      const { fn, resolve, reject } = queue.shift();
+      fn().then(resolve, reject).finally(() => { active--; run(); });
+    }
+  };
+  return fn => new Promise((resolve, reject) => {
+    queue.push({ fn, resolve, reject }); run();
+  });
+}
+
+/** Mutex — empêche exécutions concurrentes (zéro double-sell) */
+class Mutex {
+  constructor() { this._chain = Promise.resolve(); }
+  lock() {
+    let release;
+    const wait = this._chain;
+    this._chain = new Promise(r => { release = r; });
+    return wait.then(() => release);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WEBHOOK NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function sendWebhook(title, description, color = 0x3b7eff, fields = []) {
+  if (!CONFIG.WEBHOOK_URL) return;
+  try {
+    let body;
+    if (CONFIG.WEBHOOK_TYPE === 'discord') {
+      body = JSON.stringify({
+        embeds: [{ title, description, color, fields,
+          footer: { text: `SolBot v${VERSION}` },
+          timestamp: new Date().toISOString() }],
+      });
+    } else if (CONFIG.WEBHOOK_TYPE === 'telegram') {
+      const text = `*${title}*\n${description}` + (fields.length
+        ? '\n' + fields.map(f => `• ${f.name}: ${f.value}`).join('\n') : '');
+      body = JSON.stringify({ chat_id: CONFIG.TELEGRAM_CHAT_ID, text, parse_mode: 'Markdown' });
+    } else {
+      body = JSON.stringify({ title, description, fields, ts: Date.now() });
+    }
+    await fetch(CONFIG.WEBHOOK_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body, signal: AbortSignal.timeout(8000),
+    });
+  } catch (err) {
+    log('warn', 'Webhook échec', { error: err.message });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -74,258 +199,661 @@ function log(level, msg, data = null) {
 
 function loadWallet() {
   try {
-    let secretKey = CONFIG.PRIVATE_KEY.startsWith('[') 
-      ? Uint8Array.from(JSON.parse(CONFIG.PRIVATE_KEY)) 
+    const secretKey = CONFIG.PRIVATE_KEY.startsWith('[')
+      ? Uint8Array.from(JSON.parse(CONFIG.PRIVATE_KEY))
       : bs58.decode(CONFIG.PRIVATE_KEY);
-    const keypair = Keypair.fromSecretKey(secretKey);
-    log('info', 'Wallet chargé', { address: keypair.publicKey.toString().slice(0,8)+'...' });
-    return keypair;
-  } catch (err) { log('error', 'Clé invalide', { error: err.message }); process.exit(1); }
+    const kp = Keypair.fromSecretKey(secretKey);
+    log('info', 'Wallet chargé', { address: kp.publicKey.toString().slice(0, 8) + '...' });
+    return kp;
+  } catch (err) {
+    log('error', 'Clé invalide', { error: err.message }); process.exit(1);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// RPC MANAGER
+// RPC MANAGER — singletons par endpoint
 // ═══════════════════════════════════════════════════════════════════════════
 
-function getRpcConnection() {
+function createRpcManager() {
   const endpoints = [
-    CONFIG.HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${CONFIG.HELIUS_API_KEY}` : null,
+    CONFIG.HELIUS_API_KEY
+      ? `https://mainnet.helius-rpc.com/?api-key=${CONFIG.HELIUS_API_KEY}` : null,
     'https://api.mainnet-beta.solana.com',
     'https://solana-mainnet.public.blastapi.io',
   ].filter(Boolean);
-  
-  let index = 0;
-  
+
+  // FIX: un objet Connection par endpoint (pas recréé à chaque appel)
+  const conns = endpoints.map(ep => new Connection(ep, { commitment: 'confirmed' }));
+  let idx = 0;
+
   return {
-    get connection() { return new Connection(endpoints[index], { commitment: 'confirmed' }); },
+    get connection() { return conns[idx]; },
+
     async healthCheck() {
-      for (let i = 0; i < endpoints.length; i++) {
+      for (let i = 0; i < conns.length; i++) {
         try {
-          const conn = new Connection(endpoints[i], { commitment: 'confirmed' });
-          const slot = await conn.getSlot();
-          if (slot > 0) { index = i; log('info', 'RPC OK', { slot, source: i === 0 && CONFIG.HELIUS_API_KEY ? 'Helius' : 'Public' }); return true; }
-        } catch (e) { log('warn', 'RPC échec', { endpoint: endpoints[i]?.slice(0, 40) + '...' }); }
+          const slot = await conns[i].getSlot();
+          if (slot > 0) { idx = i; log('debug', 'RPC OK', { slot, ep: i }); return true; }
+        } catch { log('warn', 'RPC down', { ep: endpoints[i].slice(0, 40) }); }
       }
+      log('error', 'Tous les RPC sont indisponibles');
       return false;
     },
-    failover() { index = (index + 1) % endpoints.length; log('warn', 'RPC failover', { index }); }
+
+    failover() {
+      idx = (idx + 1) % conns.length;
+      log('warn', 'RPC failover', { ep: endpoints[idx].slice(0, 40) });
+    },
   };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PRIX — DexScreener + Cache Persistant
+// PERSISTANCE — survit aux redémarrages Render
 // ═══════════════════════════════════════════════════════════════════════════
 
-const priceCache = new Map();
-
-async function fetchPriceFromDexScreener(mint) {
-  const cleanMint = String(mint || '').trim();
-  if (!cleanMint || cleanMint.length < 32 || cleanMint === SOL_MINT) return null;
-  
-  const cached = priceCache.get(cleanMint);
-  if (cached && Date.now() - cached.ts < 300000) return cached.data;
-  
+function loadState() {
   try {
-    const url = `https://api.dexscreener.com/latest/dex/tokens/${cleanMint}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) return null;
-    
-    const data = await res.json();
-    const pair = data?.pairs?.find(p => p.chainId === 'solana' && p.baseToken?.address?.toLowerCase() === cleanMint.toLowerCase());
-    if (!pair || !pair.priceUsd) return null;
-    
-    let price = null;
-    if (typeof pair.priceUsd === 'number' && isFinite(pair.priceUsd) && pair.priceUsd > 0) price = pair.priceUsd;
-    else if (typeof pair.priceUsd === 'string') {
-      const parsed = parseFloat(pair.priceUsd.trim());
-      if (isFinite(parsed) && parsed > 0) price = parsed;
+    if (fs.existsSync(CONFIG.DATA_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(CONFIG.DATA_FILE, 'utf8'));
+      log('info', 'État restauré', {
+        positions: Object.keys(raw.entryPrices || {}).length,
+        trades: (raw.trades || []).length,
+      });
+      return raw;
     }
-    if (!price) return null;
-    
-    const result = { price, liquidity: pair.liquidity?.usd || 0, change24h: pair.priceChange?.h24 || 0, logo: pair.info?.imageUrl || pair.baseToken?.logoUri || null, symbol: pair.baseToken?.symbol || null, name: pair.baseToken?.name || null, source: 'dexscreener' };
-    priceCache.set(cleanMint, {  result, ts: Date.now() });
-    return result;
-  } catch (err) { return null; }
+  } catch (err) {
+    log('warn', 'Lecture état échouée — démarrage propre', { error: err.message });
+  }
+  return { entryPrices: {}, trades: [], stopLossHit: [], slPending: [] };
+}
+
+function saveState(state) {
+  try {
+    fs.writeFileSync(CONFIG.DATA_FILE, JSON.stringify(state, null, 2), 'utf8');
+  } catch (err) {
+    log('warn', 'Sauvegarde échouée', { error: err.message });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TAKE-PROFIT MANAGER — VERSION PRO v1.4.2 (CORRIGÉE)
+// PRIX — batch multi-sources avec fallback
 // ═══════════════════════════════════════════════════════════════════════════
 
-class TieredTakeProfitManager {
-  constructor(config = {}) {
-    this.defaultTiers = config.tiers || CONFIG.TAKE_PROFIT_TIERS;
-    this.hysteresis = config.hysteresis ?? CONFIG.TAKE_PROFIT_HYSTERESIS;
-    this.trailingStop = config.trailingStop ?? { enabled: CONFIG.TRAILING_STOP_ENABLED, drop: CONFIG.TRAILING_STOP_DROP };
-    this.timeFallback = config.timeFallback ?? { enabled: CONFIG.TIME_FALLBACK_ENABLED, hours: CONFIG.TIME_FALLBACK_HOURS };
-    this.perTokenConfig = config.perTokenConfig || CONFIG.PER_TOKEN_CONFIG;
-    this.entryPrices = new Map();
-    this.triggeredTiers = new Map();
-    this.soldAmounts = new Map();
-    this.tpHistory = [];
-    this.maxHistory = 100;
+const priceCache   = new Map(); // mint → { data, ts }
+const decimalsCache = new Map();
+const batchedSet   = new Set(); // tokens déjà tentés en batch DexScreener (évite retries inutiles)
+
+async function getTokenDecimals(mint, connection) {
+  if (decimalsCache.has(mint)) return decimalsCache.get(mint);
+  try {
+    const info = await connection.getParsedAccountInfo(new PublicKey(mint));
+    const dec  = info?.value?.data?.parsed?.info?.decimals;
+    if (typeof dec === 'number') { decimalsCache.set(mint, dec); return dec; }
+  } catch {}
+  const fb = mint.endsWith('pump') ? 6 : 9;
+  decimalsCache.set(mint, fb);
+  return fb;
+}
+
+// ─── Source 1 : DexScreener batch (primaire — fonctionne sur Render) ─────────
+// NOTE: Jupiter Price API (api.jup.ag/price) est bloqué sur les IPs Render.com
+//       (retourne systématiquement 0 résultat en ~100ms). Supprimé définitivement.
+//       Pipeline : DexScreener batch → DexScreener individuel → Pump.fun → Birdeye
+
+async function batchDexScreener(mints) {
+  if (!mints.length) return {};
+  const results = {};
+  const chunks  = [];
+  for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+
+  for (const chunk of chunks) {
+    try {
+      const r = await fetch(
+        `https://api.dexscreener.com/latest/dex/tokens/${chunk.join(',')}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+      if (!r.ok) { await sleep(600); continue; }
+      const data  = await r.json();
+      const pairs = (data?.pairs || []).filter(p => p.chainId === 'solana');
+      for (const pair of pairs) {
+        const mint = pair.baseToken?.address;
+        if (!mint || !pair.priceUsd) continue;
+        const ex = results[mint];
+        if (!ex || (pair.liquidity?.usd || 0) > (ex.liquidity || 0)) {
+          results[mint] = {
+            price:     parseFloat(pair.priceUsd),
+            liquidity: pair.liquidity?.usd    || 0,
+            volume24h: pair.volume?.h24        || 0,
+            change24h: pair.priceChange?.h24   || 0,
+            logo:      pair.info?.imageUrl     || null,
+            symbol:    pair.baseToken?.symbol  || null,
+            name:      pair.baseToken?.name    || null,
+            dexId:     pair.dexId              || null,
+          };
+        }
+      }
+      chunk.forEach(m => batchedSet.add(m));
+    } catch { chunk.forEach(m => batchedSet.add(m)); }
+    if (chunks.length > 1) await sleep(380);
   }
-  
-  _getConfigForMint(mint) {
-    const custom = this.perTokenConfig[mint];
-    if (!custom) return { tiers: this.defaultTiers, trailing: this.trailingStop, timeFallback: this.timeFallback, hysteresis: this.hysteresis };
-    return { tiers: custom.tiers || this.defaultTiers, trailing: custom.trailing ?? this.trailingStop, timeFallback: custom.timeFallback ?? this.timeFallback, hysteresis: custom.hysteresis ?? this.hysteresis };
+  return results;
+}
+
+// ─── Source 2 : Pump.fun individuel ──────────────────────────────────────────
+// Couvre les tokens en bonding curve (pas encore sur aucun DEX)
+async function fetchPumpFun(mint) {
+  try {
+    const r = await fetch(
+      `https://frontend-api.pump.fun/coins/${mint}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!r.ok) return null;
+    const c = await r.json();
+    if (!c?.usd_market_cap || !c?.total_supply) return null;
+    const price = c.usd_market_cap / c.total_supply;
+    if (!price || price <= 0) return null;
+    return {
+      price,
+      liquidity: c.virtual_sol_reserves ? c.virtual_sol_reserves / 1e9 * 150 : 0,
+      volume24h: 0,
+      change24h: 0,
+      logo:   c.image_uri || null,
+      symbol: c.symbol    || null,
+      name:   c.name      || null,
+      source: 'pumpfun',
+    };
+  } catch { return null; }
+}
+
+// ─── Source 3 : Birdeye (pas de clé requise pour les prix publics) ────────────
+// Fallback final pour les tokens non couverts par DexScreener ni Pump.fun
+async function fetchBirdeye(mint) {
+  try {
+    const r = await fetch(
+      `https://public-api.birdeye.so/defi/price?address=${mint}`,
+      {
+        headers: { 'X-Chain': 'solana' },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    const price = parseFloat(d?.data?.value ?? 0);
+    if (!price || price <= 0) return null;
+    return { price, liquidity: 0, volume24h: 0, change24h: 0,
+             logo: null, symbol: null, name: null, source: 'birdeye' };
+  } catch { return null; }
+}
+
+// ─── Orchestrateur principal ──────────────────────────────────────────────────
+async function prefetchAllPrices(mints) {
+  const now     = Date.now();
+  const toFetch = mints.filter(m => {
+    const c = priceCache.get(m);
+    return !c || now - c.ts > CONFIG.PRICE_TTL_MS;
+  });
+  if (!toFetch.length) return;
+
+  log('debug', 'Prefetch prix', { total: toFetch.length });
+
+  // ── Étape 1 : DexScreener batch (tous les tokens d'un coup) ──
+  const dexData = await batchDexScreener(toFetch);
+
+  // ── Étape 2 : DexScreener individuel pour les tokens absents du batch
+  //    (tokens très récents non encore indexés dans le batch)
+  const missing1 = toFetch.filter(m => !dexData[m] && !batchedSet.has(m));
+  if (missing1.length) {
+    const lim = pLimit(6);
+    await Promise.all(missing1.map(m => lim(async () => {
+      try {
+        const r = await fetch(
+          `https://api.dexscreener.com/latest/dex/tokens/${m}`,
+          { signal: AbortSignal.timeout(8000) }
+        );
+        if (!r.ok) { batchedSet.add(m); return; }
+        const d     = await r.json();
+        const pairs = (d?.pairs || []).filter(p => p.chainId === 'solana');
+        batchedSet.add(m);
+        if (!pairs.length) return;
+        const best = pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+        if (!best?.priceUsd) return;
+        dexData[m] = {
+          price:     parseFloat(best.priceUsd),
+          liquidity: best.liquidity?.usd    || 0,
+          volume24h: best.volume?.h24       || 0,
+          change24h: best.priceChange?.h24  || 0,
+          logo:      best.info?.imageUrl    || null,
+          symbol:    best.baseToken?.symbol || null,
+          name:      best.baseToken?.name   || null,
+        };
+      } catch { batchedSet.add(m); }
+    })));
   }
-  
-  trackEntry(mint, currentPrice, currentBalance) {
-    if (!this.entryPrices.has(mint) && currentPrice > 0 && currentBalance > 0) {
-      this.entryPrices.set(mint, { price: currentPrice, timestamp: Date.now(), originalBalance: currentBalance, highestPrice: currentPrice, lastTpTime: null, lastPrice: currentPrice });
-      this.triggeredTiers.set(mint, new Set());
-      this.soldAmounts.set(mint, 0);
-      return true;
+
+  // ── Étape 3 : Pump.fun pour TOUS les tokens encore manquants
+  //    FIX: on ne filtre plus sur endsWith('pump') — insuffisant et faux
+  const missing2 = toFetch.filter(m => !dexData[m]);
+  if (missing2.length) {
+    log('debug', 'Pump.fun fallback', { count: missing2.length });
+    const lim = pLimit(5);
+    await Promise.all(missing2.map(m => lim(async () => {
+      const r = await fetchPumpFun(m);
+      if (r) dexData[m] = r;
+    })));
+  }
+
+  // ── Étape 4 : Birdeye pour les tokens encore introuvables ──
+  const missing3 = toFetch.filter(m => !dexData[m]);
+  if (missing3.length) {
+    log('debug', 'Birdeye fallback', { count: missing3.length });
+    const lim = pLimit(4);
+    await Promise.all(missing3.map(m => lim(async () => {
+      const r = await fetchBirdeye(m);
+      if (r) dexData[m] = r;
+    })));
+  }
+
+  // ── Fusion → cache ──
+  for (const mint of toFetch) {
+    const d = dexData[mint];
+    if (d && d.price > 0) {
+      priceCache.set(mint, { data: d, ts: Date.now() });
     }
-    const entry = this.entryPrices.get(mint);
-    if (entry && currentPrice > entry.highestPrice) entry.highestPrice = currentPrice;
-    if (entry) entry.lastPrice = currentPrice;
-    return false;
   }
-  
-  getPnl(mint, currentPrice, includeFees = false) {
-    const entry = this.entryPrices.get(mint);
-    if (!entry || !currentPrice) return null;
-    const rawPnl = ((currentPrice - entry.price) / entry.price) * 100;
-    return includeFees ? rawPnl - 0.3 : rawPnl;
+
+  const found = toFetch.filter(m => (priceCache.get(m)?.data?.price || 0) > 0).length;
+  const srcs  = {};
+  for (const m of toFetch) {
+    const s = priceCache.get(m)?.data?.source;
+    if (s) srcs[s] = (srcs[s] || 0) + 1;
   }
-  
-  // ✅ CORRECTION v1.4.2 — Méthode ajoutée
+  log('debug', 'Prix done', { found, total: toFetch.length, missing: toFetch.length - found, sources: srcs });
+}
+
+function getTokenPrice(mint) {
+  return priceCache.get(mint)?.data || null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POSITION MANAGER — TP, SL, Trailing, Anti-Rug
+// ═══════════════════════════════════════════════════════════════════════════
+
+class PositionManager {
+  constructor(tiers, hysteresis, savedState = {}) {
+    this.tiers      = [...tiers].sort((a, b) => a.pnl - b.pnl);
+    this.hysteresis = hysteresis;
+
+    // Restaurer état persisté
+    this.entryPrices    = new Map(Object.entries(savedState.entryPrices || {}));
+    this.triggeredTiers = new Map();
+    this.soldAmounts    = new Map();
+    this.stopLossHit    = new Set(savedState.stopLossHit  || []); // FIX: persisté
+    this.slPending      = new Set(savedState.slPending    || []); // FIX: évite retry infini
+    this.prevPrices     = new Map(); // pour anti-rug et trailing
+    this.peakPnl        = new Map(); // pour trailing stop
+
+    for (const [mint, data] of this.entryPrices) {
+      this.triggeredTiers.set(mint, new Set(data.triggeredTiers || []));
+      this.soldAmounts.set(mint, data.soldAmount || 0);
+      if (data.peakPnl !== undefined) this.peakPnl.set(mint, data.peakPnl);
+    }
+    log('info', 'Positions restaurées', { count: this.entryPrices.size });
+  }
+
+  trackEntry(mint, currentPrice, currentBalance) {
+    if (this.entryPrices.has(mint)) return false;
+    if (!currentPrice || currentPrice <= 0 || !currentBalance) return false;
+    this.entryPrices.set(mint, {
+      price: currentPrice, ts: Date.now(),
+      originalBalance: currentBalance,
+      triggeredTiers: [], soldAmount: 0, peakPnl: 0,
+    });
+    this.triggeredTiers.set(mint, new Set());
+    this.soldAmounts.set(mint, 0);
+    this.peakPnl.set(mint, 0);
+    log('info', 'Position ouverte', { mint: mint.slice(0,8), entry: currentPrice.toPrecision(6) });
+    return true;
+  }
+
+  getPnl(mint, currentPrice) {
+    const entry = this.entryPrices.get(mint);
+    if (!entry || !currentPrice || currentPrice <= 0) return null;
+    return ((currentPrice - entry.price) / entry.price) * 100;
+  }
+
   getRemainingBalance(mint) {
     const entry = this.entryPrices.get(mint);
-    const sold = this.soldAmounts.get(mint) || 0;
     if (!entry) return 0;
-    return Math.max(0, entry.originalBalance - sold);
+    return Math.max(0, entry.originalBalance - (this.soldAmounts.get(mint) || 0));
   }
-  
-  checkTrailingStop(mint, currentPrice, config) {
-    if (!config.trailing?.enabled) return null;
-    const entry = this.entryPrices.get(mint);
-    if (!entry) return null;
-    const dropThreshold = config.trailing.drop;
-    const highest = entry.highestPrice;
-    const currentDrop = ((highest - currentPrice) / highest) * 100;
-    if (currentDrop >= dropThreshold) return { type: 'trailing_stop', triggerPrice: currentPrice, dropFromPeak: parseFloat(currentDrop.toFixed(2)), peakPrice: highest, entryPrice: entry.price, pnl: this.getPnl(mint, currentPrice) };
-    return null;
-  }
-  
-  checkTimeFallback(mint, config) {
-    if (!config.timeFallback?.enabled) return null;
-    const entry = this.entryPrices.get(mint);
-    if (!entry) return null;
-    const hoursHeld = (Date.now() - entry.timestamp) / (1000 * 60 * 60);
-    const maxHours = config.timeFallback.hours;
-    if (hoursHeld >= maxHours) {
-      const pnl = this.getPnl(mint, entry.lastPrice);
-      return { type: 'time_fallback', hoursHeld: parseFloat(hoursHeld.toFixed(1)), maxHours, pnl: pnl !== null ? parseFloat(pnl.toFixed(2)) : null, reason: hoursHeld >= maxHours * 2 ? 'stagnant' : 'timeout' };
+
+  /** Met à jour le peak PnL pour le trailing stop */
+  updatePeak(mint, currentPnl) {
+    if (currentPnl === null) return;
+    const prev = this.peakPnl.get(mint) || 0;
+    if (currentPnl > prev) {
+      this.peakPnl.set(mint, currentPnl);
+      const entry = this.entryPrices.get(mint);
+      if (entry) { entry.peakPnl = currentPnl; }
     }
-    return null;
   }
-  
-  checkTiers(mint, currentPrice) {
-    const entry = this.entryPrices.get(mint);
-    const config = this._getConfigForMint(mint);
+
+  /** Take-profit paliers */
+  checkTakeProfitTiers(mint, currentPrice) {
+    const entry     = this.entryPrices.get(mint);
     const triggered = this.triggeredTiers.get(mint);
-    const pnl = this.getPnl(mint, currentPrice);
+    const pnl       = this.getPnl(mint, currentPrice);
     if (!entry || pnl === null || !triggered) return [];
-    const availableTiers = [];
-    const hysteresis = config.hysteresis ?? this.hysteresis;
-    for (let i = 0; i < config.tiers.length; i++) {
+
+    const toExecute = [];
+    for (let i = 0; i < this.tiers.length; i++) {
       if (triggered.has(i)) continue;
-      const tier = config.tiers[i];
-      if (pnl >= tier.pnl + hysteresis) {
-        const sellAmount = entry.originalBalance * (tier.sell / 100);
-        availableTiers.push({ tierIndex: i, pnlTarget: tier.pnl, sellPercent: tier.sell, sellAmount: parseFloat(sellAmount.toFixed(6)), currentPnl: parseFloat(pnl.toFixed(2)), hysteresisBuffer: hysteresis });
+      const tier = this.tiers[i];
+      if (pnl >= tier.pnl) {
+        const remaining  = this.getRemainingBalance(mint);
+        const sellAmount = Math.min(entry.originalBalance * (tier.sell / 100), remaining);
+        if (sellAmount <= 0) continue;
+        toExecute.push({ tierIndex: i, pnlTarget: tier.pnl, currentPnl: pnl.toFixed(2), sellAmount });
       }
     }
-    return availableTiers;
+    return toExecute;
   }
-  
-  async executeSell(mint, amount, reason, tier, seller, price) {
-    const result = await seller.sell(mint, amount, reason, tier, true);
-    this.tpHistory.unshift({ mint: mint.slice(0,8)+'...', tier, reason, amount, price, value: amount * price, pnl: this.getPnl(mint, price), success: result.success, txId: result.txId, error: result.error, timestamp: Date.now() });
-    if (this.tpHistory.length > this.maxHistory) this.tpHistory.pop();
-    return result;
+
+  /** Stop-loss fixe */
+  checkStopLoss(mint, currentPrice) {
+    if (!CONFIG.STOP_LOSS_ENABLED) return null;
+    if (this.stopLossHit.has(mint) || this.slPending.has(mint)) return null;
+    const pnl = this.getPnl(mint, currentPrice);
+    if (pnl === null || pnl > CONFIG.STOP_LOSS_PCT) return null;
+    const remaining = this.getRemainingBalance(mint);
+    if (remaining <= 0) return null;
+    return { type: 'stop-loss', pnl: pnl.toFixed(2), sellAmount: remaining };
   }
-  
-  markTierExecuted(mint, tierIndex, amountSold, price, soldSuccessfully = true) {
-    const entry = this.entryPrices.get(mint);
+
+  /** Trailing stop-loss */
+  checkTrailingStop(mint, currentPrice) {
+    if (!CONFIG.TRAILING_STOP_ENABLED) return null;
+    if (this.stopLossHit.has(mint) || this.slPending.has(mint)) return null;
+    const pnl  = this.getPnl(mint, currentPrice);
+    const peak = this.peakPnl.get(mint) || 0;
+    if (pnl === null || peak < CONFIG.TRAILING_STOP_PCT) return null; // Pas encore assez haut
+    if (pnl < peak - CONFIG.TRAILING_STOP_PCT) {
+      const remaining = this.getRemainingBalance(mint);
+      if (remaining <= 0) return null;
+      return { type: 'trailing-stop', pnl: pnl.toFixed(2), peak: peak.toFixed(2), sellAmount: remaining };
+    }
+    return null;
+  }
+
+  /** Anti-rug : chute brutale en un cycle */
+  checkAntiRug(mint, currentPrice) {
+    if (!CONFIG.ANTI_RUG_ENABLED) return null;
+    if (this.stopLossHit.has(mint) || this.slPending.has(mint)) return null;
+    const prev = this.prevPrices.get(mint);
+    if (!prev || prev <= 0) return null;
+    const drop = ((prev - currentPrice) / prev) * 100;
+    if (drop >= CONFIG.ANTI_RUG_PCT) {
+      const remaining = this.getRemainingBalance(mint);
+      if (remaining <= 0) return null;
+      return { type: 'anti-rug', drop: drop.toFixed(1), sellAmount: remaining };
+    }
+    return null;
+  }
+
+  updatePrevPrice(mint, price) {
+    if (price > 0) this.prevPrices.set(mint, price);
+  }
+
+  markTierExecuted(mint, tierIndex, amountSold) {
     const triggered = this.triggeredTiers.get(mint);
-    if (!triggered) return;
+    const entry     = this.entryPrices.get(mint);
+    if (!triggered || !entry) return;
     triggered.add(tierIndex);
-    const prevSold = this.soldAmounts.get(mint) || 0;
-    this.soldAmounts.set(mint, prevSold + amountSold);
-    if (entry) entry.lastTpTime = Date.now();
-    const pnl = this.getPnl(mint, price);
-    const value = amountSold * price;
-    const status = soldSuccessfully ? '✅ VENDU' : '⚠️ ÉCHEC';
-    log('info', `🎯 TP Tier ${tierIndex+1} ${status}`, { mint: mint.slice(0,8)+'...', sold: amountSold.toFixed(4), value: `$${value.toFixed(2)}`, pnl: pnl !== null ? `${pnl.toFixed(2)}%` : 'N/A' });
-    return { pnl, value, success: soldSuccessfully };
+    const total = (this.soldAmounts.get(mint) || 0) + amountSold;
+    this.soldAmounts.set(mint, total);
+    entry.triggeredTiers = Array.from(triggered);
+    entry.soldAmount     = total;
+    log('success', `TP palier ${tierIndex+1} enregistré`, { mint: mint.slice(0,8), sold: amountSold.toFixed(4) });
   }
-  
-  maybeResetTier(mint, currentPnl, tierIndex) {
-    const config = this._getConfigForMint(mint);
-    const tier = config.tiers[tierIndex];
+
+  markStopLossExecuted(mint) {
+    this.stopLossHit.add(mint);
+    this.slPending.delete(mint);
+  }
+
+  /** FIX: marque "pending" si la vente échoue — évite retry infini */
+  markStopLossPending(mint) {
+    this.slPending.add(mint);
+    log('warn', 'SL marqué pending (échec vente)', { mint: mint.slice(0,8) });
+  }
+
+  clearStopLossPending(mint) {
+    this.slPending.delete(mint);
+  }
+
+  maybeResetTiers(mint, pnl) {
     const triggered = this.triggeredTiers.get(mint);
-    if (!triggered || !triggered.has(tierIndex)) return;
-    const resetThreshold = tier.pnl - (config.hysteresis ?? this.hysteresis);
-    if (currentPnl < resetThreshold) { triggered.delete(tierIndex); log('debug', `🔄 TP Tier ${tierIndex+1} réarmé`, { mint: mint.slice(0,8)+'...', currentPnl: `${currentPnl?.toFixed(2) || 'N/A'}%`, threshold: `${resetThreshold}%` }); }
+    const entry     = this.entryPrices.get(mint);
+    if (!triggered || !entry) return;
+    for (let i = 0; i < this.tiers.length; i++) {
+      if (!triggered.has(i)) continue;
+      if (pnl < this.tiers[i].pnl - this.hysteresis) {
+        triggered.delete(i);
+        entry.triggeredTiers = Array.from(triggered);
+        log('debug', 'Palier réinitialisé (hystérésis)', { mint: mint.slice(0,8), tier: i+1 });
+      }
+    }
   }
-  
+
+  toSerializable() {
+    const out = {};
+    for (const [mint, data] of this.entryPrices) {
+      out[mint] = {
+        price:            data.price,
+        ts:               data.ts,
+        originalBalance:  data.originalBalance,
+        triggeredTiers:   Array.from(this.triggeredTiers.get(mint) || []),
+        soldAmount:       this.soldAmounts.get(mint) || 0,
+        peakPnl:          this.peakPnl.get(mint) || 0,
+      };
+    }
+    return out;
+  }
+
   getStats() {
     const entries = [];
-    let totalTriggered = 0, totalSold = 0;
-    for (const [mint, entry] of this.entryPrices) {
+    for (const [mint, data] of this.entryPrices) {
       const triggered = this.triggeredTiers.get(mint) || new Set();
-      const sold = this.soldAmounts.get(mint) || 0;
-      const remaining = this.getRemainingBalance(mint);
-      entries.push({ mint: mint.slice(0,8)+'...', entryPrice: entry.price, currentPrice: entry.lastPrice, originalBalance: entry.originalBalance, sold, remaining, highestPrice: entry.highestPrice, triggeredTiers: Array.from(triggered).map(i => this.defaultTiers[i]?.pnl + '%'), heldHours: ((Date.now() - entry.timestamp) / 3600000).toFixed(1) });
-      totalTriggered += triggered.size;
-      totalSold += sold;
+      entries.push({
+        mint:            mint.slice(0,8) + '...',
+        mintFull:        mint,
+        entryPrice:      data.price,
+        originalBalance: data.originalBalance,
+        sold:            this.soldAmounts.get(mint) || 0,
+        remaining:       this.getRemainingBalance(mint),
+        triggeredTiers:  Array.from(triggered).map(i => this.tiers[i]?.pnl),
+        stopLossHit:     this.stopLossHit.has(mint),
+        slPending:       this.slPending.has(mint),
+        peakPnl:         this.peakPnl.get(mint) || 0,
+      });
     }
-    return { enabled: true, defaultTiers: this.defaultTiers.map((t,i) => ({ index: i+1, pnl: t.pnl + '%', sell: t.sell + '%' })), features: { trailingStop: !!this.trailingStop?.enabled, timeFallback: !!this.timeFallback?.enabled, perTokenConfig: Object.keys(this.perTokenConfig).length > 0 }, summary: { tracked: entries.length, totalTriggered, totalSold, historyCount: this.tpHistory.length }, recent: this.tpHistory.slice(0, 10), entries };
+    return {
+      enabled:    CONFIG.TAKE_PROFIT_ENABLED,
+      tiers:      this.tiers.map((t, i) => ({ index: i+1, pnl: t.pnl, sell: t.sell })),
+      hysteresis: this.hysteresis,
+      stopLoss:   { enabled: CONFIG.STOP_LOSS_ENABLED,    threshold: CONFIG.STOP_LOSS_PCT },
+      trailing:   { enabled: CONFIG.TRAILING_STOP_ENABLED, pct: CONFIG.TRAILING_STOP_PCT },
+      antiRug:    { enabled: CONFIG.ANTI_RUG_ENABLED,      pct: CONFIG.ANTI_RUG_PCT },
+      tracked:    entries.length,
+      entries,
+    };
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SELL EXECUTOR
+// SWAP ENGINE — Jupiter v6 (buy + sell + DCA)
 // ═══════════════════════════════════════════════════════════════════════════
 
-class SellExecutor {
-  constructor(wallet, rpc) { this.wallet = wallet; this.rpc = rpc; }
-  
-  async executeJupiterSell(mint, amount, slippageBps = CONFIG.SLIPPAGE_BPS) {
-    const cleanMint = String(mint||'').trim();
-    const tokenDecimals = 9;
-    const amountRaw = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
-    const jupiterHeaders = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9', 'Origin': 'https://jup.ag', 'Referer': 'https://jup.ag/', 'Content-Type': 'application/json' };
-    try {
-      const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${cleanMint}&outputMint=${SOL_MINT}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
-      const quoteRes = await fetch(quoteUrl, { headers: jupiterHeaders, signal: AbortSignal.timeout(30000) });
-      if (!quoteRes.ok) { const body = await quoteRes.text().catch(() => 'N/A'); log('error', '❌ Jupiter Quote failed', { status: quoteRes.status, body: body.slice(0,200) }); throw new Error(`Jupiter Quote ${quoteRes.status}`); }
-      const quote = await quoteRes.json();
-      if (!quote?.outAmount) throw new Error('No outAmount');
-      const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', { method: 'POST', headers: { ...jupiterHeaders }, body: JSON.stringify({ quoteResponse: quote, userPublicKey: this.wallet.publicKey.toString(), wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: 'auto' }), signal: AbortSignal.timeout(30000) });
-      if (!swapRes.ok) { const body = await swapRes.text().catch(() => 'N/A'); log('error', '❌ Jupiter Swap failed', { status: swapRes.status, body: body.slice(0,200) }); throw new Error(`Jupiter Swap ${swapRes.status}`); }
-      const swapData = await swapRes.json();
-      if (!swapData?.swapTransaction) throw new Error('No swapTransaction');
-      const transaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
-      transaction.sign([this.wallet]);
-      const txId = await this.rpc.connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false, maxRetries: 3, preflightCommitment: 'confirmed' });
-      const latestBlockhash = await this.rpc.connection.getLatestBlockhash();
-      const confirmation = await this.rpc.connection.confirmTransaction({ signature: txId, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight }, 'confirmed');
-      if (confirmation.value.err) throw new Error(`Tx failed`);
-      log('success', '🎉 VENTE CONFIRMÉE !', { mint: cleanMint.slice(0,8)+'...', txUrl: `https://solscan.io/tx/${txId}` });
-      return { success: true, txId, txUrl: `https://solscan.io/tx/${txId}` };
-    } catch (err) { log('error', '❌ Jupiter sell failed', { error: err.message, mint: cleanMint.slice(0,10)+'...' }); return { success: false, error: err.message }; }
+class SwapEngine {
+  constructor(wallet, rpc) {
+    this.wallet       = wallet;
+    this.rpc          = rpc;
+    this.sellMutex    = new Mutex();
+    this.sellFailures = 0;    // circuit-breaker
+    this.lastBuyTs    = 0;   // cooldown achats
   }
-  
-  async sell(mint, amount, reason, tier = null, useReal = true) {
-    if (!useReal) return { success: false, error: 'simulation only' };
-    log('info', `🎯 Vente — ${reason}`, { mint: String(mint||'').slice(0,8)+'...', amount: parseFloat(amount).toFixed(4) });
-    return await this.executeJupiterSell(mint, amount);
+
+  /** Quote Jupiter v6 — retourne le raw quote object */
+  async getQuote({ inputMint, outputMint, amountRaw, slippageBps }) {
+    const url = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
+    const r = await fetch(url, {
+      headers: { 'User-Agent': `SolBot/${VERSION}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) throw new Error(`Quote HTTP ${r.status}`);
+    const q = await r.json();
+    if (q.error) throw new Error(q.error);
+    if (!q.outAmount) throw new Error(`Aucun devis pour ce token (${inputMint.slice(0,8)})`);
+    return q;
+  }
+
+  /**
+   * Execute swap — FIX: extraction du blockhash directement depuis la tx Jupiter
+   * Pas de getLatestBlockhash() séparé (race condition avec le blockhash embed)
+   * FIX retry: refetch quote à chaque tentative (quotes expirent en ~60s)
+   */
+  async _executeSwap({ inputMint, outputMint, amountRaw, slippageBps }) {
+    return withRetry(async (attempt) => {
+      // Refetch quote à chaque tentative (évite "quote expired")
+      const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
+
+      const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
+        body: JSON.stringify({
+          quoteResponse:             quote,
+          userPublicKey:             this.wallet.publicKey.toString(),
+          wrapAndUnwrapSol:          true,
+          dynamicComputeUnitLimit:   true,
+          prioritizationFeeLamports: 'auto',
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!swapRes.ok) throw new Error(`Swap HTTP ${swapRes.status}`);
+      const swapData = await swapRes.json();
+      if (!swapData?.swapTransaction) throw new Error('swapTransaction manquant');
+
+      const tx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
+
+      // FIX: extraire blockhash depuis la tx signée par Jupiter (pas refetch)
+      const txBlockhash = tx.message.recentBlockhash;
+      // Besoin de lastValidBlockHeight pour confirmTransaction — fetch minimal
+      const lbhMeta = await this.rpc.connection.getLatestBlockhash('confirmed');
+
+      tx.sign([this.wallet]);
+
+      const txId = await this.rpc.connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false, maxRetries: 3, preflightCommitment: 'confirmed',
+      });
+
+      const conf = await this.rpc.connection.confirmTransaction({
+        signature:            txId,
+        blockhash:            txBlockhash,           // ← du tx, pas du refetch
+        lastValidBlockHeight: lbhMeta.lastValidBlockHeight,
+      }, 'confirmed');
+
+      if (conf.value.err) throw new Error(`Tx rejetée: ${JSON.stringify(conf.value.err)}`);
+
+      return { txId, txUrl: `https://solscan.io/tx/${txId}`, quote };
+    }, { retries: 2, baseMs: 800, label: `swap(${inputMint.slice(0,8)})` });
+  }
+
+  /** Acheter un token avec X SOL */
+  async buy(mint, solAmount, slippageBps = CONFIG.DEFAULT_SLIPPAGE) {
+    // Cooldown
+    const elapsed = Date.now() - this.lastBuyTs;
+    if (elapsed < CONFIG.BUY_COOLDOWN_MS) {
+      const wait = ((CONFIG.BUY_COOLDOWN_MS - elapsed) / 1000).toFixed(1);
+      throw new Error(`Cooldown actif — réessayez dans ${wait}s`);
+    }
+    // Garde SOL
+    const solBal = await this.getSolBalance();
+    if (solBal !== null) {
+      const needed = solAmount + CONFIG.MIN_SOL_RESERVE;
+      if (solBal < needed) {
+        throw new Error(`Solde insuffisant: ${solBal.toFixed(4)} SOL (besoin ${needed.toFixed(4)} SOL, réserve ${CONFIG.MIN_SOL_RESERVE})`);
+      }
+    }
+
+    log('info', 'Achat', { mint: mint.slice(0,8), solAmount, slippageBps });
+    const amountRaw = BigInt(Math.floor(solAmount * 1e9));
+    const { txId, txUrl, quote } = await this._executeSwap(
+      { inputMint: SOL_MINT, outputMint: mint, amountRaw, slippageBps });
+
+    const outDec   = await getTokenDecimals(mint, this.rpc.connection);
+    const outAmount = Number(quote.outAmount) / Math.pow(10, outDec);
+    this.lastBuyTs  = Date.now();
+
+    log('success', 'Achat confirmé', { mint: mint.slice(0,8), out: outAmount.toFixed(4), txId });
+    return { success: true, txId, txUrl, outAmount, solSpent: solAmount };
+  }
+
+  /**
+   * Achat DCA — split en `chunks` transactions réparties sur `intervalSec`
+   */
+  async buyDCA(mint, totalSol, chunks, intervalSec, slippageBps = CONFIG.DEFAULT_SLIPPAGE) {
+    const chunkSol = totalSol / chunks;
+    const results  = [];
+    log('info', 'DCA start', { mint: mint.slice(0,8), totalSol, chunks, intervalSec });
+    for (let i = 0; i < chunks; i++) {
+      try {
+        const r = await this.buy(mint, chunkSol, slippageBps);
+        results.push({ chunk: i+1, ...r });
+        log('info', `DCA chunk ${i+1}/${chunks}`, { out: r.outAmount?.toFixed(4) });
+        if (i < chunks - 1) await sleep(intervalSec * 1000);
+      } catch (err) {
+        log('warn', `DCA chunk ${i+1} échoué`, { error: err.message });
+        results.push({ chunk: i+1, success: false, error: err.message });
+      }
+    }
+    const succeeded = results.filter(r => r.success).length;
+    return { results, succeeded, total: chunks };
+  }
+
+  /** Vendre avec mutex (zéro double-sell) */
+  async sell(mint, amount, reason = 'MANUAL', slippageBps = CONFIG.DEFAULT_SLIPPAGE) {
+    if (this.sellFailures >= CONFIG.MAX_SELL_RETRIES) {
+      const msg = `Circuit-breaker actif (${this.sellFailures} échecs) — relancer le bot`;
+      log('error', msg);
+      return { success: false, error: msg };
+    }
+
+    const release = await this.sellMutex.lock();
+    try {
+      log('info', 'Vente', { mint: mint.slice(0,8), amount: amount.toFixed(4), reason });
+      const outDec    = await getTokenDecimals(mint, this.rpc.connection);
+      const amountRaw = BigInt(Math.floor(amount * Math.pow(10, outDec)));
+      const { txId, txUrl, quote } = await this._executeSwap(
+        { inputMint: mint, outputMint: SOL_MINT, amountRaw, slippageBps });
+
+      const solOut = Number(quote.outAmount) / 1e9;
+      this.sellFailures = 0;
+      log('success', 'Vente confirmée', { mint: mint.slice(0,8), solOut: solOut.toFixed(6), txId, reason });
+      return { success: true, txId, txUrl, solOut, amountSold: amount };
+
+    } catch (err) {
+      this.sellFailures++;
+      log('error', 'Vente échouée', { error: err.message, failures: this.sellFailures, reason });
+      return { success: false, error: err.message };
+    } finally {
+      release();
+    }
+  }
+
+  async getSolBalance() {
+    try {
+      return await this.rpc.connection.getBalance(this.wallet.publicKey) / 1e9;
+    } catch { return null; }
   }
 }
 
@@ -334,85 +862,217 @@ class SellExecutor {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class BotLoop {
-  constructor(wallet, rpc) {
-    this.wallet = wallet; this.rpc = rpc; this.portfolio = []; this.startTime = Date.now();
-    this.takeProfit = new TieredTakeProfitManager();
-    this.seller = new SellExecutor(wallet, rpc);
+  constructor(wallet, rpc, savedState) {
+    this.wallet       = wallet;
+    this.rpc          = rpc;
+    this.portfolio    = [];
+    this.startTime    = Date.now();
+    this.cycleCount   = 0;
+    this.tradeHistory = savedState.trades || [];
+    this.positions    = new PositionManager(
+      CONFIG.TAKE_PROFIT_TIERS,
+      CONFIG.TAKE_PROFIT_HYSTERESIS,
+      savedState,
+    );
+    this.swap = new SwapEngine(wallet, rpc);
   }
-  
+
+  _persist() {
+    saveState({
+      entryPrices: this.positions.toSerializable(),
+      trades:      this.tradeHistory.slice(0, 50),
+      stopLossHit: Array.from(this.positions.stopLossHit),  // FIX: persisté
+      slPending:   Array.from(this.positions.slPending),    // FIX: persisté
+    });
+  }
+
+  _recordTrade(entry) {
+    this.tradeHistory.unshift({ ...entry, ts: Date.now() });
+    if (this.tradeHistory.length > 100) this.tradeHistory.length = 100;
+  }
+
   async tick() {
     try {
-      await this.rpc.healthCheck();
-      const [accounts, accounts2022] = await Promise.all([
-        this.rpc.connection.getParsedTokenAccountsByOwner(this.wallet.publicKey, { programId: new PublicKey(TOKEN_PROGRAM) }),
-        this.rpc.connection.getParsedTokenAccountsByOwner(this.wallet.publicKey, { programId: new PublicKey(TOKEN_PROGRAM_2022) }),
+      // Health check tous les 10 cycles
+      if (this.cycleCount % 10 === 0) await this.rpc.healthCheck();
+      this.cycleCount++;
+
+      const [acc1, acc2] = await Promise.all([
+        this.rpc.connection.getParsedTokenAccountsByOwner(
+          this.wallet.publicKey, { programId: new PublicKey(TOKEN_PROGRAM) }),
+        this.rpc.connection.getParsedTokenAccountsByOwner(
+          this.wallet.publicKey, { programId: new PublicKey(TOKEN_PROGRAM_2022) }),
       ]);
-      const allAccounts = [...accounts.value, ...accounts2022.value];
+
+      const allAccounts = [...acc1.value, ...acc2.value].filter(acc => {
+        if (acc.account.data.parsed.info.mint === SOL_MINT) return false;
+        const ta  = acc.account.data.parsed.info.tokenAmount;
+        const bal = parseFloat(ta.uiAmount ?? ta.uiAmountString ?? '0');
+        return bal > 0;
+      });
+
+      const allMints = allAccounts.map(a => a.account.data.parsed.info.mint);
+      await prefetchAllPrices(allMints);
+
       const tokens = [];
-      let totalValue = 0, withPrice = 0, tpTriggered = 0, tpSold = 0;
-      
       for (const acc of allAccounts) {
-        const mintRaw = acc.account.data.parsed.info.mint;
-        const mint = String(mintRaw || '').trim();
-        if (!mint || mint === SOL_MINT) continue;
-        const ta = acc.account.data.parsed.info.tokenAmount;
-        const balance = parseFloat(ta.uiAmount ?? ta.uiAmountString ?? '0');
-        if (balance <= 0) continue;
-        const priceData = await fetchPriceFromDexScreener(mint);
-        const price = priceData?.price || 0;
-        const value = balance * price;
-        if (price > 0) withPrice++;
-        totalValue += value;
-        this.takeProfit.trackEntry(mint, price, balance);
-        
-        if (CONFIG.TAKE_PROFIT_ENABLED && price > 0) {
-          const config = this.takeProfit._getConfigForMint(mint);
-          const pnl = this.takeProfit.getPnl(mint, price);
-          if (pnl !== null) {
-            const trailing = this.takeProfit.checkTrailingStop(mint, price, config);
-            if (trailing) {
-              log('warn', '🔻 TRAILING STOP !', { mint: mint.slice(0,8)+'...', drop: `${trailing.dropFromPeak}%` });
-              const result = await this.takeProfit.executeSell(mint, balance * 0.5, 'TRAILING_STOP', null, this.seller, price);
-              this.takeProfit.markTierExecuted(mint, -1, balance * 0.5, price, result.success);
-              if (result.success) tpSold++; tpTriggered++; continue;
+        const mint = acc.account.data.parsed.info.mint;
+        const ta   = acc.account.data.parsed.info.tokenAmount;
+        const bal  = parseFloat(ta.uiAmount ?? ta.uiAmountString ?? '0');
+        if (!bal || bal <= 0) continue;
+
+        const priceData = getTokenPrice(mint);
+        const price     = priceData?.price || 0;
+        const value     = bal * price;
+
+        this.positions.trackEntry(mint, price, bal);
+        const pnl = this.positions.getPnl(mint, price);
+        if (pnl !== null) this.positions.updatePeak(mint, pnl);
+
+        if (price > 0) {
+          // ── Anti-rug (priorité maximale) ──────────────────────────────
+          const rugAlert = this.positions.checkAntiRug(mint, price);
+          if (rugAlert) {
+            log('error', '🚨 ANTI-RUG DÉCLENCHÉ', { mint: mint.slice(0,8), drop: rugAlert.drop + '%' });
+            await sendWebhook('🚨 Anti-Rug Alert', `Chute de **${rugAlert.drop}%** détectée`, 0xff4757, [
+              { name: 'Token', value: priceData?.symbol || mint.slice(0,8), inline: true },
+              { name: 'Chute', value: rugAlert.drop + '%', inline: true },
+            ]);
+            this.positions.markStopLossPending(mint);
+            const res = await this.swap.sell(mint, rugAlert.sellAmount, 'ANTI_RUG');
+            if (res.success) {
+              this.positions.markStopLossExecuted(mint);
+              this._recordTrade({ type: 'sell', mint, symbol: priceData?.symbol || mint.slice(0,8),
+                amount: rugAlert.sellAmount, solOut: res.solOut, reason: 'Anti-Rug',
+                txId: res.txId, txUrl: res.txUrl });
+              await sendWebhook('✅ Anti-Rug vendu', `${(rugAlert.sellAmount).toFixed(4)} tokens vendus`,
+                0x05d488, [{ name: 'SOL reçu', value: res.solOut?.toFixed(6), inline: true }]);
+            } else {
+              this.positions.clearStopLossPending(mint); // retry au prochain cycle
             }
-            const timeFallback = this.takeProfit.checkTimeFallback(mint, config);
-            if (timeFallback) {
-              log('info', '⏰ TIME FALLBACK', { mint: mint.slice(0,8)+'...', held: `${timeFallback.hoursHeld}h` });
-              const result = await this.takeProfit.executeSell(mint, balance, 'TIME_FALLBACK', null, this.seller, price);
-              this.takeProfit.markTierExecuted(mint, -1, balance, price, result.success);
-              if (result.success) tpSold++; tpTriggered++; continue;
+          }
+
+          // ── Take-Profit paliers ───────────────────────────────────────
+          if (CONFIG.TAKE_PROFIT_ENABLED && pnl !== null) {
+            const tiers = this.positions.checkTakeProfitTiers(mint, price);
+            for (const tier of tiers) {
+              log('warn', `TP palier ${tier.tierIndex+1}`, {
+                mint: mint.slice(0,8), pnl: tier.currentPnl + '%', sell: tier.sellAmount.toFixed(4) });
+              const res = await this.swap.sell(mint, tier.sellAmount, `TP_T${tier.tierIndex+1}`);
+              if (res.success) {
+                this.positions.markTierExecuted(mint, tier.tierIndex, tier.sellAmount);
+                this._recordTrade({ type: 'sell', mint, symbol: priceData?.symbol || mint.slice(0,8),
+                  amount: tier.sellAmount, solOut: res.solOut, reason: `TP Palier ${tier.tierIndex+1}`,
+                  txId: res.txId, txUrl: res.txUrl });
+                await sendWebhook(`🎯 Take-Profit T${tier.tierIndex+1}`,
+                  `+${tier.currentPnl}% atteint sur **${priceData?.symbol || mint.slice(0,8)}**`, 0x05d488, [
+                  { name: 'Vendu', value: tier.sellAmount.toFixed(4), inline: true },
+                  { name: 'SOL reçu', value: res.solOut?.toFixed(6), inline: true },
+                ]);
+              }
             }
-            const availableTiers = this.takeProfit.checkTiers(mint, price);
-            for (const tier of availableTiers) {
-              log('warn', '🎯 TP DÉCLENCHÉ !', { mint: mint.slice(0,8)+'...', tier: tier.tierIndex+1, pnl: `${tier.currentPnl}%` });
-              const result = await this.takeProfit.executeSell(mint, tier.sellAmount, 'TAKE_PROFIT', tier.tierIndex+1, this.seller, price);
-              this.takeProfit.markTierExecuted(mint, tier.tierIndex, tier.sellAmount, price, result.success);
-              if (result.success) tpSold++; tpTriggered++;
-              for (let i = 0; i < config.tiers.length; i++) this.takeProfit.maybeResetTier(mint, pnl, i);
+            this.positions.maybeResetTiers(mint, pnl);
+          }
+
+          // ── Stop-loss fixe ────────────────────────────────────────────
+          const sl = this.positions.checkStopLoss(mint, price);
+          if (sl) {
+            log('warn', 'STOP-LOSS', { mint: mint.slice(0,8), pnl: sl.pnl + '%' });
+            this.positions.markStopLossPending(mint);
+            const res = await this.swap.sell(mint, sl.sellAmount, 'STOP_LOSS');
+            if (res.success) {
+              this.positions.markStopLossExecuted(mint);
+              this._recordTrade({ type: 'sell', mint, symbol: priceData?.symbol || mint.slice(0,8),
+                amount: sl.sellAmount, solOut: res.solOut, reason: 'Stop-Loss',
+                txId: res.txId, txUrl: res.txUrl });
+              await sendWebhook('🔴 Stop-Loss déclenché',
+                `**${priceData?.symbol || mint.slice(0,8)}** vendu à ${sl.pnl}%`, 0xff4757, [
+                { name: 'SOL récupéré', value: res.solOut?.toFixed(6), inline: true },
+              ]);
+            } else {
+              this.positions.clearStopLossPending(mint);
+            }
+          }
+
+          // ── Trailing stop-loss ────────────────────────────────────────
+          const ts = this.positions.checkTrailingStop(mint, price);
+          if (ts) {
+            log('warn', 'TRAILING STOP', { mint: mint.slice(0,8), pnl: ts.pnl, peak: ts.peak });
+            this.positions.markStopLossPending(mint);
+            const res = await this.swap.sell(mint, ts.sellAmount, 'TRAILING_STOP');
+            if (res.success) {
+              this.positions.markStopLossExecuted(mint);
+              this._recordTrade({ type: 'sell', mint, symbol: priceData?.symbol || mint.slice(0,8),
+                amount: ts.sellAmount, solOut: res.solOut, reason: 'Trailing Stop',
+                txId: res.txId, txUrl: res.txUrl });
+              await sendWebhook('📉 Trailing Stop',
+                `**${priceData?.symbol || mint.slice(0,8)}** — pic: +${ts.peak}%, actuel: ${ts.pnl}%`, 0xffb020);
+            } else {
+              this.positions.clearStopLossPending(mint);
             }
           }
         }
-        tokens.push({ mint: mint.slice(0,8)+'...'+mint.slice(-4), mintFull: mint, balance: parseFloat(balance.toFixed(4)), price: price > 0 ? parseFloat(price.toFixed(6)) : null, value: parseFloat(value.toFixed(2)), pnl: price > 0 ? this.takeProfit.getPnl(mint, price) : null, logo: priceData?.logo || null, symbol: priceData?.symbol || null, name: priceData?.name || null, triggeredTiers: Array.from(this.takeProfit.triggeredTiers.get(mint)||[]).map(i => CONFIG.TAKE_PROFIT_TIERS[i]?.pnl+'%'), entryPrice: this.takeProfit.entryPrices.get(mint)?.price || null, remainingBalance: this.takeProfit.getRemainingBalance(mint), change24h: priceData?.change24h || 0, liquidity: priceData?.liquidity || 0 });
-        await new Promise(r => setTimeout(r, 150));
+
+        this.positions.updatePrevPrice(mint, price);
+
+        tokens.push({
+          mint:             mint.slice(0, 8) + '...' + mint.slice(-4),
+          mintFull:         mint,
+          balance:          parseFloat(bal.toFixed(6)),
+          price:            price > 0 ? price : null,
+          value:            parseFloat(value.toFixed(4)),
+          liquidity:        priceData?.liquidity  || 0,
+          volume24h:        priceData?.volume24h  || 0,
+          change24h:        priceData?.change24h  || 0,
+          logo:             priceData?.logo        || null,
+          symbol:           priceData?.symbol      || null,
+          name:             priceData?.name        || null,
+          pnl,
+          peakPnl:          this.positions.peakPnl.get(mint) || null,
+          entryPrice:       this.positions.entryPrices.get(mint)?.price || null,
+          remainingBalance: this.positions.getRemainingBalance(mint),
+          triggeredTiers:   Array.from(this.positions.triggeredTiers.get(mint) || [])
+                              .map(i => CONFIG.TAKE_PROFIT_TIERS[i]?.pnl),
+          stopLossHit:      this.positions.stopLossHit.has(mint),
+        });
       }
-      this.portfolio = tokens;
-      log('info', '✅ Cycle terminé', { tokens: tokens.length, withPrice, totalValue: `$${totalValue.toFixed(2)}`, tpTriggered, tpSold });
-    } catch (err) { log('error', '❌ Erreur cycle', { error: err.message }); }
+
+      this.portfolio = tokens.sort((a, b) => b.value - a.value);
+      const tv = tokens.reduce((s, t) => s + t.value, 0);
+      log('debug', 'Cycle OK', { tokens: tokens.length, total: `$${tv.toFixed(2)}`, cycle: this.cycleCount });
+
+      // Sauvegarde périodique (toutes les 5 min ≈ 10 cycles à 30s)
+      if (this.cycleCount % 10 === 0) this._persist();
+
+    } catch (err) {
+      log('error', 'Erreur cycle', { error: err.message });
+      this.rpc.failover();
+    }
   }
-  
+
   getStats() {
-    const totalValue = this.portfolio.reduce((sum, t) => sum + (t.value||0), 0);
+    const tv      = this.portfolio.reduce((s, t) => s + t.value, 0);
+    const pnlList = this.portfolio.filter(t => t.pnl !== null).map(t => t.pnl);
+    const posP    = pnlList.filter(p => p >= 0).length;
+    const posN    = pnlList.filter(p => p < 0).length;
+    const avgPnl  = pnlList.length ? pnlList.reduce((a, b) => a + b, 0) / pnlList.length : null;
+    const best    = pnlList.length ? Math.max(...pnlList) : null;
+    const worst   = pnlList.length ? Math.min(...pnlList) : null;
     return {
-      uptime: Math.round((Date.now()-this.startTime)/1000),
-      tokens: this.portfolio.length,
-      totalValue: parseFloat(totalValue.toFixed(2)),
-      rpcSource: CONFIG.HELIUS_API_KEY ? 'Helius' : 'Public',
-      takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? { enabled: true, ...this.takeProfit.getStats() } : { enabled: false },
-      lastUpdate: new Date().toISOString()
+      version:    VERSION,
+      uptime:     Math.round((Date.now() - this.startTime) / 1000),
+      cycles:     this.cycleCount,
+      tokens:     this.portfolio.length,
+      totalValue: parseFloat(tv.toFixed(4)),
+      pnlStats:   { avgPnl: avgPnl !== null ? +avgPnl.toFixed(2) : null, best, worst, positive: posP, negative: posN },
+      takeProfit: CONFIG.TAKE_PROFIT_ENABLED ? this.positions.getStats() : { enabled: false },
+      stopLoss:   { enabled: CONFIG.STOP_LOSS_ENABLED,    threshold: CONFIG.STOP_LOSS_PCT },
+      trailing:   { enabled: CONFIG.TRAILING_STOP_ENABLED, pct: CONFIG.TRAILING_STOP_PCT },
+      antiRug:    { enabled: CONFIG.ANTI_RUG_ENABLED,      pct: CONFIG.ANTI_RUG_PCT },
+      sellCircuitBreaker: this.swap.sellFailures,
+      lastUpdate: new Date().toISOString(),
     };
   }
-  getNewTPNotifications() { return []; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -421,24 +1081,212 @@ class BotLoop {
 
 function startApi(bot, wallet) {
   const app = express();
-  app.use(express.json());
-  app.use((req, res, next) => { res.header('Access-Control-Allow-Origin', '*'); res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept'); next(); });
-  app.use(express.static(path.join(__dirname, 'public')));
-  app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
-  app.get('/health', (req, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
-  app.get('/api/stats', (req, res) => res.json(bot.getStats()));
-  app.get('/api/portfolio', (req, res) => res.json({ address: wallet.publicKey.toString(), tokens: bot.portfolio, timestamp: Date.now() }));
-  app.get('/api/wallet', (req, res) => res.json({ address: wallet.publicKey.toString(), shortAddress: wallet.publicKey.toString().slice(0,8)+'...'+wallet.publicKey.toString().slice(-4) }));
-  app.get('/api/take-profit', (req, res) => res.json(bot.takeProfit.getStats()));
-  app.post('/api/sell/test', express.json(), async (req, res) => {
-    const { mint, amount, reason, tier, real } = req.body;
-    if (!mint) return res.status(400).json({ error: 'mint required' });
-    const result = await bot.seller.sell(mint, amount||1, reason||'TEST', tier, real===true);
-    res.json(result);
+  app.use(express.json({ limit: '128kb' }));
+
+  // CORS
+  const ORIGINS = new Set([
+    'https://pumplaunch.github.io',
+    'http://localhost:3000', 'http://localhost:10000',
+    ...CONFIG.EXTRA_ORIGINS.split(',').map(s => s.trim()).filter(Boolean),
+  ]);
+  app.use((req, res, next) => {
+    const orig  = req.headers.origin;
+    const allow = !orig || ORIGINS.has(orig) ? (orig || '*') : null;
+    if (allow) res.setHeader('Access-Control-Allow-Origin', allow);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
   });
+
+  // Dashboard statique — optionnel (présent en local, absent sur Render si GitHub Pages)
+  const staticDir   = process.env.STATIC_DIR || __dirname;
+  const DASHBOARD_URL = CONFIG.DASHBOARD_URL;
+  const indexPath   = path.join(staticDir, 'index.html');
+  const hasIndex    = fs.existsSync(indexPath);
+
+  if (hasIndex) {
+    app.use(express.static(staticDir));
+    app.get('/', (req, res) => res.sendFile(indexPath));
+    log('info', 'Dashboard local activé', { dir: staticDir });
+  } else {
+    // Pas d'index.html — retourner un JSON utile sur / plutôt que de crasher
+    app.get('/', (req, res) => {
+      const info = {
+        bot:       `SolBot v${VERSION}`,
+        status:    'running',
+        uptime:    Math.round(process.uptime()) + 's',
+        dashboard: DASHBOARD_URL || 'Non configuré (définir DASHBOARD_URL)',
+        api:       ['/health', '/api/stats', '/api/portfolio', '/api/sol-balance', '/api/trades'],
+      };
+      if (DASHBOARD_URL) {
+        res.redirect(302, DASHBOARD_URL);
+      } else {
+        res.json(info);
+      }
+    });
+    log('info', 'Dashboard local absent — route / redirige vers DASHBOARD_URL ou JSON', { dashboard: DASHBOARD_URL || 'none' });
+  }
+
+  // ── READ ──────────────────────────────────────────────────────────────────
+  app.get('/health',          (req, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
+  app.get('/api/stats',       (req, res) => res.json(bot.getStats()));
+  app.get('/api/portfolio',   (req, res) => res.json({ address: wallet.publicKey.toString(), tokens: bot.portfolio, timestamp: Date.now() }));
+  app.get('/api/wallet',      (req, res) => res.json({ address: wallet.publicKey.toString() }));
+  app.get('/api/take-profit', (req, res) => res.json(bot.positions.getStats()));
+  app.get('/api/trades',      (req, res) => res.json({ trades: bot.tradeHistory }));
+
+  app.get('/api/sol-balance', async (req, res) => {
+    const bal = await bot.swap.getSolBalance();
+    res.json({ balance: bal, formatted: bal != null ? bal.toFixed(6) + ' SOL' : null });
+  });
+
+  app.get('/api/debug/prices', (req, res) => {
+    const out = [];
+    for (const [mint, e] of priceCache) {
+      out.push({ mint: mint.slice(0,8)+'...', price: e.data?.price, source: e.data?.source,
+        symbol: e.data?.symbol, age: Math.round((Date.now()-e.ts)/1000)+'s' });
+    }
+    res.json({ total: out.length, tokens: out.slice(0, 40) });
+  });
+
+  // ── CONFIG GET + POST ─────────────────────────────────────────────────────
+  app.get('/api/config', (req, res) => res.json({
+    takeProfitEnabled:  CONFIG.TAKE_PROFIT_ENABLED,
+    takeProfitTiers:    CONFIG.TAKE_PROFIT_TIERS,
+    hysteresis:         CONFIG.TAKE_PROFIT_HYSTERESIS,
+    stopLossEnabled:    CONFIG.STOP_LOSS_ENABLED,
+    stopLossPct:        CONFIG.STOP_LOSS_PCT,
+    trailingEnabled:    CONFIG.TRAILING_STOP_ENABLED,
+    trailingPct:        CONFIG.TRAILING_STOP_PCT,
+    antiRugEnabled:     CONFIG.ANTI_RUG_ENABLED,
+    antiRugPct:         CONFIG.ANTI_RUG_PCT,
+    defaultSlippage:    CONFIG.DEFAULT_SLIPPAGE,
+    minSolReserve:      CONFIG.MIN_SOL_RESERVE,
+    intervalSec:        CONFIG.INTERVAL_SEC,
+  }));
+
+  app.post('/api/config', (req, res) => {
+    const { takeProfitEnabled, stopLossEnabled, stopLossPct,
+            trailingEnabled, trailingPct, antiRugEnabled, antiRugPct,
+            defaultSlippage, minSolReserve } = req.body;
+    if (takeProfitEnabled !== undefined) CONFIG.TAKE_PROFIT_ENABLED    = !!takeProfitEnabled;
+    if (stopLossEnabled   !== undefined) CONFIG.STOP_LOSS_ENABLED      = !!stopLossEnabled;
+    if (trailingEnabled   !== undefined) CONFIG.TRAILING_STOP_ENABLED  = !!trailingEnabled;
+    if (antiRugEnabled    !== undefined) CONFIG.ANTI_RUG_ENABLED       = !!antiRugEnabled;
+    const validateNum = (v, min, max) => { const n = parseFloat(v); return !isNaN(n) && n >= min && n <= max ? n : null; };
+    const sl  = validateNum(stopLossPct, -100, 0);      if (sl  !== null) CONFIG.STOP_LOSS_PCT       = sl;
+    const tr  = validateNum(trailingPct, 1, 100);        if (tr  !== null) CONFIG.TRAILING_STOP_PCT   = tr;
+    const ar  = validateNum(antiRugPct, 1, 100);         if (ar  !== null) CONFIG.ANTI_RUG_PCT         = ar;
+    const ds  = validateNum(defaultSlippage, 10, 5000); if (ds  !== null) CONFIG.DEFAULT_SLIPPAGE     = ds;
+    const mr  = validateNum(minSolReserve, 0, 10);      if (mr  !== null) CONFIG.MIN_SOL_RESERVE      = mr;
+    log('info', 'Config mise à jour', { tp: CONFIG.TAKE_PROFIT_ENABLED, sl: CONFIG.STOP_LOSS_ENABLED });
+    res.json({ success: true });
+  });
+
+  // ── QUOTE ─────────────────────────────────────────────────────────────────
+  app.post('/api/quote', async (req, res) => {
+    const { inputMint, outputMint, amount, slippageBps = CONFIG.DEFAULT_SLIPPAGE } = req.body;
+    if (!inputMint || !outputMint || !amount) {
+      return res.status(400).json({ error: 'inputMint, outputMint, amount requis' });
+    }
+    try {
+      const quote = await bot.swap.getQuote({
+        inputMint, outputMint,
+        amountRaw: BigInt(Math.floor(Number(amount))),
+        slippageBps: parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE,
+      });
+      res.json({ success: true, quote });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // ── BUY ───────────────────────────────────────────────────────────────────
+  app.post('/api/buy', async (req, res) => {
+    const { mint, solAmount, slippageBps = CONFIG.DEFAULT_SLIPPAGE } = req.body;
+    if (!mint || !solAmount) return res.status(400).json({ error: 'mint et solAmount requis' });
+    const sol = parseFloat(solAmount);
+    if (isNaN(sol) || sol <= 0 || sol > 50) return res.status(400).json({ error: 'solAmount invalide (0-50)' });
+    try {
+      const result = await bot.swap.buy(mint, sol, parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE);
+      if (result.success) {
+        const pd = getTokenPrice(mint);
+        bot._recordTrade({ type: 'buy', mint, symbol: pd?.symbol || mint.slice(0,8),
+          solSpent: sol, outAmount: result.outAmount, txId: result.txId, txUrl: result.txUrl });
+        bot._persist();
+        setTimeout(() => bot.tick().catch(() => {}), 4000);
+      }
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // ── BUY DCA ──────────────────────────────────────────────────────────────
+  app.post('/api/buy/dca', async (req, res) => {
+    const { mint, totalSol, chunks = 3, intervalSec = 60, slippageBps = CONFIG.DEFAULT_SLIPPAGE } = req.body;
+    if (!mint || !totalSol) return res.status(400).json({ error: 'mint et totalSol requis' });
+    const sol = parseFloat(totalSol);
+    const n   = Math.min(parseInt(chunks) || 3, 10);
+    if (isNaN(sol) || sol <= 0) return res.status(400).json({ error: 'totalSol invalide' });
+    try {
+      const result = await bot.swap.buyDCA(mint, sol, n, parseInt(intervalSec) || 60,
+        parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE);
+      for (const r of result.results.filter(r => r.success)) {
+        const pd = getTokenPrice(mint);
+        bot._recordTrade({ type: 'buy', mint, symbol: pd?.symbol || mint.slice(0,8),
+          solSpent: sol/n, outAmount: r.outAmount, txId: r.txId, txUrl: r.txUrl, tag: `DCA ${r.chunk}/${n}` });
+      }
+      bot._persist();
+      setTimeout(() => bot.tick().catch(() => {}), 4000);
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // ── SELL ──────────────────────────────────────────────────────────────────
+  app.post('/api/sell', async (req, res) => {
+    const { mint, amount, percent, slippageBps = CONFIG.DEFAULT_SLIPPAGE, reason = 'MANUAL' } = req.body;
+    if (!mint) return res.status(400).json({ error: 'mint requis' });
+
+    const tok = bot.portfolio.find(t => t.mintFull === mint || t.mintFull?.startsWith(mint.slice(0,8)));
+    if (!tok) return res.status(404).json({ error: 'Token non trouvé dans le portfolio' });
+
+    let sellAmount = amount ? parseFloat(amount) : 0;
+    if (percent !== undefined) sellAmount = tok.balance * (parseFloat(percent) / 100);
+    if (!sellAmount || sellAmount <= 0) return res.status(400).json({ error: 'Montant invalide' });
+    sellAmount = Math.min(sellAmount, tok.balance);
+
+    const result = await bot.swap.sell(tok.mintFull, sellAmount, reason,
+      parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE);
+
+    if (result.success) {
+      bot._recordTrade({ type: 'sell', mint: tok.mintFull, symbol: tok.symbol || tok.mintFull.slice(0,8),
+        amount: sellAmount, solOut: result.solOut, reason, txId: result.txId, txUrl: result.txUrl });
+      bot._persist();
+      setTimeout(() => bot.tick().catch(() => {}), 4000);
+    }
+    res.json({ ...result, sellAmount });
+  });
+
+  // ── RESET CIRCUIT BREAKER ────────────────────────────────────────────────
+  app.post('/api/reset-circuit-breaker', (req, res) => {
+    bot.swap.sellFailures = 0;
+    log('info', 'Circuit-breaker réinitialisé');
+    res.json({ success: true });
+  });
+
+  // ── LEGACY ───────────────────────────────────────────────────────────────
+  app.post('/api/sell/test', async (req, res) => {
+    res.status(410).json({ error: 'Endpoint retiré — utiliser POST /api/sell' });
+  });
+
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-  const port = CONFIG.PORT;
-  app.listen(port, '0.0.0.0', () => log('info', 'API démarrée', { port }));
+
+  app.listen(CONFIG.PORT, '0.0.0.0', () =>
+    log('info', 'API démarrée', { port: CONFIG.PORT, version: VERSION }));
   return app;
 }
 
@@ -447,17 +1295,38 @@ function startApi(bot, wallet) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function main() {
-  log('info', `🤖 SolBot-Pro v${VERSION} — Démarrage`, { env: CONFIG.NODE_ENV });
-  const wallet = loadWallet();
-  const rpc = getRpcConnection();
-  const bot = new BotLoop(wallet, rpc);
-  log('info', '🚀 Premier cycle...');
+  log('info', `SolBot v${VERSION} — Démarrage`, { env: CONFIG.NODE_ENV });
+  const wallet     = loadWallet();
+  const rpc        = createRpcManager();
+  const savedState = loadState();
+  const bot        = new BotLoop(wallet, rpc, savedState);
+
+  log('info', 'Premier cycle...');
   await bot.tick();
-  setInterval(() => bot.tick().catch(err => log('error', 'Erreur loop', { error: err.message })), CONFIG.INTERVAL_SEC * 1000);
+
+  setInterval(
+    () => bot.tick().catch(err => log('error', 'Loop error', { error: err.message })),
+    CONFIG.INTERVAL_SEC * 1000,
+  );
+
   startApi(bot, wallet);
-  log('info', '✅ Bot actif', { address: wallet.publicKey.toString().slice(0,8)+'...', interval: `${CONFIG.INTERVAL_SEC}s` });
-  process.on('SIGINT', () => { log('info', '🛑 Arrêt'); process.exit(0); });
-  process.on('uncaughtException', (err) => log('error', '💥 Exception', { error: err.message }));
+
+  log('success', 'Bot opérationnel', {
+    address:    wallet.publicKey.toString().slice(0, 8) + '...',
+    interval:   CONFIG.INTERVAL_SEC + 's',
+    tp:         CONFIG.TAKE_PROFIT_ENABLED ? CONFIG.TAKE_PROFIT_TIERS.length + ' paliers' : 'off',
+    sl:         CONFIG.STOP_LOSS_ENABLED   ? CONFIG.STOP_LOSS_PCT + '%' : 'off',
+    trailing:   CONFIG.TRAILING_STOP_ENABLED ? CONFIG.TRAILING_STOP_PCT + '%' : 'off',
+    antiRug:    CONFIG.ANTI_RUG_ENABLED ? CONFIG.ANTI_RUG_PCT + '%' : 'off',
+    solReserve: CONFIG.MIN_SOL_RESERVE + ' SOL',
+    webhook:    CONFIG.WEBHOOK_URL ? CONFIG.WEBHOOK_TYPE : 'off',
+  });
+
+  const cleanup = () => { bot._persist(); log('info', 'Arrêt propre'); process.exit(0); };
+  process.on('SIGINT',  cleanup);
+  process.on('SIGTERM', cleanup);
+  process.on('uncaughtException',  err    => log('error', 'Exception non gérée', { error: err.message }));
+  process.on('unhandledRejection', reason => log('error', 'Rejet non géré',      { reason: String(reason).slice(0, 300) }));
 }
 
-main().catch(err => { console.error('🚨 Échec démarrage:', err.message); process.exit(1); });
+main().catch(err => { console.error('Échec démarrage:', err.message); process.exit(1); });
