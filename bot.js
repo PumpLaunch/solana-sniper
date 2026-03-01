@@ -912,7 +912,30 @@ class BotLoop {
     this.startTime    = Date.now();
     this.cycleCount   = 0;
     this.tradeHistory = savedState.trades || [];
-    this.positions    = new PositionManager(
+
+    // ── Analytics persistants ──────────────────────────────────────────────
+    const saved = savedState.analytics || {};
+    this.analytics = {
+      realizedPnlSol:  saved.realizedPnlSol  || 0,   // PnL total réalisé en SOL
+      totalBoughtSol:  saved.totalBoughtSol  || 0,   // SOL total investi
+      totalSoldSol:    saved.totalSoldSol    || 0,   // SOL total récupéré
+      winCount:        saved.winCount        || 0,   // trades gagnants
+      lossCount:       saved.lossCount       || 0,   // trades perdants
+      totalTrades:     saved.totalTrades     || 0,   // nb total de round-trips
+      bestTradePct:    saved.bestTradePct    || null,// meilleur % réalisé
+      worstTradePct:   saved.worstTradePct   || null,// pire % réalisé
+      bestTradeSymbol: saved.bestTradeSymbol || null,
+      worstTradeSymbol:saved.worstTradeSymbol|| null,
+      avgHoldMs:       saved.avgHoldMs       || 0,   // durée moyenne en ms
+      dailyPnl:        saved.dailyPnl        || [],  // [{date:'2024-01-01', pnlSol, trades}]
+      pnlHistory:      saved.pnlHistory      || [],  // [{ts, cumulSol}] pour graphique
+    };
+
+    // Cost basis : Map<mint, {solSpent, tokBought, buyTs}>
+    const cbRaw = savedState.costBasis || {};
+    this.costBasis = new Map(Object.entries(cbRaw));
+
+    this.positions = new PositionManager(
       CONFIG.TAKE_PROFIT_TIERS,
       CONFIG.TAKE_PROFIT_HYSTERESIS,
       savedState,
@@ -923,15 +946,88 @@ class BotLoop {
   _persist() {
     saveState({
       entryPrices: this.positions.toSerializable(),
-      trades:      this.tradeHistory.slice(0, 50),
-      stopLossHit: Array.from(this.positions.stopLossHit),  // FIX: persisté
-      slPending:   Array.from(this.positions.slPending),    // FIX: persisté
+      trades:      this.tradeHistory.slice(0, 500),  // 500 trades persistés
+      stopLossHit: Array.from(this.positions.stopLossHit),
+      slPending:   Array.from(this.positions.slPending),
+      analytics:   this.analytics,
+      costBasis:   Object.fromEntries(this.costBasis),
     });
+  }
+
+  // Enregistre le cost basis à l'achat
+  _recordBuy(mint, solSpent, tokBought) {
+    const existing = this.costBasis.get(mint);
+    if (existing) {
+      // DCA : moyenne pondérée
+      existing.solSpent  += solSpent;
+      existing.tokBought += tokBought;
+    } else {
+      this.costBasis.set(mint, { solSpent, tokBought, buyTs: Date.now() });
+    }
+    this.analytics.totalBoughtSol = +(this.analytics.totalBoughtSol + solSpent).toFixed(6);
+  }
+
+  // Calcule et enregistre le PnL réalisé à la vente
+  _recordSell(mint, solOut, amountSold, symbol) {
+    const cb = this.costBasis.get(mint);
+    let pnlSol = null, pnlPct = null, holdMs = null;
+
+    if (cb && cb.solSpent > 0 && cb.tokBought > 0) {
+      // Coût proportionnel aux tokens vendus
+      const pctSold   = Math.min(amountSold / cb.tokBought, 1);
+      const costBasis = cb.solSpent * pctSold;
+      pnlSol  = +(solOut - costBasis).toFixed(6);
+      pnlPct  = costBasis > 0 ? +((pnlSol / costBasis) * 100).toFixed(2) : null;
+      holdMs  = Date.now() - (cb.buyTs || Date.now());
+
+      // Mettre à jour le cost basis restant
+      cb.solSpent  *= (1 - pctSold);
+      cb.tokBought -= amountSold;
+      if (cb.tokBought <= 0) this.costBasis.delete(mint);
+
+      // Mettre à jour les analytics
+      this.analytics.realizedPnlSol  = +(this.analytics.realizedPnlSol + pnlSol).toFixed(6);
+      this.analytics.totalSoldSol    = +(this.analytics.totalSoldSol + solOut).toFixed(6);
+      this.analytics.totalTrades++;
+      if (pnlSol >= 0) {
+        this.analytics.winCount++;
+        if (pnlPct !== null && (this.analytics.bestTradePct === null || pnlPct > this.analytics.bestTradePct)) {
+          this.analytics.bestTradePct    = pnlPct;
+          this.analytics.bestTradeSymbol = symbol;
+        }
+      } else {
+        this.analytics.lossCount++;
+        if (pnlPct !== null && (this.analytics.worstTradePct === null || pnlPct < this.analytics.worstTradePct)) {
+          this.analytics.worstTradePct    = pnlPct;
+          this.analytics.worstTradeSymbol = symbol;
+        }
+      }
+
+      // Moyenne hold time
+      const n = this.analytics.totalTrades;
+      this.analytics.avgHoldMs = Math.round((this.analytics.avgHoldMs * (n-1) + holdMs) / n);
+
+      // Snapshot journalier
+      const today = new Date().toISOString().slice(0, 10);
+      const day   = this.analytics.dailyPnl.find(d => d.date === today);
+      if (day) { day.pnlSol = +(day.pnlSol + pnlSol).toFixed(6); day.trades++; }
+      else      { this.analytics.dailyPnl.push({ date: today, pnlSol: +pnlSol.toFixed(6), trades: 1 }); }
+      if (this.analytics.dailyPnl.length > 90) this.analytics.dailyPnl.shift(); // 90 jours max
+
+      // Historique PnL cumulatif pour graphique
+      this.analytics.pnlHistory.push({ ts: Date.now(), cumul: +this.analytics.realizedPnlSol.toFixed(6) });
+      if (this.analytics.pnlHistory.length > 500) this.analytics.pnlHistory.shift();
+    } else {
+      // Pas de cost basis (token acheté avant analytics) — enregistre quand même le SOL
+      this.analytics.totalSoldSol = +(this.analytics.totalSoldSol + solOut).toFixed(6);
+    }
+
+    return { pnlSol, pnlPct, holdMs };
   }
 
   _recordTrade(entry) {
     this.tradeHistory.unshift({ ...entry, ts: Date.now() });
-    if (this.tradeHistory.length > 100) this.tradeHistory.length = 100;
+    if (this.tradeHistory.length > 500) this.tradeHistory.length = 500;
   }
 
   async tick() {
@@ -985,9 +1081,10 @@ class BotLoop {
             const res = await this.swap.sell(mint, rugAlert.sellAmount, 'ANTI_RUG');
             if (res.success) {
               this.positions.markStopLossExecuted(mint);
+              const { pnlSol, pnlPct } = this._recordSell(mint, res.solOut, rugAlert.sellAmount, priceData?.symbol);
               this._recordTrade({ type: 'sell', mint, symbol: priceData?.symbol || mint.slice(0,8),
                 amount: rugAlert.sellAmount, solOut: res.solOut, reason: 'Anti-Rug',
-                txId: res.txId, txUrl: res.txUrl });
+                txId: res.txId, txUrl: res.txUrl, pnlSol, pnlPct });
               await sendWebhook('✅ Anti-Rug vendu', `${(rugAlert.sellAmount).toFixed(4)} tokens vendus`,
                 0x05d488, [{ name: 'SOL reçu', value: res.solOut?.toFixed(6), inline: true }]);
             } else {
@@ -1004,9 +1101,10 @@ class BotLoop {
               const res = await this.swap.sell(mint, tier.sellAmount, `TP_T${tier.tierIndex+1}`);
               if (res.success) {
                 this.positions.markTierExecuted(mint, tier.tierIndex, tier.sellAmount);
+                const { pnlSol, pnlPct } = this._recordSell(mint, res.solOut, tier.sellAmount, priceData?.symbol);
                 this._recordTrade({ type: 'sell', mint, symbol: priceData?.symbol || mint.slice(0,8),
                   amount: tier.sellAmount, solOut: res.solOut, reason: `TP Palier ${tier.tierIndex+1}`,
-                  txId: res.txId, txUrl: res.txUrl });
+                  txId: res.txId, txUrl: res.txUrl, pnlSol, pnlPct });
                 await sendWebhook(`🎯 Take-Profit T${tier.tierIndex+1}`,
                   `+${tier.currentPnl}% atteint sur **${priceData?.symbol || mint.slice(0,8)}**`, 0x05d488, [
                   { name: 'Vendu', value: tier.sellAmount.toFixed(4), inline: true },
@@ -1025,9 +1123,10 @@ class BotLoop {
             const res = await this.swap.sell(mint, sl.sellAmount, 'STOP_LOSS');
             if (res.success) {
               this.positions.markStopLossExecuted(mint);
+              const { pnlSol: slPnlSol, pnlPct: slPnlPct } = this._recordSell(mint, res.solOut, sl.sellAmount, priceData?.symbol);
               this._recordTrade({ type: 'sell', mint, symbol: priceData?.symbol || mint.slice(0,8),
                 amount: sl.sellAmount, solOut: res.solOut, reason: 'Stop-Loss',
-                txId: res.txId, txUrl: res.txUrl });
+                txId: res.txId, txUrl: res.txUrl, pnlSol: slPnlSol, pnlPct: slPnlPct });
               await sendWebhook('🔴 Stop-Loss déclenché',
                 `**${priceData?.symbol || mint.slice(0,8)}** vendu à ${sl.pnl}%`, 0xff4757, [
                 { name: 'SOL récupéré', value: res.solOut?.toFixed(6), inline: true },
@@ -1045,9 +1144,10 @@ class BotLoop {
             const res = await this.swap.sell(mint, ts.sellAmount, 'TRAILING_STOP');
             if (res.success) {
               this.positions.markStopLossExecuted(mint);
+              const { pnlSol: tsPnlSol, pnlPct: tsPnlPct } = this._recordSell(mint, res.solOut, ts.sellAmount, priceData?.symbol);
               this._recordTrade({ type: 'sell', mint, symbol: priceData?.symbol || mint.slice(0,8),
                 amount: ts.sellAmount, solOut: res.solOut, reason: 'Trailing Stop',
-                txId: res.txId, txUrl: res.txUrl });
+                txId: res.txId, txUrl: res.txUrl, pnlSol: tsPnlSol, pnlPct: tsPnlPct });
               await sendWebhook('📉 Trailing Stop',
                 `**${priceData?.symbol || mint.slice(0,8)}** — pic: +${ts.peak}%, actuel: ${ts.pnl}%`, 0xffb020);
             } else {
@@ -1205,21 +1305,52 @@ function startApi(bot, wallet) {
   }));
 
   app.post('/api/config', (req, res) => {
-    const { takeProfitEnabled, stopLossEnabled, stopLossPct,
+    const { takeProfitEnabled, takeProfitTiers, hysteresis,
+            stopLossEnabled, stopLossPct,
             trailingEnabled, trailingPct, antiRugEnabled, antiRugPct,
-            defaultSlippage, minSolReserve } = req.body;
-    if (takeProfitEnabled !== undefined) CONFIG.TAKE_PROFIT_ENABLED    = !!takeProfitEnabled;
-    if (stopLossEnabled   !== undefined) CONFIG.STOP_LOSS_ENABLED      = !!stopLossEnabled;
-    if (trailingEnabled   !== undefined) CONFIG.TRAILING_STOP_ENABLED  = !!trailingEnabled;
-    if (antiRugEnabled    !== undefined) CONFIG.ANTI_RUG_ENABLED       = !!antiRugEnabled;
+            defaultSlippage, minSolReserve, intervalSec } = req.body;
+
+    if (takeProfitEnabled !== undefined) CONFIG.TAKE_PROFIT_ENABLED   = !!takeProfitEnabled;
+    if (stopLossEnabled   !== undefined) CONFIG.STOP_LOSS_ENABLED     = !!stopLossEnabled;
+    if (trailingEnabled   !== undefined) CONFIG.TRAILING_STOP_ENABLED = !!trailingEnabled;
+    if (antiRugEnabled    !== undefined) CONFIG.ANTI_RUG_ENABLED      = !!antiRugEnabled;
+
+    // Validate & set TP tiers: array of {pnl, sell} where pnl>0, sell>0, sum sell <= 100
+    if (Array.isArray(takeProfitTiers) && takeProfitTiers.length > 0) {
+      const clean = takeProfitTiers
+        .map(t => ({ pnl: parseFloat(t.pnl), sell: parseFloat(t.sell) }))
+        .filter(t => !isNaN(t.pnl) && t.pnl > 0 && !isNaN(t.sell) && t.sell > 0 && t.sell <= 100)
+        .sort((a, b) => a.pnl - b.pnl);
+      if (clean.length > 0) CONFIG.TAKE_PROFIT_TIERS = clean;
+    }
+
     const validateNum = (v, min, max) => { const n = parseFloat(v); return !isNaN(n) && n >= min && n <= max ? n : null; };
-    const sl  = validateNum(stopLossPct, -100, 0);      if (sl  !== null) CONFIG.STOP_LOSS_PCT       = sl;
-    const tr  = validateNum(trailingPct, 1, 100);        if (tr  !== null) CONFIG.TRAILING_STOP_PCT   = tr;
-    const ar  = validateNum(antiRugPct, 1, 100);         if (ar  !== null) CONFIG.ANTI_RUG_PCT         = ar;
-    const ds  = validateNum(defaultSlippage, 10, 5000); if (ds  !== null) CONFIG.DEFAULT_SLIPPAGE     = ds;
-    const mr  = validateNum(minSolReserve, 0, 10);      if (mr  !== null) CONFIG.MIN_SOL_RESERVE      = mr;
-    log('info', 'Config mise à jour', { tp: CONFIG.TAKE_PROFIT_ENABLED, sl: CONFIG.STOP_LOSS_ENABLED });
-    res.json({ success: true });
+    const sl  = validateNum(stopLossPct,    -100, 0);    if (sl  !== null) CONFIG.STOP_LOSS_PCT           = sl;
+    const tr  = validateNum(trailingPct,    1, 100);     if (tr  !== null) CONFIG.TRAILING_STOP_PCT       = tr;
+    const ar  = validateNum(antiRugPct,     1, 100);     if (ar  !== null) CONFIG.ANTI_RUG_PCT            = ar;
+    const ds  = validateNum(defaultSlippage,10, 5000);  if (ds  !== null) CONFIG.DEFAULT_SLIPPAGE        = ds;
+    const mr  = validateNum(minSolReserve,  0, 10);     if (mr  !== null) CONFIG.MIN_SOL_RESERVE         = mr;
+    const hys = validateNum(hysteresis,     0, 50);     if (hys !== null) CONFIG.TAKE_PROFIT_HYSTERESIS  = hys;
+    const ivl = validateNum(intervalSec,    10, 3600);  if (ivl !== null) CONFIG.INTERVAL_SEC            = ivl;
+
+    log('info', 'Config mise à jour', {
+      tp: CONFIG.TAKE_PROFIT_ENABLED, tiers: CONFIG.TAKE_PROFIT_TIERS.length,
+      sl: CONFIG.STOP_LOSS_ENABLED, trail: CONFIG.TRAILING_STOP_ENABLED,
+    });
+    res.json({ success: true, config: {
+      takeProfitEnabled:  CONFIG.TAKE_PROFIT_ENABLED,
+      takeProfitTiers:    CONFIG.TAKE_PROFIT_TIERS,
+      hysteresis:         CONFIG.TAKE_PROFIT_HYSTERESIS,
+      stopLossEnabled:    CONFIG.STOP_LOSS_ENABLED,
+      stopLossPct:        CONFIG.STOP_LOSS_PCT,
+      trailingEnabled:    CONFIG.TRAILING_STOP_ENABLED,
+      trailingPct:        CONFIG.TRAILING_STOP_PCT,
+      antiRugEnabled:     CONFIG.ANTI_RUG_ENABLED,
+      antiRugPct:         CONFIG.ANTI_RUG_PCT,
+      defaultSlippage:    CONFIG.DEFAULT_SLIPPAGE,
+      minSolReserve:      CONFIG.MIN_SOL_RESERVE,
+      intervalSec:        CONFIG.INTERVAL_SEC,
+    }});
   });
 
   // ── QUOTE ─────────────────────────────────────────────────────────────────
@@ -1250,6 +1381,7 @@ function startApi(bot, wallet) {
       const result = await bot.swap.buy(mint, sol, parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE);
       if (result.success) {
         const pd = getTokenPrice(mint);
+        bot._recordBuy(mint, sol, result.outAmount || 0);
         bot._recordTrade({ type: 'buy', mint, symbol: pd?.symbol || mint.slice(0,8),
           solSpent: sol, outAmount: result.outAmount, txId: result.txId, txUrl: result.txUrl });
         bot._persist();
@@ -1273,6 +1405,7 @@ function startApi(bot, wallet) {
         parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE);
       for (const r of result.results.filter(r => r.success)) {
         const pd = getTokenPrice(mint);
+        bot._recordBuy(mint, sol/n, r.outAmount || 0);
         bot._recordTrade({ type: 'buy', mint, symbol: pd?.symbol || mint.slice(0,8),
           solSpent: sol/n, outAmount: r.outAmount, txId: r.txId, txUrl: r.txUrl, tag: `DCA ${r.chunk}/${n}` });
       }
@@ -1301,12 +1434,55 @@ function startApi(bot, wallet) {
       parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE);
 
     if (result.success) {
+      const { pnlSol, pnlPct } = bot._recordSell(tok.mintFull, result.solOut, sellAmount, tok.symbol);
       bot._recordTrade({ type: 'sell', mint: tok.mintFull, symbol: tok.symbol || tok.mintFull.slice(0,8),
-        amount: sellAmount, solOut: result.solOut, reason, txId: result.txId, txUrl: result.txUrl });
+        amount: sellAmount, solOut: result.solOut, reason, txId: result.txId, txUrl: result.txUrl,
+        pnlSol, pnlPct });
       bot._persist();
       setTimeout(() => bot.tick().catch(() => {}), 4000);
     }
     res.json({ ...result, sellAmount });
+  });
+
+  // ── ANALYTICS ────────────────────────────────────────────────────────────
+  app.get('/api/analytics', (req, res) => {
+    const a  = bot.analytics;
+    const n  = a.winCount + a.lossCount;
+    const winRate  = n > 0 ? +((a.winCount / n) * 100).toFixed(1) : null;
+    const roi      = a.totalBoughtSol > 0
+      ? +((a.realizedPnlSol / a.totalBoughtSol) * 100).toFixed(2) : null;
+
+    // Calcul des trades sell avec PnL pour avg profit/loss
+    const sellTrades = bot.tradeHistory.filter(t => t.type === 'sell' && t.pnlPct != null);
+    const wins  = sellTrades.filter(t => t.pnlPct >= 0);
+    const loses = sellTrades.filter(t => t.pnlPct < 0);
+    const avgWin  = wins.length  ? +(wins.reduce((s,t) => s+t.pnlPct, 0)  / wins.length).toFixed(1)  : null;
+    const avgLoss = loses.length ? +(loses.reduce((s,t) => s+t.pnlPct, 0) / loses.length).toFixed(1) : null;
+
+    // Formatage du hold time moyen
+    const h   = Math.floor(a.avgHoldMs / 3600000);
+    const m   = Math.floor((a.avgHoldMs % 3600000) / 60000);
+    const avgHold = a.avgHoldMs > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : null;
+
+    res.json({
+      realizedPnlSol:  +a.realizedPnlSol.toFixed(4),
+      totalBoughtSol:  +a.totalBoughtSol.toFixed(4),
+      totalSoldSol:    +a.totalSoldSol.toFixed(4),
+      winCount:        a.winCount,
+      lossCount:       a.lossCount,
+      totalTrades:     a.totalTrades,
+      winRate,
+      roi,
+      avgWin,
+      avgLoss,
+      avgHold,
+      bestTradePct:    a.bestTradePct,
+      bestTradeSymbol: a.bestTradeSymbol,
+      worstTradePct:   a.worstTradePct,
+      worstTradeSymbol:a.worstTradeSymbol,
+      dailyPnl:        a.dailyPnl.slice(-30),   // 30 derniers jours
+      pnlHistory:      a.pnlHistory.slice(-200), // 200 derniers points
+    });
   });
 
   // ── RESET CIRCUIT BREAKER ────────────────────────────────────────────────
