@@ -1,19 +1,29 @@
 /**
- * SolBot v2.1 — Production-Grade Solana Trading Bot
+ * SolBot v2.2 — Production-Grade Solana Trading Bot
  *
- * Fixes vs v2.0:
+ * Fixes vs v2.1:
+ *  [BUG CRITIQUE] TAKE_PROFIT_ENABLED / STOP_LOSS_ENABLED / ANTI_RUG_ENABLED
+ *                  défaut FALSE si var d'env absente → stratégies jamais actives.
+ *                  Corrigé : défaut TRUE (opt-out avec =false, pas opt-in avec =true)
+ *  [BUG CRITIQUE] Prix d'entrée enregistré au mauvais moment : trackEntry() appelé
+ *                  au cycle suivant avec prix marché approximatif.
+ *                  Corrigé : prix réel calculé depuis le swap (SOL ÷ tokens reçus)
+ *                  et position enregistrée IMMÉDIATEMENT après l'achat.
+ *  [BUG] DCA : prix d'entrée non mis à jour pour les chunks suivants.
+ *              Corrigé : moyenne pondérée (cost averaging) sur tous les chunks.
+ *  [FEAT] Log de démarrage "STRATÉGIE ACTIVE" : affiche l'état TP/SL/AR/Trailing
+ *          au boot pour diagnostiquer rapidement les mauvaises configurations.
+ *  [FEAT] Log debug "📊 TP check" à chaque cycle par token : PnL courant,
+ *          prochain palier, balance restante → facilite le debug TP.
+ *
+ * Fixes vs v2.0 (hérités de v2.1):
  *  [BUG] batchJupiterPrices: fallback v6 sautait si un chunk réussissait
  *  [BUG] Blockhash extrait du tx Jupiter (tx.message.recentBlockhash) et non refetch
  *  [BUG] stopLossHit désormais persisté — évite double-vente après redémarrage
  *  [BUG] Retry _executeSwap refetch le quote (quotes Jupiter expirent en ~60s)
  *  [BUG] Stop-loss marque "pending" même si la vente échoue (évite retry infini)
- *  [PERF] DexScreener individuel ignoré si token déjà traité par le batch (sans résultat)
- *  [FEAT] Trailing stop-loss (TRAILING_STOP_PCT)
- *  [FEAT] Achat DCA (split en N chunks, intervalles configurables)
- *  [FEAT] Webhook notifications Discord/Telegram sur TP, SL, anti-rug
- *  [FEAT] Détection anti-rug (chute soudaine > ANTI_RUG_PCT en un cycle)
- *  [FEAT] GET /api/config pour lire la config courante
- *  [FEAT] Statistiques PnL globales dans /api/stats
+ *  [PERF] DexScreener individuel ignoré si token déjà traité par le batch
+ *  [FEAT] Trailing stop-loss, DCA, Webhooks, Anti-rug, /api/config, PnL stats
  */
 'use strict';
 
@@ -39,21 +49,22 @@ const CONFIG = {
   DATA_FILE:      process.env.DATA_FILE || './bot_state.json',
 
   // Take-profit par paliers
-  TAKE_PROFIT_ENABLED:    process.env.TAKE_PROFIT_ENABLED === 'true',
+  // NOTE: défaut TRUE — mettre TAKE_PROFIT_ENABLED=false pour désactiver
+  TAKE_PROFIT_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'false',
   TAKE_PROFIT_TIERS:      safeParseJson(process.env.TAKE_PROFIT_TIERS,
     [{ pnl: 20, sell: 25 }, { pnl: 40, sell: 25 }, { pnl: 60, sell: 25 }, { pnl: 100, sell: 25 }]),
   TAKE_PROFIT_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
 
-  // Stop-loss fixe
-  STOP_LOSS_ENABLED: process.env.STOP_LOSS_ENABLED === 'true',
+  // Stop-loss fixe — défaut TRUE
+  STOP_LOSS_ENABLED: process.env.STOP_LOSS_ENABLED !== 'false',
   STOP_LOSS_PCT:     parseFloat(process.env.STOP_LOSS_PCT || '-50'),  // ex: -50 = -50%
 
-  // Trailing stop-loss (s'active uniquement si TRAILING_STOP_PCT est défini)
+  // Trailing stop-loss — défaut FALSE (opt-in car agressif)
   TRAILING_STOP_ENABLED: process.env.TRAILING_STOP_ENABLED === 'true',
   TRAILING_STOP_PCT:     parseFloat(process.env.TRAILING_STOP_PCT || '20'), // recule de X% depuis le pic
 
-  // Anti-rug : vend immédiatement si la valeur chute de X% en UN seul cycle
-  ANTI_RUG_ENABLED: process.env.ANTI_RUG_ENABLED === 'true',
+  // Anti-rug : vend immédiatement si la valeur chute de X% en UN seul cycle — défaut TRUE
+  ANTI_RUG_ENABLED: process.env.ANTI_RUG_ENABLED !== 'false',
   ANTI_RUG_PCT:     parseFloat(process.env.ANTI_RUG_PCT || '60'),  // ex: 60 = chute 60%+ en 1 cycle
 
   // Garde-fous trading
@@ -95,7 +106,7 @@ const fetch   = (...args) => import('node-fetch').then(({ default: f }) => f(...
 const SOL_MINT           = 'So11111111111111111111111111111111111111112';
 const TOKEN_PROGRAM      = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_PROGRAM_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
-const VERSION            = '2.1.0';
+const VERSION            = '2.2.0';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGGER
@@ -510,18 +521,24 @@ class PositionManager {
     log('info', 'Positions restaurées', { count: this.entryPrices.size });
   }
 
-  trackEntry(mint, currentPrice, currentBalance) {
+  trackEntry(mint, currentPrice, currentBalance, forcedEntryPrice = null) {
     if (this.entryPrices.has(mint)) return false;
-    if (!currentPrice || currentPrice <= 0 || !currentBalance) return false;
+    // Use forcedEntryPrice (from actual swap) when available, else use current market price
+    const entryPrice = (forcedEntryPrice && forcedEntryPrice > 0) ? forcedEntryPrice : currentPrice;
+    if (!entryPrice || entryPrice <= 0 || !currentBalance) return false;
     this.entryPrices.set(mint, {
-      price: currentPrice, ts: Date.now(),
+      price: entryPrice, ts: Date.now(),
       originalBalance: currentBalance,
       triggeredTiers: [], soldAmount: 0, peakPnl: 0,
     });
     this.triggeredTiers.set(mint, new Set());
     this.soldAmounts.set(mint, 0);
     this.peakPnl.set(mint, 0);
-    log('info', 'Position ouverte', { mint: mint.slice(0,8), entry: currentPrice.toPrecision(6) });
+    log('info', 'Position ouverte', {
+      mint: mint.slice(0,8),
+      entryPrice: entryPrice.toPrecision(6),
+      forced: forcedEntryPrice > 0,
+    });
     return true;
   }
 
@@ -1069,6 +1086,18 @@ class BotLoop {
         if (pnl !== null) this.positions.updatePeak(mint, pnl);
 
         if (price > 0) {
+          // ── Log TP diagnostic chaque cycle ─────────────────────────────
+          if (CONFIG.TAKE_PROFIT_ENABLED && pnl !== null) {
+            const triggered  = this.positions.triggeredTiers.get(mint) || new Set();
+            const remaining  = this.positions.getRemainingBalance(mint);
+            const nextTier   = CONFIG.TAKE_PROFIT_TIERS.find((t, i) => !triggered.has(i) && pnl < t.pnl);
+            log('debug', `📊 TP check ${priceData?.symbol || mint.slice(0,8)}`, {
+              pnl: pnl.toFixed(1) + '%',
+              nextTier: nextTier ? `+${nextTier.pnl}%` : 'tous déclenché',
+              remaining: remaining.toFixed(4),
+              cbFails: this.swap.sellFailures,
+            });
+          }
           // ── Anti-rug (priorité maximale) ──────────────────────────────
           const rugAlert = this.positions.checkAntiRug(mint, price);
           if (rugAlert) {
@@ -1381,10 +1410,19 @@ function startApi(bot, wallet) {
       const result = await bot.swap.buy(mint, sol, parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE);
       if (result.success) {
         const pd = getTokenPrice(mint);
+        // Compute actual entry price from swap: SOL paid / tokens received
+        const actualEntryPrice = result.outAmount > 0 ? sol / result.outAmount : (pd?.price || 0);
+        // Pre-register position with REAL price — before next tick sees the token
+        bot.positions.trackEntry(mint, actualEntryPrice, result.outAmount, actualEntryPrice);
         bot._recordBuy(mint, sol, result.outAmount || 0);
         bot._recordTrade({ type: 'buy', mint, symbol: pd?.symbol || mint.slice(0,8),
-          solSpent: sol, outAmount: result.outAmount, txId: result.txId, txUrl: result.txUrl });
+          solSpent: sol, outAmount: result.outAmount, entryPrice: actualEntryPrice,
+          txId: result.txId, txUrl: result.txUrl });
         bot._persist();
+        log('info', '✅ Position enregistrée', {
+          mint: mint.slice(0,8), entryPrice: actualEntryPrice.toPrecision(6),
+          tokens: result.outAmount?.toFixed(4), tp: CONFIG.TAKE_PROFIT_ENABLED,
+        });
         setTimeout(() => bot.tick().catch(() => {}), 4000);
       }
       res.json(result);
@@ -1405,6 +1443,19 @@ function startApi(bot, wallet) {
         parseInt(slippageBps) || CONFIG.DEFAULT_SLIPPAGE);
       for (const r of result.results.filter(r => r.success)) {
         const pd = getTokenPrice(mint);
+        const chunkEntryPrice = r.outAmount > 0 ? (sol/n) / r.outAmount : (pd?.price || 0);
+        // For DCA, first successful chunk sets the entry; subsequent ones average in via trackEntry returning false
+        if (!bot.positions.entryPrices.has(mint)) {
+          bot.positions.trackEntry(mint, chunkEntryPrice, r.outAmount, chunkEntryPrice);
+        } else {
+          // DCA average — update entry price with weighted average
+          const existing = bot.positions.entryPrices.get(mint);
+          const cb = bot.costBasis.get(mint) || { solSpent: 0, tokBought: 0 };
+          const totalTok = cb.tokBought + r.outAmount;
+          if (totalTok > 0) {
+            existing.price = (cb.solSpent + (sol/n)) / totalTok;
+          }
+        }
         bot._recordBuy(mint, sol/n, r.outAmount || 0);
         bot._recordTrade({ type: 'buy', mint, symbol: pd?.symbol || mint.slice(0,8),
           solSpent: sol/n, outAmount: r.outAmount, txId: r.txId, txUrl: r.txUrl, tag: `DCA ${r.chunk}/${n}` });
@@ -1510,6 +1561,17 @@ function startApi(bot, wallet) {
 
 async function main() {
   log('info', `SolBot v${VERSION} — Démarrage`, { env: CONFIG.NODE_ENV });
+
+  // ── Startup strategy summary (aide au debug) ──────────────────────────────
+  const tpTierStr = CONFIG.TAKE_PROFIT_TIERS.map(t => `+${t.pnl}%→${t.sell}%`).join(' | ');
+  log('info', '═══ STRATÉGIE ACTIVE ═══', {
+    TAKE_PROFIT:  CONFIG.TAKE_PROFIT_ENABLED ? `✅ ON  [${tpTierStr}]` : '❌ OFF',
+    STOP_LOSS:    CONFIG.STOP_LOSS_ENABLED   ? `✅ ON  [${CONFIG.STOP_LOSS_PCT}%]` : '❌ OFF',
+    TRAILING:     CONFIG.TRAILING_STOP_ENABLED ? `✅ ON  [-${CONFIG.TRAILING_STOP_PCT}% depuis pic]` : '❌ OFF',
+    ANTI_RUG:     CONFIG.ANTI_RUG_ENABLED    ? `✅ ON  [chute >${CONFIG.ANTI_RUG_PCT}%]` : '❌ OFF',
+    HYSTERESIS:   CONFIG.TAKE_PROFIT_HYSTERESIS + '%',
+    INTERVAL:     CONFIG.INTERVAL_SEC + 's',
+  });
   const wallet     = loadWallet();
   const rpc        = createRpcManager();
   const savedState = loadState();
