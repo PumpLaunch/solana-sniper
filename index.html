@@ -3,1936 +3,485 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#131722">
+  <meta name="theme-color" content="#0d1117">
   <title>SolBot Pro — Trading Terminal</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root[data-theme="dark"] {
-      --tv-bg: #131722;
-      --tv-bg-secondary: #1e222d;
-      --tv-bg-tertiary: #2a2e39;
-      --tv-border: #2a2e39;
-      --tv-text-primary: #d1d4dc;
-      --tv-text-secondary: #787b86;
-      --tv-text-muted: #434651;
-      --tv-accent-blue: #2962ff;
-      --tv-accent-green: #0ecb81;
-      --tv-accent-red: #f23645;
-      --tv-accent-orange: #ff9800;
-      --tv-card-bg: #1e222d;
-      --tv-hover: #2a2e39;
-      --tv-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    
-    :root[data-theme="light"] {
-      --tv-bg: #ffffff;
-      --tv-bg-secondary: #f0f3f8;
-      --tv-bg-tertiary: #e0e3eb;
-      --tv-border: #d1d4dc;
-      --tv-text-primary: #131722;
-      --tv-text-secondary: #434651;
-      --tv-text-muted: #787b86;
-      --tv-accent-blue: #2962ff;
-      --tv-accent-green: #0ecb81;
-      --tv-accent-red: #f23645;
-      --tv-accent-orange: #ff9800;
-      --tv-card-bg: #ffffff;
-      --tv-hover: #f0f3f8;
-      --tv-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--tv-bg);
-      color: var(--tv-text-primary);
-      font-size: 13px;
-      line-height: 1.5;
-    }
-    
-    /* Header */
-    .tv-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 48px;
-      background: var(--tv-bg-secondary);
-      border-bottom: 1px solid var(--tv-border);
-      padding: 0 16px;
-    }
-    
-    .tv-logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-weight: 600;
-      font-size: 16px;
-    }
-    
-    .tv-logo-icon {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, var(--tv-accent-blue), #00bcd4);
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      color: white;
-    }
-    
-    .tv-nav {
-      display: flex;
-      gap: 4px;
-    }
-    
-    .tv-nav-item {
-      padding: 6px 12px;
-      color: var(--tv-text-secondary);
-      cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.2s;
-    }
-    
-    .tv-nav-item:hover { background: var(--tv-hover); color: var(--tv-text-primary); }
-    .tv-nav-item.active { background: var(--tv-accent-blue); color: white; }
-    
-    .tv-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .tv-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      background: rgba(14, 203, 129, 0.15);
-      border: 1px solid var(--tv-accent-green);
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--tv-accent-green);
-    }
-    
-    .tv-badge-dot {
-      width: 6px;
-      height: 6px;
-      background: var(--tv-accent-green);
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    
-    .tv-wallet {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      background: var(--tv-bg-tertiary);
-      border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-    }
-    
-    .tv-btn {
-      padding: 6px 16px;
-      border: none;
-      border-radius: 6px;
-      font-weight: 500;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    
-    .tv-btn-primary {
-      background: var(--tv-accent-blue);
-      color: white;
-    }
-    
-    .tv-btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
-    
-    .tv-btn-secondary {
-      background: var(--tv-bg-tertiary);
-      color: var(--tv-text-primary);
-      border: 1px solid var(--tv-border);
-    }
-    
-    .tv-btn-secondary:hover { background: var(--tv-hover); }
-    
-    .tv-btn-success { background: var(--tv-accent-green); color: white; }
-    .tv-btn-danger { background: var(--tv-accent-red); color: white; }
-    
-    /* Main Layout */
-    .tv-container {
-      display: grid;
-      grid-template-columns: 1fr 400px;
-      height: calc(100vh - 48px);
-    }
-    
-    .tv-main {
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid var(--tv-border);
-      overflow: hidden;
-    }
-    
-    /* KPI Cards */
-    .tv-kpi-bar {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 1px;
-      background: var(--tv-border);
-      padding: 12px 16px;
-    }
-    
-    .tv-kpi {
-      background: var(--tv-bg);
-      padding: 12px;
-      border-radius: 6px;
-    }
-    
-    .tv-kpi-label {
-      font-size: 11px;
-      color: var(--tv-text-secondary);
-      margin-bottom: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .tv-kpi-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 18px;
-      font-weight: 600;
-    }
-    
-    .tv-kpi-value.green { color: var(--tv-accent-green); }
-    .tv-kpi-value.red { color: var(--tv-accent-red); }
-    .tv-kpi-value.amber { color: var(--tv-accent-orange); }
-    
-    .tv-kpi-sub {
-      font-size: 11px;
-      color: var(--tv-text-muted);
-      margin-top: 2px;
-    }
-    
-    /* Toolbar */
-    .tv-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--tv-border);
-      background: var(--tv-bg-secondary);
-    }
-    
-    .tv-search {
-      position: relative;
-      width: 280px;
-    }
-    
-    .tv-search input {
-      width: 100%;
-      padding: 8px 12px 8px 36px;
-      background: var(--tv-bg-tertiary);
-      border: 1px solid var(--tv-border);
-      border-radius: 6px;
-      color: var(--tv-text-primary);
-      font-size: 13px;
-    }
-    
-    .tv-search input:focus {
-      outline: none;
-      border-color: var(--tv-accent-blue);
-    }
-    
-    .tv-search-icon {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--tv-text-muted);
-    }
-    
-    .tv-tabs {
-      display: flex;
-      gap: 2px;
-      background: var(--tv-bg-tertiary);
-      padding: 3px;
-      border-radius: 6px;
-    }
-    
-    .tv-tab {
-      padding: 6px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      font-size: 12px;
-      color: var(--tv-text-secondary);
-    }
-    
-    .tv-tab.active {
-      background: var(--tv-bg);
-      color: var(--tv-text-primary);
-      box-shadow: var(--tv-shadow);
-    }
-    
-    /* Table */
-    .tv-table-container {
-      flex: 1;
-      overflow-y: auto;
-    }
-    
-    .tv-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    
-    .tv-table th {
-      position: sticky;
-      top: 0;
-      background: var(--tv-bg-secondary);
-      padding: 10px 16px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--tv-text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-bottom: 1px solid var(--tv-border);
-    }
-    
-    .tv-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--tv-border);
-    }
-    
-    .tv-table tr:hover {
-      background: var(--tv-hover);
-    }
-    
-    /* Token Logo */
-    .tv-token {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    
-    .tv-token-logo {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--tv-bg-tertiary);
-      border: 1px solid var(--tv-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 11px;
-      color: var(--tv-text-secondary);
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-    
-    .tv-token-logo img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    .tv-token-logo.placeholder {
-      background: linear-gradient(135deg, var(--tv-accent-blue), var(--tv-accent-orange));
-      color: white;
-      border: none;
-    }
-    
-    .tv-token-info {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-    
-    .tv-token-symbol {
-      font-weight: 600;
-      font-size: 13px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    
-    .tv-token-address {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: var(--tv-text-muted);
-    }
-    
-    .tv-token-address a {
-      color: var(--tv-accent-blue);
-      text-decoration: none;
-    }
-    
-    .tv-token-address a:hover {
-      text-decoration: underline;
-    }
-    
-    .tv-price {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 500;
-    }
-    
-    .tv-pnl-badge {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    
-    .tv-pnl-pos {
-      background: rgba(14, 203, 129, 0.15);
-      color: var(--tv-accent-green);
-    }
-    
-    .tv-pnl-neg {
-      background: rgba(242, 54, 69, 0.15);
-      color: var(--tv-accent-red);
-    }
-    
-    .tv-tp-dots {
-      display: flex;
-      gap: 3px;
-    }
-    
-    .tv-tp-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 2px;
-      background: var(--tv-border);
-    }
-    
-    .tv-tp-dot.active {
-      background: var(--tv-accent-green);
-    }
-    
-    /* Right Panel */
-    .tv-sidebar {
-      display: flex;
-      flex-direction: column;
-      background: var(--tv-bg-secondary);
-      overflow-y: auto;
-    }
-    
-    .tv-panel {
-      border-bottom: 1px solid var(--tv-border);
-    }
-    
-    .tv-panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      font-weight: 600;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--tv-text-secondary);
-      cursor: pointer;
-    }
-    
-    .tv-panel-header:hover {
-      background: var(--tv-hover);
-    }
-    
-    .tv-panel-content {
-      padding: 12px 16px;
-    }
-    
-    .tv-spotlight {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-    
-    .tv-spotlight-card {
-      background: var(--tv-bg-tertiary);
-      padding: 12px;
-      border-radius: 6px;
-    }
-    
-    .tv-spotlight-label {
-      font-size: 11px;
-      color: var(--tv-text-muted);
-      margin-bottom: 6px;
-    }
-    
-    .tv-spotlight-symbol {
-      font-weight: 600;
-      font-size: 13px;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    
-    .tv-spotlight-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-    }
-    
-    .tv-tp-item {
-      padding: 10px 0;
-      border-bottom: 1px solid var(--tv-border);
-    }
-    
-    .tv-tp-item:last-child {
-      border-bottom: none;
-    }
-    
-    .tv-tp-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 12px;
-    }
-    
-    .tv-tp-mint {
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--tv-text-secondary);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    
-    .tv-tp-bars {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 6px;
-    }
-    
-    .tv-tp-bar {
-      flex: 1;
-      height: 4px;
-      background: var(--tv-border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    
-    .tv-tp-bar-fill {
-      height: 100%;
-      background: var(--tv-border);
-      transition: width 0.4s ease;
-    }
-    
-    .tv-tp-bar-fill.done {
-      background: var(--tv-accent-green);
-    }
-    
-    .tv-tp-bar-fill.active {
-      background: var(--tv-accent-orange);
-    }
-    
-    .tv-tp-label {
-      font-size: 9px;
-      text-align: center;
-      color: var(--tv-text-muted);
-      margin-top: 2px;
-    }
-    
-    .tv-tp-label.done { color: var(--tv-accent-green); }
-    .tv-tp-label.active { color: var(--tv-accent-orange); }
-    
-    .tv-analytics-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    
-    .tv-analytics-item {
-      background: var(--tv-bg-tertiary);
-      padding: 10px;
-      border-radius: 6px;
-    }
-    
-    .tv-analytics-label {
-      font-size: 10px;
-      color: var(--tv-text-muted);
-      margin-bottom: 4px;
-    }
-    
-    .tv-analytics-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      font-size: 14px;
-      color: var(--tv-accent-green);
-    }
-    
-    .tv-config-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--tv-border);
-      font-size: 12px;
-    }
-    
-    .tv-config-item:last-child {
-      border-bottom: none;
-    }
-    
-    .tv-config-key {
-      color: var(--tv-text-secondary);
-    }
-    
-    .tv-config-value {
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--tv-text-primary);
-    }
-    
-    .tv-config-value.on { color: var(--tv-accent-green); }
-    .tv-config-value.off { color: var(--tv-accent-red); }
-    
-    .tv-log {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      padding: 4px 0;
-      border-bottom: 1px solid var(--tv-border);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    
-    .tv-log-time {
-      color: var(--tv-text-muted);
-    }
-    
-    .tv-log-level {
-      font-weight: 600;
-    }
-    
-    .tv-log-level.info { color: var(--tv-accent-blue); }
-    .tv-log-level.warn { color: var(--tv-accent-orange); }
-    .tv-log-level.error { color: var(--tv-accent-red); }
-    
-    .tv-trade-item {
-      padding: 8px 0;
-      border-bottom: 1px solid var(--tv-border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .tv-trade-item:last-child {
-      border-bottom: none;
-    }
-    
-    .tv-trade-symbol {
-      font-weight: 600;
-      font-size: 12px;
-      min-width: 80px;
-    }
-    
-    .tv-trade-pnl {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    
-    .tv-trade-pnl.pos { color: var(--tv-accent-green); }
-    .tv-trade-pnl.neg { color: var(--tv-accent-red); }
-    
-    .tv-trade-time {
-      font-size: 10px;
-      color: var(--tv-text-muted);
-      margin-left: auto;
-    }
-    
-    /* Modals */
-    .tv-modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      backdrop-filter: blur(4px);
-    }
-    
-    .tv-modal {
-      background: var(--tv-bg-secondary);
-      border-radius: 12px;
-      width: 90%;
-      max-width: 600px;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--tv-border);
-    }
-    
-    .tv-modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--tv-border);
-    }
-    
-    .tv-modal-title {
-      font-weight: 600;
-      font-size: 16px;
-    }
-    
-    .tv-modal-close {
-      background: none;
-      border: none;
-      color: var(--tv-text-secondary);
-      font-size: 20px;
-      cursor: pointer;
-    }
-    
-    .tv-modal-body {
-      padding: 20px;
-    }
-    
-    .tv-form-group {
-      margin-bottom: 16px;
-    }
-    
-    .tv-form-label {
-      display: block;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--tv-text-secondary);
-      margin-bottom: 6px;
-    }
-    
-    .tv-form-input {
-      width: 100%;
-      padding: 10px 12px;
-      background: var(--tv-bg-tertiary);
-      border: 1px solid var(--tv-border);
-      border-radius: 6px;
-      color: var(--tv-text-primary);
-      font-size: 13px;
-    }
-    
-    .tv-form-input:focus {
-      outline: none;
-      border-color: var(--tv-accent-blue);
-    }
-    
-    .tv-form-actions {
-      display: flex;
-      gap: 12px;
-      margin-top: 20px;
-    }
-    
-    .tv-config-section {
-      margin-bottom: 20px;
-      padding: 16px;
-      background: var(--tv-bg-tertiary);
-      border-radius: 8px;
-    }
-    
-    .tv-config-section-title {
-      font-weight: 600;
-      font-size: 13px;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .tv-toggle {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    
-    .tv-toggle input {
-      width: 40px;
-      height: 20px;
-      appearance: none;
-      background: var(--tv-border);
-      border-radius: 10px;
-      position: relative;
-      cursor: pointer;
-    }
-    
-    .tv-toggle input:checked {
-      background: var(--tv-accent-green);
-    }
-    
-    .tv-toggle input::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 16px;
-      height: 16px;
-      background: white;
-      border-radius: 50%;
-      transition: all 0.2s;
-    }
-    
-    .tv-toggle input:checked::after {
-      left: 22px;
-    }
-    
-    .tv-range-slider {
-      width: 100%;
-      margin: 8px 0;
-    }
-    
-    .tv-range-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--tv-accent-blue);
-    }
-    
-    /* Toast Notifications */
-    .tv-toast-container {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 1001;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    
-    .tv-toast {
-      background: var(--tv-bg-secondary);
-      border-left: 4px solid var(--tv-accent-blue);
-      padding: 12px 16px;
-      border-radius: 6px;
-      box-shadow: var(--tv-shadow);
-      min-width: 300px;
-      animation: slideIn 0.3s ease;
-    }
-    
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    
-    .tv-toast.success { border-left-color: var(--tv-accent-green); }
-    .tv-toast.error { border-left-color: var(--tv-accent-red); }
-    .tv-toast.warn { border-left-color: var(--tv-accent-orange); }
-    
-    .tv-toast-title {
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-    
-    .tv-toast-msg {
-      font-size: 12px;
-      color: var(--tv-text-secondary);
-    }
-    
-    /* Loading */
-    .tv-loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 40px;
-      color: var(--tv-text-muted);
-    }
-    
-    .tv-spinner {
-      width: 24px;
-      height: 24px;
-      border: 3px solid var(--tv-border);
-      border-top-color: var(--tv-accent-blue);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-right: 12px;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    /* Responsive */
-    @media (max-width: 1200px) {
-      .tv-container { grid-template-columns: 1fr; }
-      .tv-sidebar { border-top: 1px solid var(--tv-border); }
-      .tv-kpi-bar { grid-template-columns: repeat(3, 1fr); }
-    }
-    
-    @media (max-width: 768px) {
-      .tv-kpi-bar { grid-template-columns: repeat(2, 1fr); }
-      .tv-table th:nth-child(n+4),
-      .tv-table td:nth-child(n+4) { display: none; }
-    }
+    :root[data-theme="dark"]{--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--t1:#e6edf3;--t2:#8b949e;--t3:#484f58;--blue:#388bfd;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#a371f7;--shadow:0 4px 16px rgba(0,0,0,.5)}
+    :root[data-theme="light"]{--bg:#f6f8fa;--bg2:#ffffff;--bg3:#f0f2f5;--border:#d0d7de;--t1:#1f2328;--t2:#656d76;--t3:#9198a1;--blue:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700;--purple:#8250df;--shadow:0 2px 8px rgba(0,0,0,.12)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--t1);font-size:13px;line-height:1.5}
+
+    /* HEADER */
+    .hdr{height:48px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:100}
+    .hdr-logo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+    .logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:11px;color:#fff}
+    .hdr-nav{display:flex;gap:2px}
+    .nav-item{padding:5px 12px;border-radius:5px;cursor:pointer;color:var(--t2);font-size:13px;font-weight:500;transition:all .15s}
+    .nav-item:hover{background:var(--bg3);color:var(--t1)}
+    .nav-item.active{background:var(--blue);color:#fff}
+    .hdr-right{display:flex;align-items:center;gap:8px}
+    .pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.3);font-size:11px;font-weight:600;color:var(--green)}
+    .pill.offline{background:rgba(248,81,73,.12);border-color:rgba(248,81,73,.3);color:var(--red)}
+    .dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:blink 2s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    .wallet{display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer}
+    .wallet:hover{border-color:var(--blue)}
+    .btn{padding:5px 14px;border:none;border-radius:6px;font-weight:500;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Sans',sans-serif;transition:all .15s}
+    .btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+    .btn:active{transform:translateY(0)}
+    .btn-p{background:var(--blue);color:#fff}
+    .btn-g{background:transparent;color:var(--t2);border:1px solid var(--border)}
+    .btn-g:hover{background:var(--bg3);color:var(--t1)}
+    .btn-s{background:var(--green);color:#fff}
+    .btn-d{background:var(--red);color:#fff}
+    .btn-o{background:var(--orange);color:#fff}
+    .btn-sm{padding:3px 9px;font-size:11px}
+
+    /* LAYOUT */
+    .layout{display:grid;grid-template-columns:1fr 340px;height:calc(100vh - 48px)}
+    .main{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+    .sidebar{display:flex;flex-direction:column;overflow-y:auto;background:var(--bg2)}
+
+    /* KPI */
+    .kpi-bar{display:grid;grid-template-columns:repeat(6,1fr);background:var(--bg2);border-bottom:1px solid var(--border)}
+    .kpi{padding:12px 16px;border-right:1px solid var(--border)}
+    .kpi:last-child{border-right:none}
+    .kpi-lbl{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+    .kpi-val{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600}
+    .kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+    .g{color:var(--green)}.r{color:var(--red)}.a{color:var(--orange)}.b{color:var(--blue)}
+
+    /* BANNER */
+    .banner{display:none;align-items:center;justify-content:space-between;padding:8px 16px;background:rgba(210,153,34,.08);border-bottom:1px solid rgba(210,153,34,.25);font-size:12px}
+    .banner.show{display:flex}
+
+    /* TOOLBAR */
+    .toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg2);gap:12px}
+    .search{position:relative;flex:1;max-width:280px}
+    .search input{width:100%;padding:7px 12px 7px 34px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-size:12px;font-family:'IBM Plex Sans',sans-serif}
+    .search input:focus{outline:none;border-color:var(--blue)}
+    .si{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:13px}
+    .tabs{display:flex;gap:2px;background:var(--bg3);padding:3px;border-radius:6px}
+    .tab{padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500;color:var(--t2)}
+    .tab.active{background:var(--bg2);color:var(--t1);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+    .tc{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;padding:0 4px;background:var(--bg3);border-radius:8px;font-size:10px;font-weight:700;margin-left:4px}
+    .tab.active .tc{background:var(--blue);color:#fff}
+
+    /* TABLE */
+    .tbl-wrap{flex:1;overflow-y:auto}
+    .tbl{width:100%;border-collapse:collapse}
+    .tbl th{position:sticky;top:0;background:var(--bg2);padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
+    .tbl td{padding:11px 16px;border-bottom:1px solid var(--border)}
+    .tbl tr:hover td{background:var(--bg3)}
+    .tok{display:flex;align-items:center;gap:10px}
+    .tok-logo{width:28px;height:28px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex-shrink:0;border:1px solid var(--border)}
+    .tok-logo img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+    .tok-sym{font-weight:600;font-size:13px}
+    .tok-addr{font-size:10px;color:var(--t3);font-family:'IBM Plex Mono',monospace}
+    .mono{font-family:'IBM Plex Mono',monospace;font-weight:500}
+    .pnl{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700}
+    .pnl-g{background:rgba(63,185,80,.12);color:var(--green)}
+    .pnl-r{background:rgba(248,81,73,.12);color:var(--red)}
+    .pnl-z{background:var(--bg3);color:var(--t3)}
+    .tpdots{display:flex;gap:3px;align-items:center}
+    .tpdot{width:6px;height:6px;border-radius:2px;background:var(--border)}
+    .tpdot.hit{background:var(--green)}
+    .boot{display:inline-flex;align-items:center;padding:1px 5px;border-radius:3px;background:rgba(210,153,34,.15);color:var(--orange);font-size:9px;font-weight:700;margin-left:5px}
+    .row-acts{display:flex;gap:4px;align-items:center}
+
+    /* SIDEBAR PANELS */
+    .panel{border-bottom:1px solid var(--border)}
+    .panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--t3)}
+    .panel-body{padding:12px 16px}
+    .spot-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .spot-card{background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border)}
+    .spot-lbl{font-size:10px;color:var(--t3);margin-bottom:5px}
+    .spot-sym{font-weight:700;font-size:13px;margin-bottom:3px}
+    .spot-pnl{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700}
+    .pos-entry{padding:10px 0;border-bottom:1px solid var(--border)}
+    .pos-entry:last-child{border:none}
+    .pos-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .tier-row{display:flex;gap:4px;margin-bottom:6px}
+    .tier-item{flex:1}
+    .tier-bar{height:3px;border-radius:2px;background:var(--border);overflow:hidden}
+    .tier-fill{height:100%;transition:width .4s;background:var(--border)}
+    .tier-fill.done{background:var(--green)}
+    .tier-fill.next{background:var(--orange)}
+    .tier-lbl{font-size:9px;color:var(--t3);text-align:center;margin-top:2px}
+    .tier-lbl.done{color:var(--green)}
+    .tier-lbl.next{color:var(--orange)}
+    .pos-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--t3)}
+    .a-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .a-card{background:var(--bg3);border-radius:6px;padding:10px;border:1px solid var(--border)}
+    .a-lbl{font-size:10px;color:var(--t3);margin-bottom:3px}
+    .a-val{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700}
+    .cfg-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+    .cfg-row:last-child{border:none}
+    .cfg-k{color:var(--t2)}
+    .cfg-v{font-family:'IBM Plex Mono',monospace}
+    .on{color:var(--green)}.off{color:var(--red)}
+    .log-line{padding:3px 0;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.6}
+    .log-t{color:var(--t3)}
+    .log-lv{font-weight:700;margin:0 5px}
+    .ll-info{color:var(--blue)}.ll-success{color:var(--green)}.ll-warn{color:var(--orange)}.ll-error{color:var(--red)}
+
+    /* MODALS */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(3px)}
+    .modal{background:var(--bg2);border-radius:12px;border:1px solid var(--border);width:90%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.5);animation:mIn .2s ease}
+    .modal-lg{max-width:640px}
+    @keyframes mIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+    .m-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+    .m-title{font-weight:700;font-size:15px}
+    .m-close{background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1}
+    .m-close:hover{color:var(--t1)}
+    .m-body{padding:20px}
+    .fg{margin-bottom:14px}
+    .fl{display:block;font-size:11px;font-weight:600;color:var(--t2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+    .fi{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-size:13px;font-family:'IBM Plex Sans',sans-serif}
+    .fi:focus{outline:none;border-color:var(--blue)}
+    .f-acts{display:flex;gap:10px;margin-top:18px}
+    .scan-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+    .scan-row:last-child{border:none}
+    .scan-badge{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700}
+    .sc-ok{background:rgba(63,185,80,.12);color:var(--green)}
+    .sc-no{background:rgba(248,81,73,.12);color:var(--red)}
+
+    /* TOASTS */
+    .toasts{position:fixed;bottom:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:6px}
+    .toast{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--blue);padding:10px 14px;border-radius:7px;min-width:280px;box-shadow:var(--shadow);animation:tIn .25s ease}
+    @keyframes tIn{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}
+    .toast.success{border-left-color:var(--green)}
+    .toast.error{border-left-color:var(--red)}
+    .toast.warn{border-left-color:var(--orange)}
+    .t-title{font-weight:700;font-size:12px;margin-bottom:2px}
+    .t-msg{font-size:11px;color:var(--t2)}
+    .spin{animation:spin .8s linear infinite;display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    @media(max-width:1100px){.layout{grid-template-columns:1fr}.sidebar{border-top:1px solid var(--border);max-height:400px}.kpi-bar{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:640px){.kpi-bar{grid-template-columns:repeat(2,1fr)}.tbl th:nth-child(n+4),.tbl td:nth-child(n+4){display:none}.hdr-nav{display:none}}
   </style>
 </head>
 <body>
-  <!-- Header -->
-  <header class="tv-header">
-    <div class="tv-logo">
-      <div class="tv-logo-icon">SB</div>
-      <span>SolBot Pro</span>
-      <span style="font-size: 11px; color: var(--tv-text-muted);">v2.1</span>
+<header class="hdr">
+  <div class="hdr-logo">
+    <div class="logo-icon">SB</div>
+    SolBot Pro
+    <span style="font-size:10px;color:var(--t3);font-family:'IBM Plex Mono',monospace">v2.2</span>
+  </div>
+  <nav class="hdr-nav">
+    <div class="nav-item active">Portfolio</div>
+    <div class="nav-item">Analytics</div>
+    <div class="nav-item">Settings</div>
+  </nav>
+  <div class="hdr-right">
+    <div class="pill" id="statusPill"><div class="dot"></div><span id="statusTxt">LIVE</span></div>
+    <div class="wallet" id="walletChip"><span id="walletAddr">━━━━━━━━━━━━</span><span id="wcIco">📋</span></div>
+    <button class="btn btn-g" id="themeBtn">☀️</button>
+    <button class="btn btn-p" onclick="openModal('buyModal')">＋ Buy</button>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="main">
+    <div class="kpi-bar">
+      <div class="kpi"><div class="kpi-lbl">Portfolio</div><div class="kpi-val" id="kVal">$━━━</div><div class="kpi-sub" id="kUpd">Chargement…</div></div>
+      <div class="kpi"><div class="kpi-lbl">Tokens</div><div class="kpi-val" id="kTok">━━</div><div class="kpi-sub a" id="kBoot"></div></div>
+      <div class="kpi"><div class="kpi-lbl">Best PnL</div><div class="kpi-val g" id="kBest">━━━</div><div class="kpi-sub" id="kBestS">━━</div></div>
+      <div class="kpi"><div class="kpi-lbl">Worst PnL</div><div class="kpi-val r" id="kWorst">━━━</div><div class="kpi-sub" id="kWorstS">━━</div></div>
+      <div class="kpi"><div class="kpi-lbl">TP Hits</div><div class="kpi-val a" id="kTP">━━</div><div class="kpi-sub">paliers</div></div>
+      <div class="kpi"><div class="kpi-lbl">Uptime</div><div class="kpi-val" id="kUp">━━━</div><div class="kpi-sub">depuis start</div></div>
     </div>
-    
-    <div class="tv-nav">
-      <div class="tv-nav-item active" onclick="switchMainTab('portfolio')">Portfolio</div>
-      <div class="tv-nav-item" onclick="switchMainTab('analytics')">Analytics</div>
-      <div class="tv-nav-item" onclick="switchMainTab('config')">Config</div>
-    </div>
-    
-    <div class="tv-actions">
-      <div class="tv-badge">
-        <div class="tv-badge-dot"></div>
-        <span id="navStatus">LIVE</span>
+
+    <div class="banner" id="scanBanner">
+      <div style="display:flex;align-items:center;gap:8px;color:var(--orange)">
+        <span>⚠️</span><span id="bannerTxt">X positions sans prix d'entrée</span>
       </div>
-      
-      <div class="tv-wallet">
-        <span>💰</span>
-        <span id="solBalance">━━</span>
-        <span style="color: var(--tv-text-muted);">SOL</span>
-      </div>
-      
-      <div class="tv-wallet">
-        <span id="walletAddr">━━━━━━━━</span>
-        <button class="tv-btn tv-btn-secondary" id="copyBtn" title="Copier" style="padding: 4px 8px;">📋</button>
-      </div>
-      
-      <button class="tv-btn tv-btn-secondary" id="themeToggle" title="Changer le thème">🌓</button>
-      <button class="tv-btn tv-btn-primary" onclick="openBuyModal()">+ BUY</button>
-    </div>
-  </header>
-  
-  <!-- Main Container -->
-  <div class="tv-container">
-    <!-- Main Content -->
-    <div class="tv-main">
-      <!-- KPI Bar -->
-      <div class="tv-kpi-bar">
-        <div class="tv-kpi">
-          <div class="tv-kpi-label">Portfolio Value</div>
-          <div class="tv-kpi-value" id="kTotalValue">$━━━</div>
-          <div class="tv-kpi-sub" id="kLastUpdate">MAJ ━━━</div>
-        </div>
-        <div class="tv-kpi">
-          <div class="tv-kpi-label">Tokens</div>
-          <div class="tv-kpi-value" id="kTokens">━━</div>
-          <div class="tv-kpi-sub">actifs</div>
-        </div>
-        <div class="tv-kpi">
-          <div class="tv-kpi-label">Best PnL</div>
-          <div class="tv-kpi-value green" id="kBestPnl">━━━</div>
-          <div class="tv-kpi-sub" id="kBestSym">━━</div>
-        </div>
-        <div class="tv-kpi">
-          <div class="tv-kpi-label">Worst PnL</div>
-          <div class="tv-kpi-value red" id="kWorstPnl">━━━</div>
-          <div class="tv-kpi-sub" id="kWorstSym">━━</div>
-        </div>
-        <div class="tv-kpi">
-          <div class="tv-kpi-label">Avg PnL</div>
-          <div class="tv-kpi-value amber" id="kAvgPnl">━━━</div>
-          <div class="tv-kpi-sub">moyenne</div>
-        </div>
-        <div class="tv-kpi">
-          <div class="tv-kpi-label">Uptime</div>
-          <div class="tv-kpi-value" id="kUptime">━━━</div>
-          <div class="tv-kpi-sub">depuis start</div>
-        </div>
-      </div>
-      
-      <!-- Toolbar -->
-      <div class="tv-toolbar" id="portfolioToolbar">
-        <div class="tv-search">
-          <span class="tv-search-icon">🔍</span>
-          <input type="text" id="searchInput" placeholder="Search tokens..." oninput="renderTable()">
-        </div>
-        
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div class="tv-tabs">
-            <div class="tv-tab active" onclick="switchTab('active')">Actifs <span id="tnActive">0</span></div>
-            <div class="tv-tab" onclick="switchTab('sold')">Sold <span id="tnSold">0</span></div>
-          </div>
-          
-          <button class="tv-btn tv-btn-secondary" onclick="fetchAll()">🔄</button>
-        </div>
-      </div>
-      
-      <!-- Analytics Toolbar (hidden by default) -->
-      <div class="tv-toolbar hidden" id="analyticsToolbar">
-        <div style="display: flex; gap: 8px;">
-          <button class="tv-btn tv-btn-primary" onclick="refreshAnalytics()">🔄 Refresh</button>
-          <button class="tv-btn tv-btn-secondary" onclick="resetCircuitBreaker()">⚡ Reset Circuit Breaker</button>
-        </div>
-      </div>
-      
-      <!-- Config Toolbar (hidden by default) -->
-      <div class="tv-toolbar hidden" id="configToolbar">
-        <div style="display: flex; gap: 8px;">
-          <button class="tv-btn tv-btn-primary" onclick="openConfigModal()">⚙ Configuration</button>
-          <button class="tv-btn tv-btn-secondary" onclick="loadConfig()">🔄 Charger Config</button>
-        </div>
-      </div>
-      
-      <!-- Portfolio Table -->
-      <div class="tv-table-container" id="portfolioView">
-        <table class="tv-table">
-          <thead>
-            <tr>
-              <th>Token</th>
-              <th>Price</th>
-              <th>Value</th>
-              <th>Balance</th>
-              <th>PnL</th>
-              <th>TP</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="rows-active">
-            <tr>
-              <td colspan="7" class="tv-loading">
-                <div class="tv-spinner"></div>
-                Chargement des positions...
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- Analytics View (hidden by default) -->
-      <div class="tv-table-container hidden" id="analyticsView" style="padding: 20px;">
-        <div class="tv-analytics-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
-          <div class="tv-analytics-item">
-            <div class="tv-analytics-label">Realized PnL</div>
-            <div class="tv-analytics-value" id="aRealizedPnl">━━</div>
-          </div>
-          <div class="tv-analytics-item">
-            <div class="tv-analytics-label">Win Rate</div>
-            <div class="tv-analytics-value" id="aWinRate">━━</div>
-          </div>
-          <div class="tv-analytics-item">
-            <div class="tv-analytics-label">Total Trades</div>
-            <div class="tv-analytics-value" id="aTotalTrades">━━</div>
-          </div>
-          <div class="tv-analytics-item">
-            <div class="tv-analytics-label">ROI</div>
-            <div class="tv-analytics-value" id="aRoi">━━</div>
-          </div>
-        </div>
-        
-        <div class="tv-analytics-grid" style="margin-bottom: 20px;">
-          <div class="tv-analytics-item">
-            <div class="tv-analytics-label">Best Trade</div>
-            <div class="tv-analytics-value" id="aBestTrade">━━</div>
-            <div style="font-size: 11px; color: var(--tv-text-muted);" id="aBestTradeSymbol"></div>
-          </div>
-          <div class="tv-analytics-item">
-            <div class="tv-analytics-label">Worst Trade</div>
-            <div class="tv-analytics-value" id="aWorstTrade">━━</div>
-            <div style="font-size: 11px; color: var(--tv-text-muted);" id="aWorstTradeSymbol"></div>
-          </div>
-          <div class="tv-analytics-item">
-            <div class="tv-analytics-label">Avg Hold Time</div>
-            <div class="tv-analytics-value" id="aAvgHold">━━</div>
-          </div>
-          <div class="tv-analytics-item">
-            <div class="tv-analytics-label">Avg Win/Loss</div>
-            <div class="tv-analytics-value" id="aAvgWinLoss">━━</div>
-          </div>
-        </div>
-        
-        <div style="margin-top: 20px;">
-          <div class="tv-panel-header">Recent Trades</div>
-          <div id="analyticsTrades" style="max-height: 300px; overflow-y: auto;">
-            <div class="tv-loading">Chargement...</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Config View (hidden by default) -->
-      <div class="tv-table-container hidden" id="configView" style="padding: 20px;">
-        <div id="configDisplay">
-          <div class="tv-loading">Chargement de la configuration...</div>
-        </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-o btn-sm" onclick="runScan()">🔍 Scan Helius</button>
+        <button class="btn btn-g btn-sm" onclick="openModal('setEntryModal')">✏️ Manuel</button>
       </div>
     </div>
-    
-    <!-- Sidebar -->
-    <div class="tv-sidebar">
-      <!-- Spotlight -->
-      <div class="tv-panel">
-        <div class="tv-panel-header">🏆 Spotlight</div>
-        <div class="tv-panel-content">
-          <div class="tv-spotlight">
-            <div class="tv-spotlight-card">
-              <div class="tv-spotlight-label">Best Performer</div>
-              <div class="tv-spotlight-symbol" id="spBestSym" style="color: var(--tv-accent-green)">━━</div>
-              <div class="tv-spotlight-value green" id="spBestPnl">━━━</div>
-              <div class="tv-kpi-sub" id="spBestVal">━━━</div>
-            </div>
-            <div class="tv-spotlight-card">
-              <div class="tv-spotlight-label">Worst Performer</div>
-              <div class="tv-spotlight-symbol" id="spWorstSym" style="color: var(--tv-accent-red)">━━</div>
-              <div class="tv-spotlight-value red" id="spWorstPnl">━━━</div>
-              <div class="tv-kpi-sub" id="spWorstVal">━━━</div>
-            </div>
-          </div>
+
+    <div class="toolbar">
+      <div class="search"><span class="si">🔍</span><input id="searchQ" placeholder="Rechercher token…" oninput="renderTable()"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="tabs">
+          <div class="tab active" id="tabA" onclick="switchTab('active')">Actifs<span class="tc" id="tnA">0</span></div>
+          <div class="tab" id="tabS" onclick="switchTab('sold')">Soldés<span class="tc" id="tnS">0</span></div>
         </div>
+        <button class="btn btn-g btn-sm" onclick="fetchAll()">↻</button>
       </div>
-      
-      <!-- Take-Profit -->
-      <div class="tv-panel">
-        <div class="tv-panel-header">
-          <span>🎯 Take-Profit</span>
-          <span class="tv-badge" id="tpBadge" style="font-size: 10px; padding: 2px 8px;">0</span>
-        </div>
-        <div class="tv-panel-content" id="tpList">
-          <div style="text-align: center; color: var(--tv-text-muted); padding: 20px;">No active TP</div>
-        </div>
-      </div>
-      
-      <!-- Recent Trades -->
-      <div class="tv-panel">
-        <div class="tv-panel-header">📊 Recent Trades</div>
-        <div class="tv-panel-content" id="recentTrades" style="max-height: 150px; overflow-y: auto;">
-          <div style="text-align: center; color: var(--tv-text-muted); padding: 10px; font-size: 12px;">No trades yet</div>
-        </div>
-      </div>
-      
-      <!-- System -->
-      <div class="tv-panel">
-        <div class="tv-panel-header">⚙ Système</div>
-        <div class="tv-panel-content">
-          <div class="tv-config-item">
-            <span class="tv-config-key">Status</span>
-            <span class="tv-config-value on" id="sysStatus">ONLINE</span>
-          </div>
-          <div class="tv-config-item">
-            <span class="tv-config-key">RPC</span>
-            <span class="tv-config-value" id="sysRpc">━━</span>
-          </div>
-          <div class="tv-config-item">
-            <span class="tv-config-key">Interval</span>
-            <span class="tv-config-value" id="sysInterval">30s</span>
-          </div>
-          <div class="tv-config-item">
-            <span class="tv-config-key">Circuit Breaker</span>
-            <span class="tv-config-value on" id="sysCircuitBreaker">OK</span>
-          </div>
-          <div class="tv-config-item">
-            <span class="tv-config-key">Version</span>
-            <span class="tv-config-value">v2.1</span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Logs -->
-      <div class="tv-panel">
-        <div class="tv-panel-header">📜 Logs</div>
-        <div class="tv-panel-content" id="logBody" style="max-height: 150px; overflow-y: auto;">
-        </div>
-      </div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Token</th><th>Prix</th><th>Valeur</th><th>Balance</th><th>PnL</th><th>TP</th><th>Actions</th></tr></thead>
+        <tbody id="tblBody"></tbody>
+      </table>
     </div>
   </div>
-  
-  <!-- Buy Modal -->
-  <div class="tv-modal-overlay" id="buyModal" style="display: none;">
-    <div class="tv-modal">
-      <div class="tv-modal-header">
-        <div class="tv-modal-title">🟢 Buy Token</div>
-        <button class="tv-modal-close" onclick="closeBuyModal()">×</button>
-      </div>
-      <div class="tv-modal-body">
-        <div class="tv-form-group">
-          <label class="tv-form-label">Token Address</label>
-          <input type="text" class="tv-form-input" id="buyTokenAddress" placeholder="Paste Solana token address">
-        </div>
-        <div class="tv-form-group">
-          <label class="tv-form-label">Amount (SOL)</label>
-          <input type="number" class="tv-form-input" id="buyAmount" placeholder="0.00" step="0.01">
-          <div style="display: flex; gap: 4px; margin-top: 8px;">
-            <button class="tv-btn tv-btn-secondary" style="flex: 1; font-size: 11px; padding: 4px 8px;" onclick="setBuyPercent(10)">10%</button>
-            <button class="tv-btn tv-btn-secondary" style="flex: 1; font-size: 11px; padding: 4px 8px;" onclick="setBuyPercent(25)">25%</button>
-            <button class="tv-btn tv-btn-secondary" style="flex: 1; font-size: 11px; padding: 4px 8px;" onclick="setBuyPercent(50)">50%</button>
-            <button class="tv-btn tv-btn-secondary" style="flex: 1; font-size: 11px; padding: 4px 8px;" onclick="setBuyPercent(100)">MAX</button>
-          </div>
-        </div>
-        <div class="tv-form-group">
-          <label class="tv-form-label">Slippage</label>
-          <select class="tv-form-input" id="buySlippage">
-            <option value="100">1% (Low)</option>
-            <option value="300" selected>3% (Medium)</option>
-            <option value="500">5% (High)</option>
-            <option value="1000">10% (Very High)</option>
-          </select>
-        </div>
-        <div class="tv-form-group">
-          <label class="tv-form-label">
-            <input type="checkbox" id="buyDca" onchange="toggleDcaFields()"> Enable DCA
-          </label>
-        </div>
-        <div id="dcaFields" style="display: none;">
-          <div class="tv-form-group">
-            <label class="tv-form-label">Chunks</label>
-            <input type="number" class="tv-form-input" id="buyChunks" value="3" min="2" max="10">
-          </div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">Interval (seconds)</label>
-            <input type="number" class="tv-form-input" id="buyInterval" value="60" min="10" max="300">
-          </div>
-        </div>
-        <div class="tv-form-actions">
-          <button class="tv-btn tv-btn-success" style="flex: 1;" onclick="executeBuy()">BUY</button>
-          <button class="tv-btn tv-btn-secondary" onclick="closeBuyModal()">Cancel</button>
+
+  <div class="sidebar">
+    <div class="panel">
+      <div class="panel-hdr">Spotlight</div>
+      <div class="panel-body">
+        <div class="spot-grid">
+          <div class="spot-card"><div class="spot-lbl">Best performer</div><div class="spot-sym g" id="spBS">━━</div><div class="spot-pnl g" id="spBP">━━━</div><div style="font-size:10px;color:var(--t3)" id="spBV">━━</div></div>
+          <div class="spot-card"><div class="spot-lbl">Worst performer</div><div class="spot-sym r" id="spWS">━━</div><div class="spot-pnl r" id="spWP">━━━</div><div style="font-size:10px;color:var(--t3)" id="spWV">━━</div></div>
         </div>
       </div>
     </div>
-  </div>
-  
-  <!-- Sell Modal -->
-  <div class="tv-modal-overlay" id="sellModal" style="display: none;">
-    <div class="tv-modal">
-      <div class="tv-modal-header">
-        <div class="tv-modal-title">🔴 Sell Token</div>
-        <button class="tv-modal-close" onclick="closeSellModal()">×</button>
-      </div>
-      <div class="tv-modal-body">
-        <div class="tv-form-group">
-          <label class="tv-form-label">Token</label>
-          <input type="text" class="tv-form-input" id="sellTokenName" readonly style="background: var(--tv-bg-tertiary);">
-          <input type="hidden" id="sellTokenAddress">
+
+    <div class="panel">
+      <div class="panel-hdr"><span>Take-Profit</span><span class="pill" style="font-size:10px;padding:2px 8px" id="tpCnt">0</span></div>
+      <div class="panel-body" id="tpPanel"><div style="text-align:center;color:var(--t3);padding:16px;font-size:11px">Aucun TP actif</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><span>Positions</span><button class="btn btn-g btn-sm" onclick="openModal('setEntryModal')">✏️</button></div>
+      <div class="panel-body" id="posPanel"><div style="text-align:center;color:var(--t3);padding:16px;font-size:11px">Chargement…</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">Analytics</div>
+      <div class="panel-body">
+        <div class="a-grid">
+          <div class="a-card"><div class="a-lbl">TP déclenchés</div><div class="a-val g" id="aTrig">━━</div></div>
+          <div class="a-card"><div class="a-lbl">Ventes OK</div><div class="a-val b" id="aSold">━━</div></div>
         </div>
-        <div class="tv-form-group">
-          <label class="tv-form-label">Balance: <span id="sellBalance">━━</span></label>
-          <div style="display: flex; gap: 4px; margin-top: 8px;">
-            <button class="tv-btn tv-btn-secondary" style="flex: 1; font-size: 11px; padding: 4px 8px;" onclick="setSellPercent(25)">25%</button>
-            <button class="tv-btn tv-btn-secondary" style="flex: 1; font-size: 11px; padding: 4px 8px;" onclick="setSellPercent(50)">50%</button>
-            <button class="tv-btn tv-btn-secondary" style="flex: 1; font-size: 11px; padding: 4px 8px;" onclick="setSellPercent(75)">75%</button>
-            <button class="tv-btn tv-btn-danger" style="flex: 1; font-size: 11px; padding: 4px 8px;" onclick="setSellPercent(100)">100%</button>
-          </div>
-        </div>
-        <div class="tv-form-group">
-          <label class="tv-form-label">Amount to Sell</label>
-          <input type="number" class="tv-form-input" id="sellAmount" placeholder="0.00" step="0.0001">
-        </div>
-        <div class="tv-form-group">
-          <label class="tv-form-label">Slippage</label>
-          <select class="tv-form-input" id="sellSlippage">
-            <option value="100">1% (Low)</option>
-            <option value="300" selected>3% (Medium)</option>
-            <option value="500">5% (High)</option>
-            <option value="1000">10% (Very High)</option>
-          </select>
-        </div>
-        <div class="tv-form-group">
-          <label class="tv-form-label">Reason</label>
-          <select class="tv-form-input" id="sellReason">
-            <option value="MANUAL">Manual Sell</option>
-            <option value="TAKE_PROFIT">Take Profit</option>
-            <option value="STOP_LOSS">Stop Loss</option>
-            <option value="EMERGENCY">Emergency</option>
-          </select>
-        </div>
-        <div class="tv-form-actions">
-          <button class="tv-btn tv-btn-danger" style="flex: 1;" onclick="executeSell()">SELL</button>
-          <button class="tv-btn tv-btn-secondary" onclick="closeSellModal()">Cancel</button>
-        </div>
+        <div id="tpRecent" style="margin-top:10px;max-height:110px;overflow-y:auto"><div style="text-align:center;color:var(--t3);padding:10px;font-size:11px">Aucune exécution récente</div></div>
       </div>
     </div>
-  </div>
-  
-  <!-- Config Modal -->
-  <div class="tv-modal-overlay" id="configModal" style="display: none;">
-    <div class="tv-modal" style="max-width: 700px;">
-      <div class="tv-modal-header">
-        <div class="tv-modal-title">⚙ Configuration</div>
-        <button class="tv-modal-close" onclick="closeConfigModal()">×</button>
-      </div>
-      <div class="tv-modal-body">
-        <!-- Take-Profit -->
-        <div class="tv-config-section">
-          <div class="tv-config-section-title">🎯 Take-Profit</div>
-          <div class="tv-toggle">
-            <input type="checkbox" id="cfgTpEnabled">
-            <span>Enable Take-Profit</span>
-          </div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">Hysteresis (%)</label>
-            <input type="number" class="tv-form-input" id="cfgTpHysteresis" step="1" min="0" max="50">
-          </div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">TP Tiers (JSON)</label>
-            <textarea class="tv-form-input" id="cfgTpTiers" rows="3" placeholder='[{"pnl":20,"sell":25},{"pnl":40,"sell":25}]'></textarea>
-          </div>
-        </div>
-        
-        <!-- Stop-Loss -->
-        <div class="tv-config-section">
-          <div class="tv-config-section-title">🛡 Stop-Loss</div>
-          <div class="tv-toggle">
-            <input type="checkbox" id="cfgSlEnabled">
-            <span>Enable Stop-Loss</span>
-          </div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">Stop-Loss Threshold (%)</label>
-            <input type="number" class="tv-form-input" id="cfgSlPct" step="5" min="-100" max="0">
-            <div style="font-size: 11px; color: var(--tv-text-muted); margin-top: 4px;">Negative value (e.g., -50 for -50%)</div>
-          </div>
-        </div>
-        
-        <!-- Trailing Stop -->
-        <div class="tv-config-section">
-          <div class="tv-config-section-title">📉 Trailing Stop</div>
-          <div class="tv-toggle">
-            <input type="checkbox" id="cfgTsEnabled">
-            <span>Enable Trailing Stop</span>
-          </div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">Trailing Stop (%)</label>
-            <input type="number" class="tv-form-input" id="cfgTsPct" step="5" min="1" max="100">
-            <div style="font-size: 11px; color: var(--tv-text-muted); margin-top: 4px;">Sell if price drops X% from peak</div>
-          </div>
-        </div>
-        
-        <!-- Anti-Rug -->
-        <div class="tv-config-section">
-          <div class="tv-config-section-title">🚨 Anti-Rug</div>
-          <div class="tv-toggle">
-            <input type="checkbox" id="cfgArEnabled">
-            <span>Enable Anti-Rug Protection</span>
-          </div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">Anti-Rug Threshold (%)</label>
-            <input type="number" class="tv-form-input" id="cfgArPct" step="10" min="1" max="100">
-            <div style="font-size: 11px; color: var(--tv-text-muted); margin-top: 4px;">Sell if price drops X% in one cycle</div>
-          </div>
-        </div>
-        
-        <!-- General -->
-        <div class="tv-config-section">
-          <div class="tv-config-section-title">⚙ General</div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">Default Slippage (bps)</label>
-            <input type="number" class="tv-form-input" id="cfgSlippage" step="100" min="10" max="5000">
-            <div style="font-size: 11px; color: var(--tv-text-muted); margin-top: 4px;">100 bps = 1%</div>
-          </div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">Min SOL Reserve</label>
-            <input type="number" class="tv-form-input" id="cfgSolReserve" step="0.01" min="0" max="10">
-          </div>
-          <div class="tv-form-group">
-            <label class="tv-form-label">Cycle Interval (seconds)</label>
-            <input type="number" class="tv-form-input" id="cfgInterval" step="5" min="10" max="3600">
-          </div>
-        </div>
-        
-        <div class="tv-form-actions">
-          <button class="tv-btn tv-btn-primary" style="flex: 1;" onclick="saveConfig()">💾 Save Configuration</button>
-          <button class="tv-btn tv-btn-secondary" onclick="closeConfigModal()">Cancel</button>
-        </div>
+
+    <div class="panel">
+      <div class="panel-hdr">Système</div>
+      <div class="panel-body">
+        <div class="cfg-row"><span class="cfg-k">Status</span><span class="cfg-v on" id="sysSt">ONLINE</span></div>
+        <div class="cfg-row"><span class="cfg-k">RPC</span><span class="cfg-v" id="sysRpc">━━</span></div>
+        <div class="cfg-row"><span class="cfg-k">Take-Profit</span><span class="cfg-v" id="sysTP">━━</span></div>
+        <div class="cfg-row"><span class="cfg-k">Stop-Loss</span><span class="cfg-v" id="sysSL">━━</span></div>
+        <div class="cfg-row"><span class="cfg-k">Trailing</span><span class="cfg-v" id="sysTR">━━</span></div>
+        <div class="cfg-row"><span class="cfg-k">Anti-Rug</span><span class="cfg-v" id="sysAR">━━</span></div>
+        <div class="cfg-row"><span class="cfg-k">Interval</span><span class="cfg-v" id="sysInt">━━</span></div>
+        <div class="cfg-row"><span class="cfg-k">Version</span><span class="cfg-v">v2.2.0</span></div>
       </div>
     </div>
+
+    <div class="panel">
+      <div class="panel-hdr">Logs</div>
+      <div class="panel-body" id="logsPanel" style="max-height:180px;overflow-y:auto"></div>
+    </div>
   </div>
-  
-  <!-- Toast Container -->
-  <div class="tv-toast-container" id="toastContainer"></div>
-  
-  <script>
-    const API_BASE = window.location.origin;
-    const REFRESH_MS = 10000;
-    
-    let autoRefresh = true, logBuffer = [], currentTab = "active", currentMainTab = "portfolio";
-    let lastTokens = [], lastTp = {}, lastTrades = [], currentConfig = {};
-    let solBalance = 0;
-    const MAX_LOGS = 50;
-    
-    const $ = id => document.getElementById(id);
-    const fmtN = (n,d=2) => parseFloat(n||0).toFixed(d);
-    const fmtTime = ts => new Date(ts).toLocaleTimeString("fr-FR");
-    const fmtUptime = s => { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:m>0?`${m}m ${s%60}s`:`${s}s`; };
-    const fmtAddr = a => a ? a.slice(0,6)+"…"+a.slice(-4) : "━━";
-    const fmtUSD = n => { const v=parseFloat(n||0); return v>=0.01?"$"+v.toFixed(2):v===0?"$0.00":"$"+v.toFixed(6); };
-    const fmtPrice = n => { if(!n||n<=0) return "━━"; if(n>=1) return "$"+n.toFixed(4); if(n>=0.01) return "$"+n.toFixed(5); return "$"+n.toFixed(7); };
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🖼️ LOGO HELPER
-    // ═══════════════════════════════════════════════════════════════════════
-    function logoEl(tok, size=28) {
-      const symbol = tok?.symbol || tok?.mint || '?';
-      const ini = symbol.slice(0,2).toUpperCase();
-      const hasLogo = tok?.logo && tok.logo !== 'null' && tok.logo !== 'undefined';
-      
-      if (hasLogo) {
-        return `<div class="tv-token-logo" style="width:${size}px;height:${size}px">
-          <img src="${tok.logo}" alt="${ini}" onerror="this.parentElement.classList.add('placeholder');this.parentElement.textContent='${ini}';this.style.display='none'">
-        </div>`;
-      } else {
-        return `<div class="tv-token-logo placeholder" style="width:${size}px;height:${size}px">${ini}</div>`;
-      }
-    }
-    
-    // Theme
-    function initTheme() {
-      const saved = localStorage.getItem('solbot-theme');
-      if(saved) document.documentElement.setAttribute('data-theme', saved);
-      updateThemeIcon();
-    }
-    
-    function toggleTheme() {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('solbot-theme', next);
-      updateThemeIcon();
-    }
-    
-    function updateThemeIcon() {
-      $('themeToggle').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
-    }
-    
-    // Toast
-    function notify(message, type='info', title=null) {
-      const container = $('toastContainer');
-      const toast = document.createElement('div');
-      toast.className = `tv-toast ${type}`;
-      const titles = {success:'Success',error:'Error',warn:'Warning',info:'Info'};
-      toast.innerHTML = `<div class="tv-toast-title">${title||titles[type]}</div><div class="tv-toast-msg">${message}</div>`;
-      container.appendChild(toast);
-      setTimeout(() => { if(toast.parentElement) { toast.style.opacity='0'; toast.style.transform='translateX(100%)'; setTimeout(()=>toast.remove(),300); } }, 4000);
-      while(container.children.length > 5) container.firstChild.remove();
-    }
-    
-    // Logs
-    function pushLog(level, msg) {
-      logBuffer.unshift({t:fmtTime(Date.now()),level,msg});
-      if(logBuffer.length > MAX_LOGS) logBuffer.pop();
-      $('logBody').innerHTML = logBuffer.map(l => `<div class="tv-log"><span class="tv-log-time">${l.t}</span><span class="tv-log-level ${l.level}">[${l.level.toUpperCase()}]</span>${l.msg}</div>`).join('');
-    }
-    
-    // Main Tabs (Portfolio/Analytics/Config)
-    function switchMainTab(tab) {
-      currentMainTab = tab;
-      document.querySelectorAll('.tv-nav-item').forEach((t,i) => {
-        t.classList.toggle('active', 
-          (tab==='portfolio' && i===0) || 
-          (tab==='analytics' && i===1) || 
-          (tab==='config' && i===2)
-        );
-      });
-      
-      // Show/hide views
-      $('portfolioView').classList.toggle('hidden', tab !== 'portfolio');
-      $('analyticsView').classList.toggle('hidden', tab !== 'analytics');
-      $('configView').classList.toggle('hidden', tab !== 'config');
-      
-      // Show/hide toolbars
-      $('portfolioToolbar').classList.toggle('hidden', tab !== 'portfolio');
-      $('analyticsToolbar').classList.toggle('hidden', tab !== 'analytics');
-      $('configToolbar').classList.toggle('hidden', tab !== 'config');
-      
-      if(tab === 'analytics') refreshAnalytics();
-      if(tab === 'config') loadConfig();
-    }
-    
-    // Sub Tabs (Active/Sold)
-    function switchTab(tab) {
-      currentTab = tab;
-      document.querySelectorAll('.tv-tab').forEach((t,i) => t.classList.toggle('active', (tab==='active' && i===0) || (tab==='sold' && i===1)));
-      renderTable();
-    }
-    
-    // Sort
-    let sortKey = 'value', sortAsc = false;
-    function setSort(key) {
-      if (sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = false; }
-      document.querySelectorAll('.sort-btn').forEach(b => {
-        const isActive = b.id === 'sp-' + key;
-        b.classList.toggle('active', isActive);
-      });
-      renderTable();
-    }
-    
-    // Rows
-    function buildRow(tok, idx) {
-      const done = tok.triggeredTiers||[];
-      const tiers = lastTp.tiers||lastTp.defaultTiers||[];
-      const dots = tiers.map(t => `<div class="tv-tp-dot ${done.includes(t.pnl)?'active':''}" title="${t.pnl}%"></div>`).join('');
-      const pnl = tok.pnl;
-      const pnlClass = pnl > 0 ? 'tv-pnl-pos' : pnl < 0 ? 'tv-pnl-neg' : '';
-      const url = `https://solscan.io/token/${tok.mintFull}`;
-      
-      return `<tr>
-        <td>
-          <div class="tv-token">
-            ${logoEl(tok, 28)}
-            <div class="tv-token-info">
-              <div class="tv-token-symbol" title="${tok.name || tok.symbol || tok.mint}">${tok.symbol||tok.mint.slice(0,8)}</div>
-              <div class="tv-token-address"><a href="${url}" target="_blank">${fmtAddr(tok.mintFull)}</a></div>
-            </div>
-          </div>
-        </td>
-        <td class="tv-price">${tok.price?fmtPrice(tok.price):'━━'}</td>
-        <td class="tv-price" style="font-weight:600">${fmtUSD(tok.value)}</td>
-        <td class="tv-price">${fmtN(tok.balance)}</td>
-        <td><span class="tv-pnl-badge ${pnlClass}">${pnl===null?'N/A':(pnl>=0?'+':'')+fmtN(pnl,2)+'%'}</span></td>
-        <td><div class="tv-tp-dots">${dots}</div></td>
-        <td>
-          <button class="tv-btn tv-btn-success" style="padding:4px 8px;font-size:11px" onclick="openBuyModal('${tok.mintFull}')">Buy</button>
-          <button class="tv-btn tv-btn-danger" style="padding:4px 8px;font-size:11px;margin-left:4px" onclick="openSellModal('${tok.mintFull}','${tok.symbol||tok.mint.slice(0,8)}',${tok.balance})">Sell</button>
-        </td>
-      </tr>`;
-    }
-    
-    // TP Items
-    function buildTpItem(e, tiers) {
-      const pfx = e.mint.replace('...','').slice(0,6);
-      const tok = lastTokens.find(t => t.mintFull?.slice(0,6) === pfx) || {};
-      const barsHtml = tiers.map(t=>{
-        const isDone = e.triggeredTiers?.includes(t.pnl);
-        const pnlReq = parseFloat(t.pnl);
-        const isActive = !isDone;
-        return `<div class="tv-tp-bar"><div class="tv-tp-bar-fill ${isDone?'done':isActive?'active':''}" style="width:${isDone?100:30}%"></div></div><div class="tv-tp-label ${isDone?'done':isActive?'active':''}">${t.pnl}%</div>`;
-      }).join('');
-      
-      return `<div class="tv-tp-item">
-        <div class="tv-tp-header">
-          <span class="tv-tp-mint">
-            ${logoEl(tok, 20)}
-            ${tok.symbol || e.mint.slice(0,8)}
-          </span>
-          <span style="font-family:'JetBrains Mono';font-size:11px">${fmtPrice(e.entryPrice)}</span>
-        </div>
-        <div style="display:flex;gap:4px;margin-bottom:6px">${barsHtml}</div>
-        <div style="font-size:11px;color:var(--tv-text-muted)">Sold: ${fmtN(e.sold,4)} / Remaining: ${fmtN(e.remaining,4)}</div>
-      </div>`;
-    }
-    
-    // Trade Items
-    function buildTradeItem(trade) {
-      const tok = lastTokens.find(t => t.mintFull === trade.mint || t.mintFull?.slice(0,8) === trade.mint?.slice(0,8)) || {};
-      const pnlClass = trade.pnlPct >= 0 ? 'pos' : 'neg';
-      const pnlSign = trade.pnlPct >= 0 ? '+' : '';
-      
-      return `<div class="tv-trade-item">
-        ${logoEl(tok, 20)}
-        <span class="tv-trade-symbol">${tok.symbol || trade.symbol || trade.mint?.slice(0,8)}</span>
-        <span class="tv-trade-pnl ${pnlClass}">${pnlSign}${trade.pnlPct?.toFixed(1) || '━━'}%</span>
-        <span class="tv-trade-time">${fmtTime(trade.ts)}</span>
-      </div>`;
-    }
-    
-    // Render Table
-    function renderTable() {
-      const q = ($('searchInput').value||'').toLowerCase();
-      const filt = t => !q||(t.symbol||'').toLowerCase().includes(q)||(t.mintFull||'').toLowerCase().includes(q);
-      const data = lastTokens.filter(filt).sort((a,b) => b.value - a.value);
-      $('rows-active').innerHTML = data.length ? data.map((t,i)=>buildRow(t,i)).join('') : '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--tv-text-muted)">No positions found</td></tr>';
-      $('tnActive').textContent = data.length;
-    }
-    
-    // Buy Modal
-    function openBuyModal(mint='') {
-      $('buyModal').style.display = 'flex';
-      if(mint) $('buyTokenAddress').value = mint;
-    }
-    
-    function closeBuyModal() {
-      $('buyModal').style.display = 'none';
-    }
-    
-    function toggleDcaFields() {
-      $('dcaFields').style.display = $('buyDca').checked ? 'block' : 'none';
-    }
-    
-    async function fetchSolBalance() {
-      try {
-        const res = await fetch(`${API_BASE}/api/sol-balance`);
-        const data = await res.json();
-        solBalance = data.balance || 0;
-        $('solBalance').textContent = solBalance.toFixed(4);
-      } catch(e) {}
-    }
-    
-    function setBuyPercent(pct) {
-      if(solBalance > 0) {
-        const amount = (solBalance * pct / 100).toFixed(4);
-        $('buyAmount').value = amount;
-      }
-    }
-    
-    async function executeBuy() {
-      const mint = $('buyTokenAddress').value;
-      const amount = parseFloat($('buyAmount').value);
-      const slippage = parseInt($('buySlippage').value);
-      const isDca = $('buyDca').checked;
-      
-      if(!mint || !amount || amount <= 0) { notify('Please fill all fields', 'error'); return; }
-      if(amount > solBalance) { notify('Insufficient SOL balance', 'error'); return; }
-      
-      try {
-        $('buyModal').querySelector('.tv-btn-success').disabled = true;
-        $('buyModal').querySelector('.tv-btn-success').textContent = 'Processing...';
-        
-        let result;
-        if(isDca) {
-          const chunks = parseInt($('buyChunks').value) || 3;
-          const interval = parseInt($('buyInterval').value) || 60;
-          result = await fetch(`${API_BASE}/api/buy/dca`, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({mint, totalSol:amount, chunks, intervalSec:interval, slippageBps:slippage})
-          });
-        } else {
-          result = await fetch(`${API_BASE}/api/buy`, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({mint, solAmount:amount, slippageBps:slippage})
-          });
-        }
-        
-        const data = await result.json();
-        if(data.success) {
-          notify(`Buy successful! ${data.outAmount?.toFixed(4) || data.succeeded || 0} tokens`, 'success');
-          closeBuyModal();
-          setTimeout(() => { fetchAll(); fetchSolBalance(); }, 3000);
-        } else {
-          notify(data.error || 'Buy failed', 'error');
-        }
-      } catch(err) {
-        notify('Buy error: '+err.message, 'error');
-      } finally {
-        const btn = $('buyModal').querySelector('.tv-btn-success');
-        btn.disabled = false;
-        btn.textContent = 'BUY';
-      }
-    }
-    
-    // Sell Modal
-    function openSellModal(mint, symbol, balance) {
-      $('sellModal').style.display = 'flex';
-      $('sellTokenAddress').value = mint;
-      $('sellTokenName').value = symbol;
-      $('sellBalance').textContent = fmtN(balance);
-      $('sellAmount').value = '';
-    }
-    
-    function closeSellModal() {
-      $('sellModal').style.display = 'none';
-    }
-    
-    function setSellPercent(pct) {
-      const balance = parseFloat($('sellBalance').textContent);
-      if(balance > 0) {
-        const amount = (balance * pct / 100).toFixed(6);
-        $('sellAmount').value = amount;
-      }
-    }
-    
-    async function executeSell() {
-      const mint = $('sellTokenAddress').value;
-      const amount = parseFloat($('sellAmount').value);
-      const slippage = parseInt($('sellSlippage').value);
-      const reason = $('sellReason').value;
-      
-      if(!mint || !amount || amount <= 0) { notify('Please fill all fields', 'error'); return; }
-      
-      try {
-        $('sellModal').querySelector('.tv-btn-danger').disabled = true;
-        $('sellModal').querySelector('.tv-btn-danger').textContent = 'Processing...';
-        
-        const result = await fetch(`${API_BASE}/api/sell`, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({mint, amount, slippageBps:slippage, reason})
-        });
-        
-        const data = await result.json();
-        if(data.success) {
-          notify(`Sold ${data.sellAmount?.toFixed(4)} tokens for ${data.solOut?.toFixed(6)} SOL`, 'success');
-          closeSellModal();
-          setTimeout(() => { fetchAll(); fetchSolBalance(); }, 3000);
-        } else {
-          notify(data.error || 'Sell failed', 'error');
-        }
-      } catch(err) {
-        notify('Sell error: '+err.message, 'error');
-      } finally {
-        const btn = $('sellModal').querySelector('.tv-btn-danger');
-        btn.disabled = false;
-        btn.textContent = 'SELL';
-      }
-    }
-    
-    // Analytics
-    async function refreshAnalytics() {
-      try {
-        const [tpRes, tradesRes, analyticsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/take-profit`),
-          fetch(`${API_BASE}/api/trades`),
-          fetch(`${API_BASE}/api/analytics`)
-        ]);
-        
-        const tp = await tpRes.json();
-        const tradesData = await tradesRes.json();
-        const analytics = await analyticsRes.json();
-        
-        // TP List
-        const liveEntries = (tp.entries||[]).filter(e=>e.remaining>0||e.sold>0);
-        $('tpBadge').textContent = liveEntries.length;
-        $('tpList').innerHTML = liveEntries.length ? liveEntries.map(e=>buildTpItem(e, tp.tiers||[])).join('') : '<div style="text-align:center;color:var(--tv-text-muted);padding:20px">No active TP</div>';
-        
-        // Trades
-        lastTrades = tradesData.trades || [];
-        const recentTrades = lastTrades.slice(0, 8);
-        $('recentTrades').innerHTML = recentTrades.length ? recentTrades.map(t=>buildTradeItem(t)).join('') : '<div style="text-align:center;color:var(--tv-text-muted);padding:10px;font-size:12px">No trades yet</div>';
-        
-        // Analytics
-        $('aRealizedPnl').textContent = fmtUSD(analytics.realizedPnlSol || 0);
-        $('aRealizedPnl').className = `tv-analytics-value ${analytics.realizedPnlSol >= 0 ? 'green' : 'red'}`;
-        $('aWinRate').textContent = analytics.winRate ? `${analytics.winRate}%` : '━━';
-        $('aTotalTrades').textContent = analytics.totalTrades || 0;
-        $('aRoi').textContent = analytics.roi ? `${analytics.roi}%` : '━━';
-        $('aBestTrade').textContent = analytics.bestTradePct ? `+${analytics.bestTradePct}%` : '━━';
-        $('aBestTradeSymbol').textContent = analytics.bestTradeSymbol || '';
-        $('aWorstTrade').textContent = analytics.worstTradePct ? `${analytics.worstTradePct}%` : '━━';
-        $('aWorstTradeSymbol').textContent = analytics.worstTradeSymbol || '';
-        $('aAvgHold').textContent = analytics.avgHold || '━━';
-        $('aAvgWinLoss').textContent = analytics.avgWin ? `+${analytics.avgWin}% / ${analytics.avgLoss||0}%` : '━━';
-        
-        // Analytics trades list
-        const sellTrades = lastTrades.filter(t => t.type === 'sell' && t.pnlPct != null).slice(0, 20);
-        $('analyticsTrades').innerHTML = sellTrades.length ? sellTrades.map(t=>buildTradeItem(t)).join('') : '<div style="text-align:center;color:var(--tv-text-muted);padding:10px">No sell trades</div>';
-        
-      } catch(e) {
-        console.error('Analytics error:', e);
-        notify('Failed to load analytics', 'error');
-      }
-    }
-    
-    // Config
-    async function loadConfig() {
-      try {
-        const res = await fetch(`${API_BASE}/api/config`);
-        currentConfig = await res.json();
-        
-        $('cfgTpEnabled').checked = currentConfig.takeProfitEnabled || false;
-        $('cfgTpHysteresis').value = currentConfig.hysteresis || 5;
-        $('cfgTpTiers').value = JSON.stringify(currentConfig.takeProfitTiers || [], null, 2);
-        
-        $('cfgSlEnabled').checked = currentConfig.stopLossEnabled || false;
-        $('cfgSlPct').value = currentConfig.stopLossPct || -50;
-        
-        $('cfgTsEnabled').checked = currentConfig.trailingEnabled || false;
-        $('cfgTsPct').value = currentConfig.trailingPct || 20;
-        
-        $('cfgArEnabled').checked = currentConfig.antiRugEnabled || false;
-        $('cfgArPct').value = currentConfig.antiRugPct || 60;
-        
-        $('cfgSlippage').value = currentConfig.defaultSlippage || 500;
-        $('cfgSolReserve').value = currentConfig.minSolReserve || 0.05;
-        $('cfgInterval').value = currentConfig.intervalSec || 30;
-        
-        $('configDisplay').innerHTML = `
-          <div class="tv-analytics-grid" style="margin-bottom: 20px;">
-            <div class="tv-analytics-item">
-              <div class="tv-analytics-label">Take-Profit</div>
-              <div class="tv-analytics-value ${currentConfig.takeProfitEnabled ? 'green' : 'red'}">${currentConfig.takeProfitEnabled ? 'ON' : 'OFF'}</div>
-            </div>
-            <div class="tv-analytics-item">
-              <div class="tv-analytics-label">Stop-Loss</div>
-              <div class="tv-analytics-value ${currentConfig.stopLossEnabled ? 'green' : 'red'}">${currentConfig.stopLossEnabled ? 'ON' : 'OFF'}</div>
-            </div>
-            <div class="tv-analytics-item">
-              <div class="tv-analytics-label">Trailing Stop</div>
-              <div class="tv-analytics-value ${currentConfig.trailingEnabled ? 'green' : 'red'}">${currentConfig.trailingEnabled ? 'ON' : 'OFF'}</div>
-            </div>
-            <div class="tv-analytics-item">
-              <div class="tv-analytics-label">Anti-Rug</div>
-              <div class="tv-analytics-value ${currentConfig.antiRugEnabled ? 'green' : 'red'}">${currentConfig.antiRugEnabled ? 'ON' : 'OFF'}</div>
-            </div>
-          </div>
-          <div class="tv-config-section">
-            <div class="tv-config-section-title">Current Configuration</div>
-            <div class="tv-config-item"><span class="tv-config-key">Hysteresis</span><span class="tv-config-value">${currentConfig.hysteresis || 5}%</span></div>
-            <div class="tv-config-item"><span class="tv-config-key">Slippage</span><span class="tv-config-value">${currentConfig.defaultSlippage || 500} bps</span></div>
-            <div class="tv-config-item"><span class="tv-config-key">SOL Reserve</span><span class="tv-config-value">${currentConfig.minSolReserve || 0.05} SOL</span></div>
-            <div class="tv-config-item"><span class="tv-config-key">Interval</span><span class="tv-config-value">${currentConfig.intervalSec || 30}s</span></div>
-            <div class="tv-config-item"><span class="tv-config-key">TP Tiers</span><span class="tv-config-value">${(currentConfig.takeProfitTiers || []).length} levels</span></div>
-          </div>
-          <button class="tv-btn tv-btn-primary" style="width: 100%;" onclick="openConfigModal()">✏ Edit Configuration</button>
-        `;
-        
-      } catch(e) {
-        console.error('Config load error:', e);
-        $('configDisplay').innerHTML = '<div style="text-align:center;color:var(--tv-accent-red);padding:20px">Failed to load configuration</div>';
-      }
-    }
-    
-    function openConfigModal() {
-      $('configModal').style.display = 'flex';
-    }
-    
-    function closeConfigModal() {
-      $('configModal').style.display = 'none';
-    }
-    
-    async function saveConfig() {
-      try {
-        const config = {
-          takeProfitEnabled: $('cfgTpEnabled').checked,
-          hysteresis: parseFloat($('cfgTpHysteresis').value) || 5,
-          takeProfitTiers: JSON.parse($('cfgTpTiers').value || '[]'),
-          stopLossEnabled: $('cfgSlEnabled').checked,
-          stopLossPct: parseFloat($('cfgSlPct').value) || -50,
-          trailingEnabled: $('cfgTsEnabled').checked,
-          trailingPct: parseFloat($('cfgTsPct').value) || 20,
-          antiRugEnabled: $('cfgArEnabled').checked,
-          antiRugPct: parseFloat($('cfgArPct').value) || 60,
-          defaultSlippage: parseInt($('cfgSlippage').value) || 500,
-          minSolReserve: parseFloat($('cfgSolReserve').value) || 0.05,
-          intervalSec: parseInt($('cfgInterval').value) || 30,
-        };
-        
-        const result = await fetch(`${API_BASE}/api/config`, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(config)
-        });
-        
-        const data = await result.json();
-        if(data.success) {
-          notify('Configuration saved successfully!', 'success');
-          closeConfigModal();
-          loadConfig();
-        } else {
-          notify(data.error || 'Failed to save config', 'error');
-        }
-      } catch(e) {
-        notify('Invalid configuration: '+e.message, 'error');
-      }
-    }
-    
-    async function resetCircuitBreaker() {
-      try {
-        await fetch(`${API_BASE}/api/reset-circuit-breaker`, { method: 'POST' });
-        notify('Circuit breaker reset', 'success');
-        fetchAll();
-      } catch(e) {
-        notify('Failed to reset circuit breaker', 'error');
-      }
-    }
-    
-    // Update All
-    function updateAll(stats, portfolio, tp) {
-      lastTokens = portfolio.tokens||[];
-      lastTp = tp;
-      
-      $('walletAddr').textContent = fmtAddr(portfolio.address);
-      $('copyBtn').dataset.full = portfolio.address||'';
-      $('kTotalValue').textContent = fmtUSD(stats.totalValue);
-      $('kTokens').textContent = stats.tokens??'━━';
-      $('kTpCount').textContent = tp.summary?.totalTriggered||0;
-      $('kUptime').textContent = fmtUptime(stats.uptime||0);
-      $('kLastUpdate').textContent = 'MAJ '+fmtTime(Date.now());
-      
-      // PnL stats
-      if(stats.pnlStats) {
-        $('kAvgPnl').textContent = stats.pnlStats.avgPnl !== null ? fmtN(stats.pnlStats.avgPnl, 2)+'%' : '━━';
-        $('kBestPnl').textContent = stats.pnlStats.best !== null ? '+'+fmtN(stats.pnlStats.best, 2)+'%' : '━━';
-        $('kBestSym').innerHTML = stats.pnlStats.best !== null ? `${logoEl(lastTokens.find(t=>t.pnl===stats.pnlStats.best)||{}, 16)} ${stats.pnlStats.bestSymbol||fmtAddr(lastTokens.find(t=>t.pnl===stats.pnlStats.best)?.mintFull)}` : '━━';
-        $('kWorstPnl').textContent = stats.pnlStats.worst !== null ? fmtN(stats.pnlStats.worst, 2)+'%' : '━━';
-        $('kWorstSym').innerHTML = stats.pnlStats.worst !== null ? `${logoEl(lastTokens.find(t=>t.pnl===stats.pnlStats.worst)||{}, 16)} ${stats.pnlStats.worstSymbol||fmtAddr(lastTokens.find(t=>t.pnl===stats.pnlStats.worst)?.mintFull)}` : '━━';
-        $('spBestSym').innerHTML = stats.pnlStats.best !== null ? `${logoEl(lastTokens.find(t=>t.pnl===stats.pnlStats.best)||{}, 20)} ${lastTokens.find(t=>t.pnl===stats.pnlStats.best)?.symbol||fmtAddr(lastTokens.find(t=>t.pnl===stats.pnlStats.best)?.mintFull)}` : '━━';
-        $('spBestPnl').textContent = stats.pnlStats.best !== null ? '+'+fmtN(stats.pnlStats.best, 2)+'%' : '━━';
-        $('spBestVal').textContent = fmtUSD(lastTokens.find(t=>t.pnl===stats.pnlStats.best)?.value || 0);
-        $('spWorstSym').innerHTML = stats.pnlStats.worst !== null ? `${logoEl(lastTokens.find(t=>t.pnl===stats.pnlStats.worst)||{}, 20)} ${lastTokens.find(t=>t.pnl===stats.pnlStats.worst)?.symbol||fmtAddr(lastTokens.find(t=>t.pnl===stats.pnlStats.worst)?.mintFull)}` : '━━';
-        $('spWorstPnl').textContent = stats.pnlStats.worst !== null ? fmtN(stats.pnlStats.worst, 2)+'%' : '━━';
-        $('spWorstVal').textContent = fmtUSD(lastTokens.find(t=>t.pnl===stats.pnlStats.worst)?.value || 0);
-      }
-      
-      // System
-      $('sysCircuitBreaker').textContent = stats.sellCircuitBreaker >= 3 ? 'TRIPPED' : 'OK';
-      $('sysCircuitBreaker').className = `tv-config-value ${stats.sellCircuitBreaker >= 3 ? 'off' : 'on'}`;
-      
-      renderTable();
-      if(currentMainTab === 'analytics') refreshAnalytics();
-    }
-    
-    // Fetch All
-    async function fetchAll() {
-      try {
-        const [statsRes, portfolioRes, tpRes] = await Promise.all([
-          fetch(`${API_BASE}/api/stats`),
-          fetch(`${API_BASE}/api/portfolio`),
-          fetch(`${API_BASE}/api/take-profit`)
-        ]);
-        
-        if(!statsRes.ok || !portfolioRes.ok || !tpRes.ok) throw new Error('HTTP '+statsRes.status);
-        
-        const [stats, portfolio, tp] = await Promise.all([statsRes.json(), portfolioRes.json(), tpRes.json()]);
-        updateAll(stats, portfolio, tp);
-        pushLog('info', `Cycle OK — ${portfolio.tokens?.length||0} tokens — ${fmtUSD(stats.totalValue)}`);
-        $('navStatus').textContent = 'LIVE';
-        
-      } catch(err) {
-        pushLog('error', 'API: '+err.message);
-        $('sysStatus').textContent = 'OFFLINE';
-        $('sysStatus').className = 'tv-config-value off';
-        $('navStatus').textContent = 'OFFLINE';
-        notify('API Error: '+err.message, 'error');
-      }
-    }
-    
-    // Copy
-    $('copyBtn').onclick = async () => {
-      const addr = $('copyBtn').dataset.full||$('walletAddr').textContent;
-      try {
-        await navigator.clipboard.writeText(addr);
-        $('copyBtn').textContent = '✓';
-        notify('Address copied', 'success');
-        setTimeout(() => { $('copyBtn').textContent = '📋'; }, 1500);
-      } catch { notify('Copy failed', 'error'); }
-    };
-    
-    // Visibility
-    document.addEventListener('visibilitychange', () => {
-      autoRefresh = !document.hidden;
-    });
-    
-    // Close modals on outside click
-    ['buyModal', 'sellModal', 'configModal'].forEach(id => {
-      $(id).addEventListener('click', (e) => { if(e.target === $(id)) {
-        if(id==='buyModal') closeBuyModal();
-        if(id==='sellModal') closeSellModal();
-        if(id==='configModal') closeConfigModal();
-      }});
-    });
-    
-    // Init
-    document.addEventListener('DOMContentLoaded', () => {
-      initTheme();
-      pushLog('info', 'SolBot Pro initialized');
-      fetchAll();
-      fetchSolBalance();
-      setInterval(() => { if(autoRefresh) { fetchAll(); fetchSolBalance(); } }, REFRESH_MS);
-      $('themeToggle').addEventListener('click', toggleTheme);
-    });
-  </script>
+</div>
+
+<!-- BUY MODAL -->
+<div class="overlay" id="buyModal" style="display:none" onclick="oc(event,'buyModal')">
+  <div class="modal">
+    <div class="m-hdr"><span class="m-title">Buy Token</span><button class="m-close" onclick="closeModal('buyModal')">×</button></div>
+    <div class="m-body">
+      <div class="fg"><label class="fl">Token Address</label><input class="fi" id="buyMint" placeholder="Adresse Solana…"></div>
+      <div class="fg"><label class="fl">Montant (SOL)</label><input class="fi" type="number" id="buyAmt" placeholder="0.05" step="0.01"></div>
+      <div class="f-acts"><button class="btn btn-s" style="flex:1" onclick="executeBuy()">✓ Acheter</button><button class="btn btn-g" onclick="closeModal('buyModal')">Annuler</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- SET ENTRY MODAL -->
+<div class="overlay" id="setEntryModal" style="display:none" onclick="oc(event,'setEntryModal')">
+  <div class="modal">
+    <div class="m-hdr"><span class="m-title">✏️ Corriger Prix d'Entrée</span><button class="m-close" onclick="closeModal('setEntryModal')">×</button></div>
+    <div class="m-body">
+      <div style="padding:10px 12px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.25);border-radius:6px;margin-bottom:16px;font-size:12px;color:var(--orange)">
+        ⚠️ Corrigez le prix d'achat réel pour activer le TP/SL.
+      </div>
+      <div class="fg"><label class="fl">Mint address</label><input class="fi" id="seMint" placeholder="Adresse complète du token…" list="mintDL"><datalist id="mintDL"></datalist></div>
+      <div class="fg"><label class="fl">Prix d'achat (en SOL)</label><input class="fi" type="number" id="sePrice" placeholder="ex: 0.00000177" step="any"></div>
+      <div class="fg"><label class="fl">Balance initiale (tokens) <span style="color:var(--t3)">(optionnel)</span></label><input class="fi" type="number" id="seBal" placeholder="ex: 10647.22"></div>
+      <div class="f-acts"><button class="btn btn-p" style="flex:1" onclick="submitEntry()">✓ Confirmer</button><button class="btn btn-g" onclick="closeModal('setEntryModal')">Annuler</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCAN MODAL -->
+<div class="overlay" id="scanModal" style="display:none" onclick="oc(event,'scanModal')">
+  <div class="modal modal-lg">
+    <div class="m-hdr"><span class="m-title">🔍 Scan Helius</span><button class="m-close" onclick="closeModal('scanModal')">×</button></div>
+    <div class="m-body" id="scanBody"><div style="text-align:center;padding:30px;color:var(--t3)"><div class="spin" style="font-size:24px">⏳</div><div style="margin-top:10px">Analyse on-chain…</div></div></div>
+  </div>
+</div>
+
+<!-- SELL MODAL -->
+<div class="overlay" id="sellModal" style="display:none" onclick="oc(event,'sellModal')">
+  <div class="modal">
+    <div class="m-hdr"><span class="m-title">Vendre token</span><button class="m-close" onclick="closeModal('sellModal')">×</button></div>
+    <div class="m-body">
+      <p style="margin-bottom:16px;font-size:13px" id="sellTxt">Confirmer la vente ?</p>
+      <div class="fg"><label class="fl">Pourcentage</label><input class="fi" type="number" id="sellPct" value="100" min="1" max="100"></div>
+      <div class="f-acts"><button class="btn btn-d" style="flex:1" id="sellBtn">✓ Vendre</button><button class="btn btn-g" onclick="closeModal('sellModal')">Annuler</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+const API = 'https://solana-sniper-7o8s.onrender.com';
+const TICK = 10000;
+let tokens=[], positions=[], tpData={}, logs=[], pendingSell=null, autoRefresh=true;
+const $=id=>document.getElementById(id);
+const fmtTime=ts=>new Date(ts).toLocaleTimeString('fr-FR');
+const fmtUp=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h?`${h}h ${m}m`:m?`${m}m ${Math.floor(s%60)}s`:`${Math.floor(s)}s`};
+const fmtAddr=a=>a?a.slice(0,6)+'…'+a.slice(-4):'━━';
+const fmtPrice=n=>{if(!n||n<=0)return'━━';if(n>=1)return'$'+n.toFixed(4);if(n>=0.01)return'$'+n.toFixed(5);return'$'+n.toFixed(8)};
+const fmtUSD=n=>{const v=parseFloat(n||0);if(v===0)return'$0.00';if(v>=0.01)return'$'+v.toFixed(2);return'$'+v.toFixed(6)};
+const fmtN=(n,d=2)=>parseFloat(n||0).toFixed(d);
+
+// Theme
+function initTheme(){const t=localStorage.getItem('sb-theme')||'dark';document.documentElement.setAttribute('data-theme',t);$('themeBtn').textContent=t==='dark'?'☀️':'🌙'}
+$('themeBtn').addEventListener('click',()=>{const c=document.documentElement.getAttribute('data-theme'),n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('sb-theme',n);$('themeBtn').textContent=n==='dark'?'☀️':'🌙'});
+
+// Toast
+function notify(msg,type='info',title=null){const titles={success:'Succès',error:'Erreur',warn:'Attention',info:'Info'};const t=document.createElement('div');t.className=`toast ${type}`;t.innerHTML=`<div class="t-title">${title||titles[type]}</div><div class="t-msg">${msg}</div>`;$('toasts').appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300)},4000);while($('toasts').children.length>5)$('toasts').firstChild.remove()}
+
+// Logs
+function pushLog(lv,msg){logs.unshift({t:fmtTime(Date.now()),lv,msg});if(logs.length>60)logs.pop();$('logsPanel').innerHTML=logs.map(l=>`<div class="log-line"><span class="log-t">${l.t}</span><span class="log-lv ll-${l.lv}">[${l.lv.toUpperCase()}]</span>${l.msg}</div>`).join('')}
+
+// Tabs
+function switchTab(tab){$('tabA').classList.toggle('active',tab==='active');$('tabS').classList.toggle('active',tab==='sold');renderTable()}
+
+// Logo helper
+function logoEl(tok){const ini=(tok.symbol||'?').slice(0,2).toUpperCase();return tok.logo&&tok.logo!=='null'?`<div class="tok-logo"><img src="${tok.logo}" onerror="this.style.display='none';this.parentElement.textContent='${ini}'" loading="lazy"></div>`:`<div class="tok-logo">${ini}</div>`}
+
+// Render table
+function renderTable(){
+  const q=($('searchQ').value||'').toLowerCase();
+  const data=tokens.filter(t=>!q||(t.symbol||'').toLowerCase().includes(q)||(t.mintFull||'').toLowerCase().includes(q));
+  $('tnA').textContent=tokens.length;$('tnS').textContent=0;
+  const tiers=tpData.defaultTiers||tpData.tiers||[];
+  $('tblBody').innerHTML=data.length?data.sort((a,b)=>b.value-a.value).map(tok=>{
+    const pos=positions.find(p=>p.mint===tok.mintFull)||{};
+    const boot=pos.bootstrapped;
+    const pnl=tok.pnl;
+    const pc=pnl===null?'pnl-z':pnl>0?'pnl-g':'pnl-r';
+    const pt=pnl===null?'N/A':(pnl>=0?'+':'')+fmtN(pnl,2)+'%';
+    const dots=tiers.map((_,i)=>`<div class="tpdot ${(pos.triggeredTiers||[]).includes(i)?'hit':''}"></div>`).join('');
+    return `<tr><td><div class="tok">${logoEl(tok)}<div><div class="tok-sym">${tok.symbol||tok.mint.slice(0,8)}${boot?'<span class="boot">BOOT</span>':''}</div><div class="tok-addr">${fmtAddr(tok.mintFull)}</div></div></div></td><td class="mono">${tok.price?fmtPrice(tok.price):'━━'}</td><td class="mono" style="font-weight:600">${fmtUSD(tok.value)}</td><td class="mono">${fmtN(tok.balance)}</td><td><span class="pnl ${pc}">${pt}</span></td><td><div class="tpdots">${dots}</div></td><td><div class="row-acts"><button class="btn btn-s btn-sm" onclick="openBuyFor('${tok.mintFull}')">Buy</button><button class="btn btn-d btn-sm" onclick="openSell('${tok.mintFull}','${tok.symbol||tok.mint.slice(0,8)}',${tok.balance||0})">Sell</button>${boot?`<button class="btn btn-o btn-sm" onclick="openEntryFor('${tok.mintFull}')" title="Corriger prix">✏️</button>`:''}</div></td></tr>`;
+  }).join(''):'<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--t3)">Aucune position</td></tr>'
+}
+
+// Sidebar
+function updateSidebar(stats,tp){
+  const withPnl=tokens.filter(t=>t.pnl!==null);
+  if(withPnl.length){
+    const b=withPnl.reduce((a,c)=>a.pnl>c.pnl?a:c),w=withPnl.reduce((a,c)=>a.pnl<c.pnl?a:c);
+    $('spBS').textContent=b.symbol||fmtAddr(b.mintFull);$('spBP').textContent=(b.pnl>=0?'+':'')+fmtN(b.pnl,2)+'%';$('spBV').textContent=fmtUSD(b.value);
+    $('spWS').textContent=w.symbol||fmtAddr(w.mintFull);$('spWP').textContent=fmtN(w.pnl,2)+'%';$('spWV').textContent=fmtUSD(w.value);
+  }
+  // TP panel
+  const active=(tp.entries||[]).filter(e=>(e.remaining||0)>0||(e.sold||0)>0);
+  $('tpCnt').textContent=active.length;
+  const tiers=tp.defaultTiers||tp.tiers||[];
+  $('tpPanel').innerHTML=active.length?active.map(e=>`<div class="pos-entry"><div class="pos-top"><span style="font-weight:600;font-size:12px">${e.mint}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t3)">${fmtPrice(e.entryPrice)}</span></div><div class="tier-row">${tiers.map((t,i)=>{const d=(e.triggeredTiers||[]).includes(t.pnl);return`<div class="tier-item"><div class="tier-bar"><div class="tier-fill ${d?'done':'next'}" style="width:${d?100:30}%"></div></div><div class="tier-lbl ${d?'done':'next'}">${t.pnl}%</div></div>`}).join('')}</div><div class="pos-meta"><span>Vendu:${fmtN(e.sold,2)}</span><span>Reste:${fmtN(e.remaining,2)}</span></div></div>`).join(''):'<div style="text-align:center;color:var(--t3);padding:16px;font-size:11px">Aucun TP actif</div>';
+  // Positions panel
+  const boots=positions.filter(p=>p.bootstrapped);
+  $('posPanel').innerHTML=boots.length?boots.map(p=>`<div class="pos-entry"><div class="pos-top"><div><span style="font-weight:600;font-size:12px">${p.symbol||p.mint.slice(0,8)}</span><span class="boot" style="margin-left:6px">BOOT</span></div><button class="btn btn-o btn-sm" onclick="openEntryFor('${p.mint}')">✏️ Fix</button></div><div class="pos-meta"><span>Entrée:${fmtPrice(p.entryPrice)}</span><span>PnL:N/A</span></div></div>`).join('')+`<div style="margin-top:10px"><button class="btn btn-o" style="width:100%;font-size:12px" onclick="runScan()">🔍 Scan Helius automatique</button></div>`:'<div style="text-align:center;color:var(--t3);padding:12px;font-size:11px">✅ Tous les prix connus</div>';
+  // Analytics
+  if(tp.summary){$('aTrig').textContent=tp.summary.totalTriggered||0;$('aSold').textContent=tp.summary.totalSold||0}
+  if(tp.recent?.length)$('tpRecent').innerHTML=tp.recent.slice(0,5).map(h=>`<div class="log-line"><span class="log-t">${fmtTime(h.timestamp)}</span> ${h.mint} <span class="g">+${fmtN(h.pnl,1)}%</span></div>`).join('');
+  // System
+  $('sysSt').textContent='ONLINE';$('sysSt').className='cfg-v on';
+  $('sysRpc').textContent=stats.rpcSource||'Public';$('sysInt').textContent=(stats.intervalSec||30)+'s';
+  const c=tp.config||{};
+  $('sysTP').innerHTML=`<span class="${c.takeProfitEnabled!==false?'on':'off'}">${c.takeProfitEnabled!==false?'✅ ON':'❌ OFF'}</span>`;
+  $('sysSL').innerHTML=`<span class="${c.stopLossEnabled!==false?'on':'off'}">${c.stopLossEnabled!==false?'✅ ON':'❌ OFF'}</span>`;
+  $('sysTR').innerHTML=`<span class="${c.trailingEnabled?'on':'off'}">${c.trailingEnabled?'✅ ON':'❌ OFF'}</span>`;
+  $('sysAR').innerHTML=`<span class="${c.antiRugEnabled!==false?'on':'off'}">${c.antiRugEnabled!==false?'✅ ON':'❌ OFF'}</span>`;
+}
+
+// Main fetch
+async function fetchAll(){
+  try{
+    const [sR,pR,tR,posR]=await Promise.all([fetch(`${API}/api/stats`),fetch(`${API}/api/portfolio`),fetch(`${API}/api/take-profit`),fetch(`${API}/api/positions`)]);
+    if(!sR.ok||!pR.ok||!tR.ok)throw new Error('HTTP '+sR.status);
+    const [stats,port,tp,posD]=await Promise.all([sR.json(),pR.json(),tR.json(),posR.ok?posR.json():{positions:[],bootstrapped:0}]);
+    tokens=port.tokens||[];tpData=tp;positions=posD.positions||[];
+    $('walletAddr').textContent=fmtAddr(port.address||'');$('walletChip').dataset.full=port.address||'';
+    $('kVal').textContent=fmtUSD(stats.totalValue);$('kTok').textContent=tokens.length;$('kTP').textContent=tp.summary?.totalTriggered||0;
+    $('kUp').textContent=fmtUp(stats.uptime||0);$('kUpd').textContent='MAJ '+fmtTime(Date.now());
+    const bc=posD.bootstrapped||0;
+    if(bc>0){$('scanBanner').classList.add('show');$('bannerTxt').textContent=`${bc} position${bc>1?'s':''} sans prix d'entrée réel`;$('kBoot').textContent=`${bc} sans prix réel`}else{$('scanBanner').classList.remove('show');$('kBoot').textContent=''}
+    const wp=tokens.filter(t=>t.pnl!==null);
+    if(wp.length){const b=wp.reduce((a,c)=>a.pnl>c.pnl?a:c),w=wp.reduce((a,c)=>a.pnl<c.pnl?a:c);$('kBest').textContent=(b.pnl>=0?'+':'')+fmtN(b.pnl,2)+'%';$('kBestS').textContent=b.symbol||fmtAddr(b.mintFull);$('kWorst').textContent=fmtN(w.pnl,2)+'%';$('kWorstS').textContent=w.symbol||fmtAddr(w.mintFull)}
+    $('mintDL').innerHTML=tokens.map(t=>`<option value="${t.mintFull}">${t.symbol||t.mintFull}</option>`).join('');
+    renderTable();updateSidebar(stats,tp);
+    $('statusPill').className='pill';$('statusTxt').textContent='LIVE';
+    pushLog('info',`OK — ${tokens.length} tokens — ${fmtUSD(stats.totalValue)}`);
+  }catch(err){
+    $('statusPill').className='pill offline';$('statusTxt').textContent='OFFLINE';$('sysSt').textContent='OFFLINE';$('sysSt').className='cfg-v off';
+    pushLog('error','API: '+err.message);notify('API inaccessible','error');
+  }
+}
+
+// Scan Helius
+async function runScan(){
+  openModal('scanModal');
+  $('scanBody').innerHTML='<div style="text-align:center;padding:30px;color:var(--t3)"><div class="spin" style="font-size:28px">⏳</div><div style="margin-top:10px;font-size:13px">Analyse des transactions on-chain…</div></div>';
+  try{
+    const r=await fetch(`${API}/api/positions/scan-history`);const d=await r.json();
+    if(!r.ok)throw new Error(d.error||'HTTP '+r.status);
+    const fixed=(d.results||[]).filter(x=>x.status==='fixed');
+    $('scanBody').innerHTML=`<div style="padding:12px 16px;background:${fixed.length>0?'rgba(63,185,80,.08)':'rgba(248,81,73,.08)'};border-radius:6px;border:1px solid ${fixed.length>0?'rgba(63,185,80,.25)':'rgba(248,81,73,.25)'};margin-bottom:16px;font-size:13px"><strong>${d.fixed||0}/${d.total||0} prix retrouvés</strong></div><div style="max-height:300px;overflow-y:auto">${(d.results||[]).map(row=>`<div class="scan-row"><div><div style="font-weight:600;font-size:12px">${row.symbol||row.mint}</div>${row.entryPrice?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t3)">${row.entryPrice?.toPrecision?row.entryPrice.toPrecision(6):row.entryPrice}</div>`:''}</div><span class="scan-badge ${row.status==='fixed'?'sc-ok':'sc-no'}">${row.status==='fixed'?'✓ FIXÉ':'✗ INTROUVABLE'}</span></div>`).join('')}</div><div class="f-acts"><button class="btn btn-p" onclick="closeModal('scanModal');fetchAll()">Fermer & Refresh</button></div>`;
+    if(d.fixed>0)notify(`${d.fixed} prix corrigés !`,'success');
+    pushLog('success','Scan: '+d.fixed+'/'+(d.total||0)+' fixés');
+  }catch(err){
+    $('scanBody').innerHTML=`<div style="color:var(--red);padding:20px;text-align:center">❌ ${err.message}<br><br><small style="color:var(--t3)">Vérifiez HELIUS_API_KEY dans les env vars Render.</small></div><div class="f-acts"><button class="btn btn-g" onclick="closeModal('scanModal')">Fermer</button></div>`;
+    pushLog('error','Scan: '+err.message);
+  }
+}
+
+// Set entry
+function openEntryFor(mint){$('seMint').value=mint;$('sePrice').value='';$('seBal').value='';openModal('setEntryModal')}
+async function submitEntry(){
+  const mint=$('seMint').value.trim(),price=parseFloat($('sePrice').value),balance=$('seBal').value?parseFloat($('seBal').value):undefined;
+  if(!mint||isNaN(price)||price<=0){notify('Mint et prix valide requis','error');return}
+  try{const r=await fetch(`${API}/api/positions/set-entry`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint,entryPrice:price,...(balance?{balance}:{})})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Erreur');notify('Prix fixé — TP/SL actifs','success');closeModal('setEntryModal');setTimeout(fetchAll,800);pushLog('success','Entry set: '+mint.slice(0,8)+' → '+price.toPrecision(5))}catch(err){notify('Erreur: '+err.message,'error')}
+}
+
+// Buy
+function openBuyFor(mint){$('buyMint').value=mint;$('buyAmt').value='';openModal('buyModal')}
+async function executeBuy(){
+  const mint=$('buyMint').value.trim(),sol=parseFloat($('buyAmt').value);
+  if(!mint||isNaN(sol)||sol<=0){notify('Champs requis','error');return}
+  try{const r=await fetch(`${API}/api/buy`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint,solAmount:sol})});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||'Failed');notify(`Acheté: ${fmtN(d.outAmount,4)} tokens`,'success');closeModal('buyModal');setTimeout(fetchAll,2000);pushLog('success','Buy: '+mint.slice(0,8)+' — '+sol+' SOL')}catch(err){notify('Achat échoué: '+err.message,'error')}
+}
+
+// Sell
+function openSell(mint,sym,bal){pendingSell={mint,bal};$('sellTxt').textContent=`Vendre ${sym} (${fmtN(bal,4)}) ?`;$('sellPct').value='100';$('sellBtn').onclick=executeSell;openModal('sellModal')}
+async function executeSell(){
+  if(!pendingSell)return;const{mint,bal}=pendingSell;const pct=parseFloat($('sellPct').value)||100;const amt=bal*(pct/100);
+  try{const r=await fetch(`${API}/api/sell`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint,amount:amt,percent:pct})});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||'Failed');notify(`Vendu: ${fmtN(d.solOut,6)} SOL`,'success');closeModal('sellModal');setTimeout(fetchAll,2000);pushLog('success','Sell: '+mint.slice(0,8)+' '+pct+'%')}catch(err){notify('Vente échouée: '+err.message,'error')}
+}
+
+// Modal utils
+function openModal(id){$(id).style.display='flex'}
+function closeModal(id){$(id).style.display='none'}
+function oc(e,id){if(e.target===$(id))closeModal(id)}
+
+// Wallet copy
+$('walletChip').addEventListener('click',async()=>{const a=$('walletChip').dataset.full||$('walletAddr').textContent;try{await navigator.clipboard.writeText(a);$('wcIco').textContent='✓';notify('Adresse copiée','success');setTimeout(()=>{$('wcIco').textContent='📋'},1500)}catch{notify('Échec copie','error')}});
+
+// ESC
+document.addEventListener('keydown',e=>{if(e.key==='Escape')['buyModal','setEntryModal','scanModal','sellModal'].forEach(closeModal)});
+
+// Visibility
+document.addEventListener('visibilitychange',()=>{autoRefresh=!document.hidden});
+
+initTheme();
+pushLog('info','SolBot Pro v2.2.0 — Init');
+fetchAll();
+setInterval(()=>{if(autoRefresh)fetchAll()},TICK);
+</script>
 </body>
 </html>
