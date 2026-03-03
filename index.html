@@ -41,7 +41,9 @@
     
     /* Token List */
     .token-list { padding: 0 12px; }
-    .token-item { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+    .token-item { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 8px; cursor: pointer; transition: 0.2s; }
+    .token-item:active { transform: scale(0.98); }
+    .token-row { display: flex; align-items: center; gap: 12px; }
     .token-logo { width: 40px; height: 40px; border-radius: 50%; background: var(--bg3); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; flex-shrink: 0; }
     .token-logo img { width: 100%; height: 100%; border-radius: 50%; }
     .token-info { flex: 1; min-width: 0; }
@@ -53,17 +55,18 @@
     .token-pnl.pos { background: rgba(14,203,129,0.15); color: var(--green); }
     .token-pnl.neg { background: rgba(242,54,69,0.15); color: var(--red); }
     
-    /* Action Buttons */
-    .token-actions { display: flex; gap: 8px; margin-top: 8px; }
-    .btn { flex: 1; padding: 8px; border: none; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer; }
+    /* Compact Action Buttons */
+    .token-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .btn { padding: 6px 12px; border: none; border-radius: 6px; font-weight: 600; font-size: 11px; cursor: pointer; flex: 1; }
     .btn-buy { background: var(--green); color: white; }
     .btn-sell { background: var(--red); color: white; }
     .btn-chart { background: var(--bg3); color: var(--text); }
+    .btn-sm { padding: 4px 8px; font-size: 10px; }
     
     /* Modals (Bottom Sheet) */
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 200; display: none; align-items: flex-end; }
     .modal-overlay.active { display: flex; }
-    .modal { background: var(--bg2); border-radius: var(--radius) var(--radius) 0 0; width: 100%; max-height: 85vh; overflow-y: auto; padding: 20px 16px calc(20px + var(--safe-bottom)); }
+    .modal { background: var(--bg2); border-radius: var(--radius) var(--radius) 0 0; width: 100%; max-height: 90vh; overflow-y: auto; padding: 20px 16px calc(20px + var(--safe-bottom)); }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .modal-title { font-weight: 600; font-size: 16px; }
     .modal-close { background: none; border: none; color: var(--text2); font-size: 24px; cursor: pointer; padding: 4px; }
@@ -73,8 +76,8 @@
     .form-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; display: block; }
     .form-input { width: 100%; padding: 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
     .form-input:focus { outline: none; border-color: var(--blue); }
-    .preset-row { display: flex; gap: 8px; margin-top: 8px; }
-    .preset-btn { flex: 1; padding: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px; cursor: pointer; }
+    .preset-row { display: flex; gap: 6px; margin-top: 8px; }
+    .preset-btn { flex: 1; padding: 6px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 10px; cursor: pointer; }
     .preset-btn.active { background: var(--blue); border-color: var(--blue); color: white; }
     
     /* Tabs */
@@ -119,6 +122,17 @@
     .search-bar { padding: 12px; background: var(--bg2); border-bottom: 1px solid var(--border); }
     .search-input { width: 100%; padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
     .search-input:focus { outline: none; border-color: var(--blue); }
+    
+    /* TradingView Chart Modal */
+    .chart-modal { max-height: 85vh; }
+    .chart-container { width: 100%; height: 400px; border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
+    .token-detail { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 12px; background: var(--bg3); border-radius: var(--radius); }
+    .token-detail-info { flex: 1; }
+    .token-detail-symbol { font-weight: 700; font-size: 16px; }
+    .token-detail-mint { font-size: 10px; color: var(--text2); font-family: 'JetBrains Mono', monospace; }
+    .token-detail-stats { text-align: right; }
+    .token-detail-price { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 14px; }
+    .token-detail-pnl { font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -268,6 +282,35 @@
     </div>
   </nav>
 
+  <!-- Token Detail + TradingView Chart Modal -->
+  <div class="modal-overlay" id="chartModal">
+    <div class="modal chart-modal">
+      <div class="modal-header">
+        <div class="modal-title">📊 Graphique</div>
+        <button class="modal-close" onclick="closeModal('chartModal')">×</button>
+      </div>
+      
+      <div class="token-detail">
+        <div class="token-logo" id="chartTokenLogo"></div>
+        <div class="token-detail-info">
+          <div class="token-detail-symbol" id="chartTokenSymbol">━━</div>
+          <div class="token-detail-mint" id="chartTokenMint">━━</div>
+        </div>
+        <div class="token-detail-stats">
+          <div class="token-detail-price" id="chartTokenPrice">━━</div>
+          <div class="token-detail-pnl" id="chartTokenPnl">━━</div>
+        </div>
+      </div>
+      
+      <div class="chart-container" id="chartContainer"></div>
+      
+      <div class="token-actions">
+        <button class="btn btn-buy" onclick="openBuyModalFromChart()">🟢 Acheter</button>
+        <button class="btn btn-sell" onclick="openSellModalFromChart()">🔴 Vendre</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Buy Modal -->
   <div class="modal-overlay" id="buyModal">
     <div class="modal">
@@ -329,7 +372,7 @@
 
   <script>
     const API = window.location.origin;
-    let tokens = [], currentTab = 'active', solBalance = 0, config = {};
+    let tokens = [], currentTab = 'active', solBalance = 0, config = {}, currentToken = null;
     
     const $ = id => document.getElementById(id);
     const fmt = (n, d=2) => parseFloat(n||0).toFixed(d);
@@ -364,6 +407,64 @@
     // Modals
     function openModal(id) { $(id).classList.add('active'); }
     function closeModal(id) { $(id).classList.remove('active'); }
+    
+    // Token Click → Chart Modal
+    function openTokenChart(mint, token) {
+      currentToken = token;
+      
+      // Populate token detail
+      $('chartTokenSymbol').textContent = token.symbol || mint.slice(0,8);
+      $('chartTokenMint').textContent = fmtAddr(mint);
+      $('chartTokenPrice').textContent = token.price ? fmtUSD(token.price) : '━━';
+      $('chartTokenPnl').textContent = token.pnl !== null ? (token.pnl >= 0 ? '+' : '') + fmt(token.pnl, 1) + '%' : '━━';
+      $('chartTokenPnl').className = `token-detail-pnl ${token.pnl >= 0 ? 'pos' : 'neg'}`;
+      $('chartTokenLogo').innerHTML = token.logo ? `<img src="${token.logo}">` : (token.symbol||'?').slice(0,2).toUpperCase();
+      
+      // TradingView Widget
+      $('chartContainer').innerHTML = `
+        <div class="tradingview-widget-container" style="height:100%;width:100%">
+          <div id="tradingview_chart" style="height:100%;width:100%"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+          <script type="text/javascript">
+            new TradingView.widget({
+              "autosize": true,
+              "symbol": "BINANCE:${token.symbol || 'SOL'}USDT",
+              "interval": "5",
+              "timezone": "Europe/Paris",
+              "theme": "dark",
+              "style": "1",
+              "locale": "fr",
+              "toolbar_bg": "#f1f3f6",
+              "enable_publishing": false,
+              "hide_top_toolbar": false,
+              "container_id": "tradingview_chart"
+            });
+          <\/script>
+        </div>
+      `;
+      
+      openModal('chartModal');
+    }
+    
+    // Buy from chart
+    function openBuyModalFromChart() {
+      if (currentToken) {
+        $('buyTokenAddress').value = currentToken.mintFull;
+      }
+      closeModal('chartModal');
+      openModal('buyModal');
+    }
+    
+    // Sell from chart
+    function openSellModalFromChart() {
+      if (currentToken) {
+        $('sellTokenAddress').value = currentToken.mintFull;
+        $('sellTokenName').value = currentToken.symbol || currentToken.mintFull.slice(0,8);
+        $('sellBalance').textContent = fmt(currentToken.balance, 4);
+      }
+      closeModal('chartModal');
+      openModal('sellModal');
+    }
     
     // Buy
     function openBuyModal(mint='') {
@@ -484,7 +585,7 @@
     
     async function saveConfig() {
       try {
-        await fetch(`${API}/api/config`, {
+        const res = await fetch(`${API}/api/config`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
@@ -498,9 +599,14 @@
             antiRugPct: parseFloat($('cfgArPct').value)
           })
         });
-        toast('Configuration sauvegardée', 'success');
+        const data = await res.json();
+        if (data.success) {
+          toast('Configuration sauvegardée ✅', 'success');
+        } else {
+          toast('Erreur sauvegarde', 'error');
+        }
       } catch (e) {
-        toast('Erreur sauvegarde', 'error');
+        toast('Erreur: ' + e.message, 'error');
       }
     }
     
@@ -570,19 +676,21 @@
         const logo = t.logo ? `<img src="${t.logo}" onerror="this.style.display='none'">` : (t.symbol||'?').slice(0,2).toUpperCase();
         
         return `
-          <div class="token-item">
-            <div class="token-logo">${logo}</div>
-            <div class="token-info">
-              <div class="token-symbol">${t.symbol || t.mint.slice(0,8)}</div>
-              <div class="token-name">${fmtAddr(t.mintFull)}</div>
-              <div class="token-actions">
-                <button class="btn btn-buy" onclick="openBuyModal('${t.mintFull}')">BUY</button>
-                <button class="btn btn-sell" onclick="openSellModal('${t.mintFull}','${t.symbol||t.mint.slice(0,8)}',${t.balance})">SELL</button>
+          <div class="token-item" onclick="openTokenChart('${t.mintFull}', ${JSON.stringify(t).replace(/"/g, '&quot;')})">
+            <div class="token-row">
+              <div class="token-logo">${logo}</div>
+              <div class="token-info">
+                <div class="token-symbol">${t.symbol || t.mint.slice(0,8)}</div>
+                <div class="token-name">${fmtAddr(t.mintFull)}</div>
+                <div class="token-actions">
+                  <button class="btn btn-buy btn-sm" onclick="event.stopPropagation(); openBuyModal('${t.mintFull}')">Buy</button>
+                  <button class="btn btn-sell btn-sm" onclick="event.stopPropagation(); openSellModal('${t.mintFull}','${t.symbol||t.mint.slice(0,8)}',${t.balance})">Sell</button>
+                </div>
               </div>
-            </div>
-            <div class="token-stats">
-              <div class="token-value">${fmtUSD(t.value)}</div>
-              <div class="token-pnl ${pnlClass}">${pnlSign}${fmt(t.pnl, 1)}%</div>
+              <div class="token-stats">
+                <div class="token-value">${fmtUSD(t.value)}</div>
+                <div class="token-pnl ${pnlClass}">${pnlSign}${fmt(t.pnl, 1)}%</div>
+              </div>
             </div>
           </div>
         `;
