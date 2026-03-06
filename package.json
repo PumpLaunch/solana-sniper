@@ -1,18 +1,17 @@
 {
-  "name": "solbot-pro-v331",
-  "version": "3.3.1",
-  "description": "SolBot Pro v3.3.1 — Optimisé Render",
+  "name": "solbot-pro-backend",
+  "version": "1.0.0",
+  "description": "Bot de trading Solana - Backend Node.js pour Render",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
-  "dependencies": {
-    "@solana/web3.js": "^1.95.3",
-    "bs58": "^6.0.0",
-    "express": "^4.21.1",
-    "ws": "^8.18.0"
-  },
   "engines": {
-    "node": "20.x"
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.91.8",
+    "node-fetch": "^3.3.2",
+    "bs58": "^5.0.0"
   }
 }
