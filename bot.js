@@ -69,7 +69,7 @@ const CONFIG = {
   JITO_URL:     process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
   
   // 📐 Position Sizing
-  MAX_POSITIONS:    parseInt(process.env.MAX_POSITIONS || '10'),
+  MAX_POSITIONS:    parseInt(process.env.MAX_POSITIONS || '100'),
   MIN_SCORE_TO_BUY: parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
   
   // ⚙ Execution
