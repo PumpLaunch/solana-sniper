@@ -26,9 +26,9 @@ const CONFIG = {
   DATA_FILE:      process.env.DATA_FILE || './bot_state.json',
   
   // 🎯 Take-Profit (default ON)
-  TAKE_PROFIT_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'false',
+  TAKE_PROFIT_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'true',
   TAKE_PROFIT_TIERS:      safeParseJson(process.env.TAKE_PROFIT_TIERS,
-    [{ pnl: 20, sell: 25 }, { pnl: 40, sell: 25 }, { pnl: 60, sell: 25 }, { pnl: 100, sell: 25 }]),
+    [{ pnl: 40, sell: 25 }, { pnl: 80, sell: 25 }, { pnl: 120, sell: 25 }, { pnl: 170, sell: 20 }]),
   TAKE_PROFIT_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
   
   // 🛡 Break-Even Stop (after TP1)
