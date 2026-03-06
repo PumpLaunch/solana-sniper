@@ -22,17 +22,17 @@ NODE_ENV:       process.env.NODE_ENV || 'production',
 DATA_FILE:      process.env.DATA_FILE || './bot_state.json',
 
 // 🎯 Take-Profit
-TAKE_PROFIT_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'false',
+TAKE_PROFIT_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'true',
 TAKE_PROFIT_TIERS:      safeParseJson(process.env.TAKE_PROFIT_TIERS,
 [{ pnl: 20, sell: 25 }, { pnl: 40, sell: 25 }, { pnl: 60, sell: 25 }, { pnl: 100, sell: 25 }]),
 TAKE_PROFIT_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
 
 // 🛡 Break-Even
-BREAK_EVEN_ENABLED: process.env.BREAK_EVEN_ENABLED !== 'false',
+BREAK_EVEN_ENABLED: process.env.BREAK_EVEN_ENABLED !== 'true',
 BREAK_EVEN_BUFFER:  parseFloat(process.env.BREAK_EVEN_BUFFER || '2'),
 
 // 🛑 Stop-Loss
-STOP_LOSS_ENABLED: process.env.STOP_LOSS_ENABLED !== 'false',
+STOP_LOSS_ENABLED: process.env.STOP_LOSS_ENABLED !== 'true',
 STOP_LOSS_PCT:     parseFloat(process.env.STOP_LOSS_PCT || '-50'),
 
 // 📉 Trailing Stop
@@ -42,7 +42,7 @@ TRAILING_VOL_ENABLED:  process.env.TRAILING_VOL_ENABLED === 'true',
 TRAILING_VOL_MULT:     parseFloat(process.env.TRAILING_VOL_MULT || '2.5'),
 
 // 🚨 Anti-Rug
-ANTI_RUG_ENABLED: process.env.ANTI_RUG_ENABLED !== 'false',
+ANTI_RUG_ENABLED: process.env.ANTI_RUG_ENABLED !== 'true',
 ANTI_RUG_PCT:     parseFloat(process.env.ANTI_RUG_PCT || '60'),
 
 // 💧 Liquidity Exit
