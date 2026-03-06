@@ -73,14 +73,14 @@ const CONFIG = {
   MIN_SCORE_TO_BUY: parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
   
   // ⚙ Execution
-  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE || '0.05'),
+  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE || '0.005'),
   MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES || '20'), // ← FIX: was 3
   DEFAULT_SLIPPAGE: parseInt(process.env.DEFAULT_SLIPPAGE || '500'),
   PRICE_TTL_MS:     parseInt(process.env.PRICE_TTL_MS || '55000'), // > 1.8× INTERVAL
   BUY_COOLDOWN_MS:  parseInt(process.env.BUY_COOLDOWN_MS || '5000'),
   
   // 🔔 Webhooks
-  WEBHOOK_URL:      process.env.WEBHOOK_URL || null,
+  WEBHOOK_URL:      process.env.WEBHOOK_URL || true,
   WEBHOOK_TYPE:     process.env.WEBHOOK_TYPE || 'discord',
   TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || null,
   
