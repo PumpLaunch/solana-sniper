@@ -632,129 +632,33 @@ const SWAP_EPS = ['https://lite-api.jup.ag/swap/v1/swap','https://api.jup.ag/swa
 class SwapEngine {
 constructor(wallet, rpc) { this.wallet=wallet; this.rpc=rpc; this.mutex=new Mutex(); this.sellFails=0; this.lastBuy=0; }
 async getQuote({ inputMint, outputMint, amountRaw, slippageBps }) {
-const params = `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
-const QUOTE_ENDPOINTS = [
-`https://lite-api.jup.ag/swap/v1/quote?${params}`,
-`https://api.jup.ag/swap/v1/quote?${params}`,
-];
-let lastErr = null;
-for (const url of QUOTE_ENDPOINTS) {
-try {
-const r = await fetch(url, {
-headers: { 'User-Agent': `SolBot/${VERSION}`, 'Accept': 'application/json' },
-signal: AbortSignal.timeout(15000),
-});
-if (!r.ok) { lastErr = new Error(`Quote HTTP ${r.status}`); log('warn', 'Quote endpoint failed', { url: url.split('/')[2], status: r.status }); continue; }
-const q = await r.json();
-if (q.error) { lastErr = new Error(q.error); continue; }
-if (!q.outAmount) { lastErr = new Error('No outAmount'); continue; }
-log('success', 'Quote success', { endpoint: url.split('/')[2] });
-return q;
-} catch (err) { lastErr = err; log('debug', 'Quote endpoint error', { url: url.split('/')[2], err: err.message }); }
-}
-throw lastErr || new Error('Tous les endpoints Jupiter quote ont échoué');
-}
-
-async _buildAndSendTx({ inputMint, outputMint, amountRaw, slippageBps, priorityMode='auto' }) {
-return withRetry(async () => {
-const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
-const priLamports = priorityMode==='turbo'?500000:priorityMode==='high'?200000:priorityMode==='medium'?100000:'auto';
-const body = JSON.stringify({ quoteResponse:quote, userPublicKey:this.wallet.publicKey.toString(), wrapAndUnwrapSol:true, dynamicComputeUnitLimit:true, prioritizationFeeLamports:priLamports });
-let swapData=null, swapErr;
-for (const ep of SWAP_EPS) {
-try {
-const r = await fetch(ep, { method:'POST', headers:{'Content-Type':'application/json','User-Agent':`SolBot/${VERSION}`}, body, signal:AbortSignal.timeout(30000) });
-if (!r.ok) { swapErr=new Error(`Swap HTTP ${r.status}`); continue; }
-const d = await r.json(); if (d?.swapTransaction) { swapData=d; break; }
-swapErr=new Error('swapTransaction absent');
-} catch (err) { swapErr=err; }
-}
-if (!swapData) throw swapErr||new Error('Tous les endpoints swap ont échoué');
-const tx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction,'base64'));
-const blockhash = tx.message.recentBlockhash;
-const lbh = await this.rpc.conn.getLatestBlockhash('confirmed');
-tx.sign([this.wallet]);
-const sig = await this.rpc.conn.sendRawTransaction(tx.serialize(), { skipPreflight:false, maxRetries:3, preflightCommitment:'confirmed' });
-const conf = await this.rpc.conn.confirmTransaction({ signature:sig, blockhash, lastValidBlockHeight:lbh.lastValidBlockHeight }, 'confirmed');
-if (conf.value.err) throw new Error(`Tx rejected: ${JSON.stringify(conf.value.err)}`);
-return { sig, txUrl:`https://solscan.io/tx/${sig}`, quote };
-}, { tries:3, baseMs:800, label:`swap(${inputMint.slice(0,8)})` });
-}
-
-async buy(mint, solAmount, slippageBps=CONFIG.DEFAULT_SLIPPAGE) {
-const elapsed = Date.now()-this.lastBuy;
-if (elapsed < CONFIG.BUY_COOLDOWN_MS) throw new Error(`Cooldown: ${((CONFIG.BUY_COOLDOWN_MS-elapsed)/1000).toFixed(1)}s remaining`);
-const bal = await this.getSolBalance();
-if (bal !== null && bal < solAmount+CONFIG.MIN_SOL_RESERVE) throw new Error(`Solde insuffisant: ${bal.toFixed(4)} SOL (besoin ${(solAmount+CONFIG.MIN_SOL_RESERVE).toFixed(4)})`);
-const raw = BigInt(Math.floor(solAmount*1e9));
-const { sig, txUrl, quote } = await this._buildAndSendTx({ inputMint:SOL_MINT, outputMint:mint, amountRaw:raw, slippageBps });
-const dec = await getDecimals(mint, this.rpc.conn);
-const outAmount = Number(quote.outAmount)/10**dec;
-this.lastBuy = Date.now();
-log('success','Achat confirmé',{mint:mint.slice(0,8),tokens:outAmount.toFixed(4),sig});
-return { success:true, sig, txUrl, outAmount, solSpent:solAmount };
-}
-
-async buyDCA(mint, totalSol, chunks, intervalSec, slippageBps=CONFIG.DEFAULT_SLIPPAGE) {
-const chunkSol = totalSol/chunks;
-const results = [];
-log('info','DCA start',{mint:mint.slice(0,8),totalSol,chunks,intervalSec});
-for (let i=0;i<chunks;i++) {
-try {
-const r = await this.buy(mint,chunkSol,slippageBps);
-results.push({chunk:i+1,...r});
-log('info',`DCA chunk ${i+1}/${chunks}`,{out:r.outAmount?.toFixed(4)});
-if (i<chunks-1) await sleep(intervalSec*1000);
-} catch (err) { log('warn',`DCA chunk ${i+1} failed`,{err:err.message}); results.push({chunk:i+1,success:false,error:err.message}); }
-}
-return { results, succeeded:results.filter(r=>r.success).length, total:chunks };
-}
-
-async sell(mint, amount, reason='MANUAL', slippageBps=CONFIG.DEFAULT_SLIPPAGE, useJito=false) {
-if (this.sellFails >= CONFIG.MAX_SELL_RETRIES) {
-const msg = `Circuit-breaker actif (${this.sellFails} échecs)`;
-log('error',msg); return { success:false, error:msg };
-}
-const release = await this.mutex.lock();
-try {
-const dec = await getDecimals(mint, this.rpc.conn);
-const raw = BigInt(Math.floor(amount*10**dec));
-const res = useJito ? await this._buildAndSendJito({inputMint:mint,outputMint:SOL_MINT,amountRaw:raw,slippageBps}) : await this._buildAndSendTx({inputMint:mint,outputMint:SOL_MINT,amountRaw:raw,slippageBps,priorityMode:'high'});
-const solOut = Number(res.quote.outAmount)/1e9;
-this.sellFails = 0;
-log('success','Vente confirmée',{mint:mint.slice(0,8),solOut:solOut.toFixed(6),reason,sig:res.sig});
-return { success:true, sig:res.sig, txUrl:res.txUrl, solOut, amountSold:amount };
-} catch (err) {
-this.sellFails++;
-log('error','Vente échouée',{err:err.message,failures:this.sellFails,reason});
-return { success:false, error:err.message };
-} finally { release(); }
-}
-
-async _buildAndSendJito({ inputMint, outputMint, amountRaw, slippageBps }) {
-if (!CONFIG.JITO_ENABLED) return this._buildAndSendTx({inputMint,outputMint,amountRaw,slippageBps,priorityMode:'turbo'});
-try {
-const quote = await this.getQuote({inputMint,outputMint,amountRaw,slippageBps});
-const body = JSON.stringify({quoteResponse:quote,userPublicKey:this.wallet.publicKey.toString(),wrapAndUnwrapSol:true,dynamicComputeUnitLimit:true,prioritizationFeeLamports:500000});
-let swapData=null;
-for (const ep of SWAP_EPS) {
-try { const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body,signal:AbortSignal.timeout(30000)}); if(r.ok){const d=await r.json();if(d?.swapTransaction){swapData=d;break;}} } catch{}
-}
-if (!swapData) throw new Error('Swap data manquante');
-const lbh = await this.rpc.conn.getLatestBlockhash('confirmed');
-const swapTx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction,'base64'));
-const tipTx = new VersionedTransaction(new TransactionMessage({payerKey:this.wallet.publicKey,recentBlockhash:lbh.blockhash,instructions:[SystemProgram.transfer({fromPubkey:this.wallet.publicKey,toPubkey:new PublicKey(JITO_TIP_WALLET),lamports:Math.floor(CONFIG.JITO_TIP_SOL*LAMPORTS_PER_SOL)})]}).compileToV0Message());
-swapTx.sign([this.wallet]); tipTx.sign([this.wallet]);
-await fetch(CONFIG.JITO_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'sendBundle',params:[[Buffer.from(swapTx.serialize()).toString('base64'),Buffer.from(tipTx.serialize()).toString('base64')]]}),signal:AbortSignal.timeout(20000)});
-const sig = await this.rpc.conn.sendRawTransaction(swapTx.serialize(),{skipPreflight:true,maxRetries:2});
-const conf = await this.rpc.conn.confirmTransaction({signature:sig,blockhash:lbh.blockhash,lastValidBlockHeight:lbh.lastValidBlockHeight},'confirmed');
-if (conf.value.err) throw new Error('Tx Jito rejetée');
-log('info','Jito bundle confirmé',{sig:sig.slice(0,16)});
-return { sig, txUrl:`https://solscan.io/tx/${sig}`, quote };
-} catch (err) { log('warn','Jito échoué — fallback Jupiter',{err:err.message}); return this._buildAndSendTx({inputMint,outputMint,amountRaw,slippageBps,priorityMode:'turbo'}); }
-}
-
-async getSolBalance() { try { return await this.rpc.conn.getBalance(this.wallet.publicKey)/1e9; } catch { return null; } }
+  const params = `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
+  const QUOTE_ENDPOINTS = [
+    `https://lite-api.jup.ag/swap/v1/quote?${params}`,
+    `https://api.jup.ag/swap/v1/quote?${params}`,
+  ];
+  let lastErr = null;
+  for (const url of QUOTE_ENDPOINTS) {
+    try {
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': `SolBot/${VERSION} (Trading Bot)`,
+          'Accept': 'application/json',
+          'Origin': 'https://jup.ag',
+          'Referer': 'https://jup.ag/',
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (r.status === 401) { log('warn', 'Quote 401', {url:url.split('/')[2]}); continue; }
+      if (r.status === 429) { log('warn', 'Quote 429'); await sleep(1000); continue; }
+      if (!r.ok) { lastErr = new Error(`Quote HTTP ${r.status}`); continue; }
+      const q = await r.json();
+      if (q.error) { lastErr = new Error(q.error); continue; }
+      if (!q.outAmount) { lastErr = new Error('No outAmount'); continue; }
+      return q;
+    } catch (err) { lastErr = err; }
+  }
+  throw lastErr || new Error('Tous les endpoints Jupiter quote ont échoué');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
