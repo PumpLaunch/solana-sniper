@@ -17,7 +17,7 @@ const CONFIG = {
 PRIVATE_KEY:    process.env.PRIVATE_KEY,
 HELIUS_API_KEY: process.env.HELIUS_API_KEY || null,
 PORT:           parseInt(process.env.PORT) || 10000,
-INTERVAL_SEC:   parseInt(process.env.INTERVAL_SEC) || 30, // ↓ Réduis à 10-15s pour scalping ultra-rapide
+INTERVAL_SEC:   parseInt(process.env.INTERVAL_SEC) || 15, // ↓ Réduis à 10-15s pour scalping ultra-rapide
 NODE_ENV:       process.env.NODE_ENV || 'production',
 DATA_FILE:      process.env.DATA_FILE || './bot_state.json',
 
