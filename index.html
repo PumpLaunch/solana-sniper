@@ -2,509 +2,212 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0a0e1a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="description" content="SolBot Pro — Trading Bot Solana Professionnel">
-    <title>SolBot Pro | Trading Dashboard</title>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Charts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    
+    <title>SolBot Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* CSS VARIABLES — Thème professionnel */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        :root {
-            /* Colors */
-            --bg-primary: #0a0e1a;
-            --bg-secondary: #111827;
-            --bg-card: #1f2937;
-            --bg-hover: #374151;
-            --bg-active: #2563eb;
-            
-            --text-primary: #f9fafb;
-            --text-secondary: #9ca3af;
-            --text-muted: #6b7280;
-            
-            --border: #374151;
-            --border-hover: #4b5563;
-            
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --accent-glow: rgba(59, 130, 246, 0.4);
-            
-            --success: #10b981;
-            --success-bg: rgba(16, 185, 129, 0.15);
-            --warning: #f59e0b;
-            --warning-bg: rgba(245, 158, 11, 0.15);
-            --danger: #ef4444;
-            --danger-bg: rgba(239, 68, 68, 0.15);
-            
-            /* Spacing */
-            --space-xs: 4px;
-            --space-sm: 8px;
-            --space-md: 12px;
-            --space-lg: 16px;
-            --space-xl: 24px;
-            --space-2xl: 32px;
-            
-            /* Radius */
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --radius-xl: 20px;
-            
-            /* Shadows */
-            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-            --shadow-glow: 0 0 20px var(--accent-glow);
-            
-            /* Transitions */
-            --transition-fast: 0.15s ease;
-            --transition-normal: 0.25s ease;
-            --transition-slow: 0.4s ease;
-            
-            /* Safe areas */
-            --safe-top: env(safe-area-inset-top);
-            --safe-bottom: env(safe-area-inset-bottom);
-            
-            /* Fonts */
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* RESET & BASE */
-        /* ═══════════════════════════════════════════════════════════════════ */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
-        html { 
-            font-size: 14px; 
-            scroll-behavior: smooth;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+        :root {
+            --bg: #0a0e1a;
+            --bg-card: #151a28;
+            --bg-hover: #1e2538;
+            --border: #2a3550;
+            --text: #ffffff;
+            --text-muted: #6b7a99;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --radius: 12px;
         }
-        
+
         body {
-            font-family: var(--font-sans);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
-            padding-top: var(--safe-top);
-            padding-bottom: calc(80px + var(--safe-bottom));
-            overflow-x: hidden;
+            padding-bottom: 80px;
         }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg-primary); }
-        ::-webkit-scrollbar-thumb { 
-            background: var(--border-hover); 
-            border-radius: 3px;
-            transition: background var(--transition-fast);
-        }
-        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-
-        /* Selection */
-        ::selection { background: var(--accent); color: white; }
-
-        /* Focus */
-        :focus-visible { 
-            outline: 2px solid var(--accent); 
-            outline-offset: 2px;
-            border-radius: var(--radius-sm);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ═══════════════════════════════════════════════════════════════ */
         /* HEADER */
-        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ═══════════════════════════════════════════════════════════════ */
         .header {
             position: sticky;
             top: 0;
             z-index: 100;
-            background: linear-gradient(180deg, var(--bg-secondary) 0%, rgba(17, 24, 39, 0.95) 100%);
+            background: rgba(10, 14, 26, 0.95);
+            backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border);
-            padding: var(--space-lg) var(--space-xl);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            box-shadow: var(--shadow-md);
+            padding: 16px 20px;
         }
 
         .header-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: var(--space-lg);
-            flex-wrap: wrap;
-            gap: var(--space-md);
+            margin-bottom: 16px;
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: var(--space-md);
-            text-decoration: none;
-            color: var(--text-primary);
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
         }
 
         .logo-icon {
-            width: 44px;
-            height: 44px;
-            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
-            border-radius: var(--radius-md);
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
-            font-weight: 700;
-            color: white;
-            box-shadow: var(--shadow-glow);
-            transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+            font-size: 18px;
         }
 
-        .logo:hover .logo-icon {
-            transform: scale(1.05);
-            box-shadow: 0 0 30px var(--accent-glow);
-        }
-
-        .logo-text {
-            font-size: 22px;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .logo-version {
-            font-size: 11px;
-            color: var(--text-muted);
-            background: var(--bg-card);
-            padding: 2px 8px;
-            border-radius: var(--radius-sm);
-            margin-left: var(--space-xs);
-            font-family: var(--font-mono);
-        }
-
-        .status-badge {
+        .status {
             display: flex;
             align-items: center;
-            gap: var(--space-xs);
-            padding: var(--space-xs) var(--space-md);
-            background: var(--success-bg);
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(16, 185, 129, 0.15);
             border: 1px solid var(--success);
             border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
+            font-size: 12px;
             color: var(--success);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            animation: pulse-glow 2s infinite;
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 5px var(--success-bg); }
-            50% { box-shadow: 0 0 15px var(--success-bg); }
         }
 
         .status-dot {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
             background: var(--success);
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.2); }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* STATS GRID */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .stats-grid {
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* STATS */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .stats {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: var(--space-md);
-            margin-bottom: var(--space-xl);
-        }
-
-        @media (min-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(4, 1fr); }
+            gap: 12px;
+            margin-bottom: 20px;
         }
 
         .stat-card {
-            background: var(--bg-secondary);
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-lg);
-            transition: all var(--transition-normal);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%);
-            opacity: 0;
-            transition: opacity var(--transition-normal);
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: var(--border-hover);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .stat-card:hover::before { opacity: 1; }
-
-        .stat-card.compact {
-            padding: var(--space-md);
+            border-radius: var(--radius);
+            padding: 16px;
         }
 
         .stat-label {
             font-size: 11px;
-            color: var(--text-secondary);
+            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: var(--space-xs);
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: var(--space-xs);
+            margin-bottom: 6px;
         }
-
-        .stat-label i { font-size: 12px; }
 
         .stat-value {
-            font-family: var(--font-mono);
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--text-primary);
-            letter-spacing: -0.5px;
-        }
-
-        .stat-value.positive { 
-            color: var(--success);
-            text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-        }
-        
-        .stat-value.negative { 
-            color: var(--danger);
-            text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
-        }
-
-        .stat-sub {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-top: var(--space-xs);
-            font-family: var(--font-mono);
-        }
-
-        .stat-change {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--space-xs);
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: var(--radius-sm);
-            margin-left: var(--space-xs);
-        }
-
-        .stat-change.up { background: var(--success-bg); color: var(--success); }
-        .stat-change.down { background: var(--danger-bg); color: var(--danger); }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* TABS */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .tabs {
-            display: flex;
-            gap: var(--space-sm);
-            margin-bottom: var(--space-xl);
-            background: var(--bg-secondary);
-            padding: var(--space-sm);
-            border-radius: var(--radius-lg);
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-
-        .tabs::-webkit-scrollbar { display: none; }
-
-        .tab {
-            flex: 1;
-            min-width: 80px;
-            padding: var(--space-md) var(--space-lg);
-            text-align: center;
-            background: transparent;
-            border: none;
-            border-radius: var(--radius-md);
-            color: var(--text-secondary);
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all var(--transition-fast);
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--space-xs);
-        }
-
-        .tab i { font-size: 14px; }
-
-        .tab:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        .tab.active {
-            background: var(--accent);
-            color: white;
-            box-shadow: var(--shadow-glow);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* SECTIONS */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .section { display: none; animation: fadeIn 0.3s ease; }
-        .section.active { display: block; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* PORTFOLIO */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .portfolio-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: var(--space-lg);
-            flex-wrap: wrap;
-            gap: var(--space-md);
-        }
-
-        .portfolio-title {
+            font-family: 'JetBrains Mono', monospace;
             font-size: 18px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: var(--space-md);
+            font-weight: 600;
         }
 
-        .portfolio-title i {
-            width: 28px;
-            height: 28px;
-            background: var(--accent);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .stat-value.pos { color: var(--success); }
+        .stat-value.neg { color: var(--danger); }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* SEARCH & FILTERS */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .search-bar {
+            position: sticky;
+            top: 70px;
+            z-index: 90;
+            background: var(--bg);
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
             font-size: 14px;
         }
 
-        .portfolio-actions {
-            display: flex;
-            gap: var(--space-sm);
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
         }
 
-        .portfolio-list {
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* TOKEN LIST */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .token-list {
+            padding: 16px 20px;
             display: flex;
             flex-direction: column;
-            gap: var(--space-md);
+            gap: 12px;
         }
 
         .token-card {
-            background: var(--bg-secondary);
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-lg);
-            transition: all var(--transition-normal);
+            border-radius: var(--radius);
+            padding: 16px;
             cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .token-card::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            background: var(--accent);
-            opacity: 0;
-            transition: opacity var(--transition-normal);
+            transition: all 0.2s;
         }
 
         .token-card:hover {
-            border-color: var(--border-hover);
+            border-color: var(--accent);
             transform: translateX(4px);
-            box-shadow: var(--shadow-md);
         }
-
-        .token-card:hover::after { opacity: 1; }
 
         .token-card.active {
             border-color: var(--accent);
-            box-shadow: var(--shadow-glow);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
         }
-
-        .token-card.active::after { opacity: 1; }
 
         .token-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: var(--space-md);
-            gap: var(--space-md);
+            align-items: center;
+            margin-bottom: 12px;
         }
 
         .token-info {
             display: flex;
             align-items: center;
-            gap: var(--space-md);
-            flex: 1;
-            min-width: 0;
+            gap: 12px;
         }
 
         .token-logo {
             width: 44px;
             height: 44px;
-            border-radius: var(--radius-md);
-            background: var(--bg-card);
-            border: 2px solid var(--border);
+            border-radius: 10px;
+            background: var(--bg-hover);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
+            font-size: 20px;
             overflow: hidden;
-            transition: border-color var(--transition-fast);
         }
-
-        .token-card:hover .token-logo { border-color: var(--accent); }
 
         .token-logo img {
             width: 100%;
@@ -512,67 +215,51 @@
             object-fit: cover;
         }
 
-        .token-details {
-            flex: 1;
-            min-width: 0;
-        }
-
         .token-symbol {
             font-weight: 600;
             font-size: 15px;
             margin-bottom: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: var(--text-primary);
         }
 
-        .token-address {
-            font-family: var(--font-mono);
+        .token-name {
             font-size: 11px;
             color: var(--text-muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .token-price {
             text-align: right;
-            flex-shrink: 0;
         }
 
         .price-value {
-            font-family: var(--font-mono);
+            font-family: 'JetBrains Mono', monospace;
             font-weight: 600;
             font-size: 15px;
             margin-bottom: 2px;
-            color: var(--text-primary);
         }
 
         .price-change {
-            font-family: var(--font-mono);
+            font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
-            font-weight: 600;
             padding: 2px 8px;
-            border-radius: var(--radius-sm);
+            border-radius: 4px;
             display: inline-block;
         }
 
-        .price-change.positive {
-            background: var(--success-bg);
+        .price-change.pos {
+            background: rgba(16, 185, 129, 0.15);
             color: var(--success);
         }
 
-        .price-change.negative {
-            background: var(--danger-bg);
+        .price-change.neg {
+            background: rgba(239, 68, 68, 0.15);
             color: var(--danger);
         }
 
         .token-stats {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: var(--space-md);
-            padding-top: var(--space-md);
+            gap: 12px;
+            padding-top: 12px;
             border-top: 1px solid var(--border);
         }
 
@@ -583,112 +270,187 @@
         .token-stat-label {
             font-size: 10px;
             color: var(--text-muted);
-            margin-bottom: var(--space-xs);
-            text-transform: uppercase;
-            font-weight: 500;
+            margin-bottom: 4px;
         }
 
         .token-stat-value {
-            font-family: var(--font-mono);
-            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 13px;
-            color: var(--text-primary);
+            font-weight: 600;
         }
 
         .token-actions {
             display: flex;
-            gap: var(--space-sm);
-            margin-top: var(--space-md);
+            gap: 8px;
+            margin-top: 12px;
         }
 
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* BUTTONS */
-        /* ═══════════════════════════════════════════════════════════════════ */
         .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--space-xs);
-            padding: var(--space-md) var(--space-lg);
+            flex: 1;
+            padding: 10px;
             border: none;
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: all var(--transition-fast);
-            text-decoration: none;
-            white-space: nowrap;
-            font-family: var(--font-sans);
+            transition: all 0.2s;
         }
 
-        .btn i { font-size: 14px; }
-
-        .btn:active { transform: scale(0.98); }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
-            color: white;
-            box-shadow: var(--shadow-glow);
-        }
-
-        .btn-primary:hover {
-            box-shadow: 0 0 30px var(--accent-glow);
-            transform: translateY(-1px);
-        }
-
-        .btn-success {
+        .btn-buy {
             background: var(--success);
             color: white;
         }
 
-        .btn-success:hover { 
-            background: #059669;
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
-        }
-
-        .btn-danger {
+        .btn-sell {
             background: var(--danger);
             color: white;
         }
 
-        .btn-danger:hover { 
-            background: #dc2626;
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-        }
-
-        .btn-secondary {
-            background: var(--bg-card);
-            color: var(--text-primary);
+        .btn-chart {
+            background: var(--bg-hover);
+            color: var(--text);
             border: 1px solid var(--border);
         }
 
-        .btn-secondary:hover {
-            border-color: var(--border-hover);
-            background: var(--bg-hover);
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* SETTINGS PANEL */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 100%;
+            max-width: 400px;
+            height: 100vh;
+            background: var(--bg-card);
+            border-left: 1px solid var(--border);
+            z-index: 200;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+            padding: 20px;
         }
 
-        .btn-sm {
-            padding: var(--space-sm) var(--space-md);
-            font-size: 12px;
+        .settings-panel.active {
+            right: 0;
         }
 
-        .btn-lg {
-            padding: var(--space-lg) var(--space-xl);
-            font-size: 14px;
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .btn-block { width: 100%; }
+        .settings-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
 
-        .btn-icon {
+        .settings-close {
             width: 36px;
             height: 36px;
-            padding: 0;
-            border-radius: var(--radius-md);
+            background: var(--bg-hover);
+            border: none;
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 20px;
+            cursor: pointer;
         }
 
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* MODALS */
-        /* ═══════════════════════════════════════════════════════════════════ */
+        .setting-group {
+            margin-bottom: 24px;
+        }
+
+        .setting-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-size: 13px;
+        }
+
+        .setting-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .toggle {
+            width: 50px;
+            height: 28px;
+            background: var(--bg-hover);
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .toggle.active {
+            background: var(--success);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.2s;
+        }
+
+        .toggle.active::after {
+            transform: translateX(22px);
+        }
+
+        .setting-input {
+            width: 100px;
+            padding: 8px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .btn-save {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* CHART MODAL */
+        /* ═══════════════════════════════════════════════════════════════ */
         .modal {
             display: none;
             position: fixed;
@@ -696,380 +458,222 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            align-items: flex-end;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 300;
+            align-items: center;
             justify-content: center;
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+            padding: 20px;
         }
 
-        .modal.active { 
+        .modal.active {
             display: flex;
-            animation: modalIn 0.3s ease;
-        }
-
-        @keyframes modalIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
         }
 
         .modal-content {
-            background: var(--bg-secondary);
-            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            background: var(--bg-card);
+            border-radius: var(--radius);
             width: 100%;
-            max-width: 600px;
-            max-height: 85vh;
-            overflow-y: auto;
-            padding: var(--space-xl);
-            animation: slideUp 0.3s ease;
-            border: 1px solid var(--border);
-            border-bottom: none;
-        }
-
-        @media (min-width: 768px) {
-            .modal { align-items: center; }
-            .modal-content {
-                border-radius: var(--radius-xl);
-                max-height: 80vh;
-                border: 1px solid var(--border);
-            }
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
+            max-width: 900px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: var(--space-xl);
-            padding-bottom: var(--space-md);
+            padding: 16px 20px;
             border-bottom: 1px solid var(--border);
         }
 
         .modal-title {
-            font-size: 18px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: var(--space-sm);
+            font-size: 16px;
+            font-weight: 600;
         }
 
         .modal-close {
             width: 36px;
             height: 36px;
-            background: var(--bg-card);
+            background: var(--bg-hover);
             border: none;
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-size: 18px;
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 20px;
             cursor: pointer;
-            transition: all var(--transition-fast);
+        }
+
+        .chart-container {
+            flex: 1;
+            min-height: 500px;
+        }
+
+        .chart-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .modal-actions {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            gap: 12px;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
         }
 
-        .modal-close:hover {
-            background: var(--danger);
-            color: white;
-            transform: rotate(90deg);
+        .modal-actions .btn {
+            flex: 1;
+            padding: 12px;
         }
 
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* FORMS */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .form-group { margin-bottom: var(--space-xl); }
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* BUY/SELL MODAL */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .trade-modal .modal-content {
+            max-width: 500px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
 
         .form-label {
             display: block;
             font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: var(--space-sm);
+            color: var(--text-muted);
+            margin-bottom: 8px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            gap: var(--space-xs);
         }
-
-        .form-label i { font-size: 12px; }
 
         .form-input {
             width: 100%;
-            padding: var(--space-md) var(--space-lg);
-            background: var(--bg-card);
+            padding: 12px;
+            background: var(--bg-hover);
             border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
+            border-radius: 8px;
+            color: var(--text);
             font-size: 14px;
-            font-family: var(--font-sans);
-            transition: all var(--transition-fast);
         }
 
         .form-input:focus {
             outline: none;
             border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-            background: var(--bg-hover);
-        }
-
-        .form-input::placeholder { color: var(--text-muted); }
-
-        .form-input.error {
-            border-color: var(--danger);
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--space-md);
-        }
-
-        @media (max-width: 640px) {
-            .form-row { grid-template-columns: 1fr; }
         }
 
         .quick-amounts {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: var(--space-sm);
-            margin-top: var(--space-sm);
+            gap: 8px;
+            margin-top: 8px;
         }
 
-        .quick-amount {
-            padding: var(--space-sm);
-            background: var(--bg-card);
+        .quick-btn {
+            padding: 8px;
+            background: var(--bg-hover);
             border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-secondary);
+            border-radius: 6px;
+            color: var(--text-muted);
             font-size: 12px;
-            font-weight: 600;
             cursor: pointer;
-            transition: all var(--transition-fast);
             text-align: center;
         }
 
-        .quick-amount:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-            background: rgba(59, 130, 246, 0.1);
-        }
-
-        .quick-amount.active {
+        .quick-btn.active {
             background: var(--accent);
-            border-color: var(--accent);
             color: white;
+            border-color: var(--accent);
         }
 
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* CONFIG */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .config-grid {
-            display: grid;
-            gap: var(--space-lg);
-        }
-
-        .config-section {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-lg);
-            transition: border-color var(--transition-fast);
-        }
-
-        .config-section:hover {
-            border-color: var(--border-hover);
-        }
-
-        .config-section-title {
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: var(--space-lg);
-            display: flex;
-            align-items: center;
-            gap: var(--space-sm);
-            color: var(--text-primary);
-        }
-
-        .config-section-title i {
-            width: 24px;
-            height: 24px;
-            background: var(--accent);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-        }
-
-        .toggle-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: var(--space-md) 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .toggle-row:last-child { 
-            border-bottom: none;
-            padding-bottom: 0;
-        }
-
-        .toggle-row:first-child {
-            padding-top: 0;
-        }
-
-        .toggle-label {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-xs);
-            flex: 1;
-        }
-
-        .toggle-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .toggle-desc {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .toggle-switch {
-            width: 48px;
-            height: 26px;
-            background: var(--bg-card);
-            border-radius: 13px;
-            position: relative;
-            cursor: pointer;
-            transition: background var(--transition-fast);
-            flex-shrink: 0;
-            margin-left: var(--space-md);
-        }
-
-        .toggle-switch.active { 
-            background: var(--success);
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
-        }
-
-        .toggle-switch::after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            top: 3px;
-            left: 3px;
-            transition: transform var(--transition-fast);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .toggle-switch.active::after { 
-            transform: translateX(22px);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* FLOATING ACTION BUTTON */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .fab {
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* FLOATING BUTTONS */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .fab-settings {
             position: fixed;
-            bottom: calc(90px + var(--safe-bottom));
-            right: var(--space-xl);
+            bottom: 90px;
+            right: 20px;
             width: 56px;
             height: 56px;
-            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
-            border: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 50%;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            box-shadow: var(--shadow-lg), var(--shadow-glow);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all var(--transition-normal);
+            font-size: 24px;
+            cursor: pointer;
             z-index: 90;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
 
-        .fab:hover {
-            transform: scale(1.1) rotate(90deg);
-            box-shadow: 0 0 40px var(--accent-glow);
+        .fab-buy {
+            position: fixed;
+            bottom: 90px;
+            left: 20px;
+            width: 56px;
+            height: 56px;
+            background: var(--success);
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+            cursor: pointer;
+            z-index: 90;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
         }
 
-        .fab:active { transform: scale(0.95); }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* BOTTOM NAVIGATION */
-        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* BOTTOM NAV */
+        /* ═══════════════════════════════════════════════════════════════ */
         .bottom-nav {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             height: 70px;
-            background: var(--bg-secondary);
+            background: var(--bg-card);
             border-top: 1px solid var(--border);
             display: flex;
             justify-content: space-around;
             align-items: center;
             z-index: 100;
-            padding-bottom: var(--safe-bottom);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
         }
 
         .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: var(--space-xs);
-            padding: var(--space-sm) var(--space-md);
-            color: var(--text-secondary);
+            gap: 4px;
+            padding: 8px 16px;
+            color: var(--text-muted);
             cursor: pointer;
-            transition: all var(--transition-fast);
-            flex: 1;
-            text-decoration: none;
         }
 
-        .nav-item:hover { color: var(--text-primary); }
+        .nav-item.active {
+            color: var(--accent);
+        }
 
-        .nav-item.active { color: var(--accent); }
-
-        .nav-icon { 
+        .nav-icon {
             font-size: 20px;
-            transition: transform var(--transition-fast);
-        }
-
-        .nav-item.active .nav-icon {
-            transform: translateY(-2px);
         }
 
         .nav-label {
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 11px;
+            font-weight: 500;
         }
 
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* LOADING & EMPTY STATES */
-        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* LOADING & EMPTY */
+        /* ═══════════════════════════════════════════════════════════════ */
         .loading {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: var(--space-2xl);
+            padding: 60px 20px;
             color: var(--text-muted);
-            gap: var(--space-md);
         }
 
         .spinner {
@@ -1079,1238 +683,648 @@
             border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin-right: 12px;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
 
-        .empty-state {
+        .empty {
             text-align: center;
-            padding: var(--space-2xl);
+            padding: 60px 20px;
             color: var(--text-muted);
         }
 
         .empty-icon {
             font-size: 64px;
-            margin-bottom: var(--space-lg);
+            margin-bottom: 16px;
             opacity: 0.3;
         }
 
-        .empty-text {
-            font-size: 14px;
-            margin-bottom: var(--space-sm);
-            color: var(--text-secondary);
-        }
-
-        .empty-subtext {
-            font-size: 12px;
-            opacity: 0.7;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* ALERTS & TOASTS */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .alert {
-            padding: var(--space-md) var(--space-lg);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--space-lg);
-            display: flex;
-            align-items: center;
-            gap: var(--space-sm);
-            font-size: 13px;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(-20px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        .alert-error {
-            background: var(--danger-bg);
-            border: 1px solid var(--danger);
-            color: var(--danger);
-        }
-
-        .alert-success {
-            background: var(--success-bg);
-            border: 1px solid var(--success);
-            color: var(--success);
-        }
-
-        .alert-warning {
-            background: var(--warning-bg);
-            border: 1px solid var(--warning);
-            color: var(--warning);
-        }
-
-        .toast-container {
-            position: fixed;
-            top: calc(var(--space-xl) + var(--safe-top));
-            right: var(--space-xl);
-            z-index: 2000;
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-sm);
-        }
-
-        .toast {
-            padding: var(--space-md) var(--space-lg);
-            background: var(--bg-card);
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-lg);
-            display: flex;
-            align-items: center;
-            gap: var(--space-sm);
-            font-size: 13px;
-            animation: toastIn 0.3s ease;
-            border-left: 4px solid var(--accent);
-            min-width: 280px;
-            max-width: 400px;
-        }
-
-        @keyframes toastIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        .toast.success { border-left-color: var(--success); }
-        .toast.error { border-left-color: var(--danger); }
-        .toast.warning { border-left-color: var(--warning); }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* CHARTS */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .chart-container {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-lg);
-            margin-bottom: var(--space-xl);
-            height: 300px;
-            position: relative;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* BADGES */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--space-xs);
-            padding: 2px 8px;
-            border-radius: var(--radius-sm);
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .badge-success { background: var(--success-bg); color: var(--success); }
-        .badge-warning { background: var(--warning-bg); color: var(--warning); }
-        .badge-danger { background: var(--danger-bg); color: var(--danger); }
-        .badge-info { background: var(--accent-glow); color: var(--accent); }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* PROGRESS BARS */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: var(--bg-card);
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: var(--space-xs);
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%);
-            border-radius: 3px;
-            transition: width var(--transition-slow);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ═══════════════════════════════════════════════════════════════ */
         /* RESPONSIVE */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        @media (max-width: 640px) {
-            .header { padding: var(--space-md); }
-            .logo-text { font-size: 18px; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
-            .token-stats { grid-template-columns: 1fr; }
-            .quick-amounts { grid-template-columns: repeat(2, 1fr); }
-            .portfolio-header { flex-direction: column; align-items: stretch; }
-            .portfolio-actions { justify-content: flex-end; }
-        }
-
+        /* ═══════════════════════════════════════════════════════════════ */
         @media (min-width: 768px) {
-            .fab {
-                bottom: var(--space-xl);
-                right: var(--space-xl);
-            }
+            .stats { grid-template-columns: repeat(4, 1fr); }
+            .token-stats { grid-template-columns: repeat(5, 1fr); }
+            .settings-panel { max-width: 450px; }
         }
-
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* UTILITIES */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .text-muted { color: var(--text-muted); }
-        .text-success { color: var(--success); }
-        .text-danger { color: var(--danger); }
-        .text-warning { color: var(--warning); }
-        .text-accent { color: var(--accent); }
-
-        .mt-sm { margin-top: var(--space-sm); }
-        .mt-md { margin-top: var(--space-md); }
-        .mt-lg { margin-top: var(--space-lg); }
-        .mb-sm { margin-bottom: var(--space-sm); }
-        .mb-md { margin-bottom: var(--space-md); }
-        .mb-lg { margin-bottom: var(--space-lg); }
-
-        .hidden { display: none !important; }
-        .flex { display: flex; }
-        .flex-col { flex-direction: column; }
-        .items-center { align-items: center; }
-        .justify-between { justify-content: space-between; }
-        .gap-sm { gap: var(--space-sm); }
-        .gap-md { gap: var(--space-md); }
-        .gap-lg { gap: var(--space-lg); }
     </style>
 </head>
 <body>
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- HEADER -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <header class="header">
         <div class="header-top">
-            <a href="#" class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <div>
-                    <div class="logo-text">SolBot Pro</div>
-                    <div class="logo-version">v4.0</div>
-                </div>
-            </a>
-            <div class="status-badge">
+            <div class="logo">
+                <div class="logo-icon">🤖</div>
+                <span>SolBot Pro</span>
+            </div>
+            <div class="status">
                 <div class="status-dot"></div>
                 <span id="statusText">LIVE</span>
             </div>
         </div>
         
-        <div class="stats-grid">
+        <div class="stats">
             <div class="stat-card">
-                <div class="stat-label">
-                    <i class="fas fa-wallet"></i>
-                    Portfolio Value
-                </div>
+                <div class="stat-label">Portfolio</div>
                 <div class="stat-value" id="totalValue">$0.00</div>
-                <div class="stat-sub" id="totalValueChange">—</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">
-                    <i class="fas fa-chart-line"></i>
-                    PnL Réalisé
-                </div>
-                <div class="stat-value" id="realizedPnl">$0.00</div>
-                <div class="stat-sub" id="realizedPnlChange">—</div>
+                <div class="stat-label">PnL</div>
+                <div class="stat-value" id="pnlValue">$0.00</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">
-                    <i class="fas fa-percent"></i>
-                    Win Rate
-                </div>
-                <div class="stat-value" id="winRate">0%</div>
-                <div class="stat-sub" id="winLossRecord">0W / 0L</div>
+                <div class="stat-label">Tokens</div>
+                <div class="stat-value" id="tokenCount">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">
-                    <i class="fas fa-exchange-alt"></i>
-                    Total Trades
-                </div>
-                <div class="stat-value" id="totalTrades">0</div>
-                <div class="stat-sub" id="tradesToday">0 aujourd'hui</div>
+                <div class="stat-label">Uptime</div>
+                <div class="stat-value" id="uptime">0h 0m</div>
             </div>
         </div>
     </header>
 
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- MAIN CONTENT -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <main class="container" style="padding: 0 var(--space-xl);">
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab active" onclick="switchTab('portfolio')">
-                <i class="fas fa-chart-pie"></i>
-                Portfolio
-            </button>
-            <button class="tab" onclick="switchTab('analytics')">
-                <i class="fas fa-chart-bar"></i>
-                Analytics
-            </button>
-            <button class="tab" onclick="switchTab('config')">
-                <i class="fas fa-cog"></i>
-                Config
-            </button>
-        </div>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- SEARCH -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="search-bar">
+        <input type="text" class="search-input" id="searchInput" placeholder="🔍 Rechercher un token...">
+    </div>
 
-        <!-- Portfolio Section -->
-        <section id="portfolio" class="section active">
-            <div class="portfolio-header">
-                <div class="portfolio-title">
-                    <i class="fas fa-coins"></i>
-                    Positions Actives
-                </div>
-                <div class="portfolio-actions">
-                    <button class="btn btn-secondary btn-sm btn-icon" onclick="refreshData()">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="portfolio-list" id="portfolioList">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <span>Chargement du portfolio...</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Analytics Section -->
-        <section id="analytics" class="section">
-            <!-- PnL Chart -->
-            <div class="chart-container">
-                <canvas id="pnlChart"></canvas>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card compact">
-                    <div class="stat-label">
-                        <i class="fas fa-rocket"></i>
-                        ROI
-                    </div>
-                    <div class="stat-value" id="analyticsRoi">0%</div>
-                </div>
-                <div class="stat-card compact">
-                    <div class="stat-label">
-                        <i class="fas fa-arrow-up"></i>
-                        Avg Win
-                    </div>
-                    <div class="stat-value positive" id="avgWin">+0%</div>
-                </div>
-                <div class="stat-card compact">
-                    <div class="stat-label">
-                        <i class="fas fa-arrow-down"></i>
-                        Avg Loss
-                    </div>
-                    <div class="stat-value negative" id="avgLoss">-0%</div>
-                </div>
-                <div class="stat-card compact">
-                    <div class="stat-label">
-                        <i class="fas fa-trophy"></i>
-                        Best Trade
-                    </div>
-                    <div class="stat-value positive" id="bestTrade">+0%</div>
-                </div>
-            </div>
-
-            <div class="config-section">
-                <div class="config-section-title">
-                    <i class="fas fa-history"></i>
-                    Historique des Trades
-                </div>
-                <div id="recentTrades">
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="empty-text">Aucun trade récent</div>
-                        <div class="empty-subtext">Les trades apparaîtront ici après exécution</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Config Section -->
-        <section id="config" class="section">
-            <div class="config-grid">
-                <!-- Take-Profit -->
-                <div class="config-section">
-                    <div class="config-section-title">
-                        <i class="fas fa-bullseye"></i>
-                        Take-Profit
-                    </div>
-                    <div class="toggle-row">
-                        <div class="toggle-label">
-                            <div class="toggle-title">Actif</div>
-                            <div class="toggle-desc">Vente auto à chaque palier</div>
-                        </div>
-                        <div class="toggle-switch" id="toggle-tpEnabled" onclick="toggleConfig('takeProfitEnabled')"></div>
-                    </div>
-                    <div class="form-group mt-md">
-                        <label class="form-label">
-                            <i class="fas fa-sliders-h"></i>
-                            Hysteresis (%)
-                        </label>
-                        <input type="number" class="form-input" id="tpHysteresis" value="5" min="0" max="50">
-                        <div class="text-muted" style="font-size: 11px; margin-top: var(--space-xs);">
-                            Marge avant re-déclenchement
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stop-Loss -->
-                <div class="config-section">
-                    <div class="config-section-title">
-                        <i class="fas fa-shield-alt"></i>
-                        Stop-Loss
-                    </div>
-                    <div class="toggle-row">
-                        <div class="toggle-label">
-                            <div class="toggle-title">Actif</div>
-                            <div class="toggle-desc">Vente forcée sous le seuil</div>
-                        </div>
-                        <div class="toggle-switch" id="toggle-slEnabled" onclick="toggleConfig('stopLossEnabled')"></div>
-                    </div>
-                    <div class="form-group mt-md">
-                        <label class="form-label">
-                            <i class="fas fa-percentage"></i>
-                            Seuil (%)
-                        </label>
-                        <select class="form-input" id="slPct">
-                            <option value="-25">-25%</option>
-                            <option value="-40">-40%</option>
-                            <option value="-50" selected>-50%</option>
-                            <option value="-70">-70%</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Trailing Stop -->
-                <div class="config-section">
-                    <div class="config-section-title">
-                        <i class="fas fa-chart-line"></i>
-                        Trailing Stop
-                    </div>
-                    <div class="toggle-row">
-                        <div class="toggle-label">
-                            <div class="toggle-title">Actif</div>
-                            <div class="toggle-desc">Suit le peak, vend si recul</div>
-                        </div>
-                        <div class="toggle-switch" id="toggle-tsEnabled" onclick="toggleConfig('trailingEnabled')"></div>
-                    </div>
-                    <div class="form-group mt-md">
-                        <label class="form-label">
-                            <i class="fas fa-arrows-alt-v"></i>
-                            Recul max (%)
-                        </label>
-                        <select class="form-input" id="tsPct">
-                            <option value="10">10%</option>
-                            <option value="20" selected>20%</option>
-                            <option value="30">30%</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Anti-Rug -->
-                <div class="config-section">
-                    <div class="config-section-title">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Anti-Rug
-                    </div>
-                    <div class="toggle-row">
-                        <div class="toggle-label">
-                            <div class="toggle-title">Actif</div>
-                            <div class="toggle-desc">Vente d'urgence si chute brutale</div>
-                        </div>
-                        <div class="toggle-switch" id="toggle-arEnabled" onclick="toggleConfig('antiRugEnabled')"></div>
-                    </div>
-                    <div class="form-group mt-md">
-                        <label class="form-label">
-                            <i class="fas fa-arrow-down"></i>
-                            Chute (% / cycle)
-                        </label>
-                        <select class="form-input" id="arPct">
-                            <option value="40">40%</option>
-                            <option value="60" selected>60%</option>
-                            <option value="80">80%</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- General -->
-                <div class="config-section">
-                    <div class="config-section-title">
-                        <i class="fas fa-cogs"></i>
-                        Général
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-percent"></i>
-                                Slippage (bps)
-                            </label>
-                            <input type="number" class="form-input" id="defaultSlippage" value="500" min="10" max="5000">
-                            <div class="text-muted" style="font-size: 11px; margin-top: var(--space-xs);">
-                                100 bps = 1%
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-coins"></i>
-                                Réserve SOL
-                            </label>
-                            <input type="number" class="form-input" id="minSolReserve" value="0.05" step="0.01" min="0" max="10">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <i class="fas fa-clock"></i>
-                            Intervalle (sec)
-                        </label>
-                        <select class="form-input" id="intervalSec">
-                            <option value="15">15s</option>
-                            <option value="30" selected>30s</option>
-                            <option value="60">60s</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <button class="btn btn-primary btn-block btn-lg mt-lg" onclick="saveConfig()">
-                <i class="fas fa-save"></i>
-                SAUVEGARDER LA CONFIG
-            </button>
-        </section>
-    </main>
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- FLOATING ACTION BUTTON -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <button class="fab" onclick="openBuyModal()" title="Acheter un token">
-        <i class="fas fa-plus"></i>
-    </button>
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- BOTTOM NAVIGATION -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <nav class="bottom-nav">
-        <a href="#" class="nav-item active" onclick="switchTab('portfolio'); return false;">
-            <div class="nav-icon">
-                <i class="fas fa-chart-pie"></i>
-            </div>
-            <div class="nav-label">Portfolio</div>
-        </a>
-        <a href="#" class="nav-item" onclick="switchTab('analytics'); return false;">
-            <div class="nav-icon">
-                <i class="fas fa-chart-bar"></i>
-            </div>
-            <div class="nav-label">Analytics</div>
-        </a>
-        <a href="#" class="nav-item" onclick="switchTab('config'); return false;">
-            <div class="nav-icon">
-                <i class="fas fa-cog"></i>
-            </div>
-            <div class="nav-label">Config</div>
-        </a>
-    </nav>
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- BUY MODAL -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <div class="modal" id="buyModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-shopping-cart text-accent"></i>
-                    Acheter Token
-                </div>
-                <button class="modal-close" onclick="closeBuyModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">
-                    <i class="fas fa-link"></i>
-                    Token Address
-                </label>
-                <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse complète du token">
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">
-                    <i class="fas fa-coins"></i>
-                    Montant (SOL)
-                </label>
-                <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01" min="0.01">
-                <div class="quick-amounts">
-                    <div class="quick-amount" onclick="setBuyAmount(0.1)">0.1</div>
-                    <div class="quick-amount" onclick="setBuyAmount(0.25)">0.25</div>
-                    <div class="quick-amount" onclick="setBuyAmount(0.5)">0.5</div>
-                    <div class="quick-amount" onclick="setMaxBuy()">MAX</div>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">
-                    <i class="fas fa-sliders-h"></i>
-                    Slippage
-                </label>
-                <select class="form-input" id="buySlippage">
-                    <option value="500">0.5% (Faible)</option>
-                    <option value="1000" selected>1% (Normal)</option>
-                    <option value="2000">2% (Élevé)</option>
-                    <option value="5000">5% (Max)</option>
-                </select>
-            </div>
-            
-            <div id="buyPreview" class="hidden">
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>Preview du swap non disponible</span>
-                </div>
-            </div>
-            
-            <button class="btn btn-success btn-block btn-lg" onclick="executeBuy()">
-                <i class="fas fa-check-circle"></i>
-                CONFIRMER L'ACHAT
-            </button>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TOKEN LIST -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="token-list" id="tokenList">
+        <div class="loading">
+            <div class="spinner"></div>
+            <span>Chargement des tokens...</span>
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- SELL MODAL -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <div class="modal" id="sellModal">
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- FLOATING BUTTONS -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <button class="fab-buy" onclick="openBuyModal()">+</button>
+    <button class="fab-settings" onclick="toggleSettings()">⚙</button>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- SETTINGS PANEL -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-header">
+            <div class="settings-title">⚙ Paramètres</div>
+            <button class="settings-close" onclick="toggleSettings()">×</button>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-title">🎯 Take-Profit</div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Actif</div>
+                    <div class="setting-desc">Vente auto aux paliers</div>
+                </div>
+                <div class="toggle" id="toggle-tp" onclick="toggleSetting('tp')"></div>
+            </div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Hysteresis</div>
+                    <div class="setting-desc">Marge avant reset (%)</div>
+                </div>
+                <input type="number" class="setting-input" id="tpHysteresis" value="5">
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-title">🛡 Stop-Loss</div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Actif</div>
+                    <div class="setting-desc">Vente si perte</div>
+                </div>
+                <div class="toggle" id="toggle-sl" onclick="toggleSetting('sl')"></div>
+            </div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Seuil</div>
+                    <div class="setting-desc">Perte max (%)</div>
+                </div>
+                <select class="setting-input" id="slPct">
+                    <option value="-25">-25%</option>
+                    <option value="-50" selected>-50%</option>
+                    <option value="-70">-70%</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-title">📉 Trailing Stop</div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Actif</div>
+                    <div class="setting-desc">Suit le peak</div>
+                </div>
+                <div class="toggle" id="toggle-ts" onclick="toggleSetting('ts')"></div>
+            </div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Recul</div>
+                    <div class="setting-desc">Max depuis peak (%)</div>
+                </div>
+                <select class="setting-input" id="tsPct">
+                    <option value="10">10%</option>
+                    <option value="20" selected>20%</option>
+                    <option value="30">30%</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-title">🚨 Anti-Rug</div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Actif</div>
+                    <div class="setting-desc">Vente urgence</div>
+                </div>
+                <div class="toggle" id="toggle-ar" onclick="toggleSetting('ar')"></div>
+            </div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Chute</div>
+                    <div class="setting-desc">Max par cycle (%)</div>
+                </div>
+                <select class="setting-input" id="arPct">
+                    <option value="40">40%</option>
+                    <option value="60" selected>60%</option>
+                    <option value="80">80%</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-title">⚙ Général</div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Slippage</div>
+                    <div class="setting-desc">Défaut (bps)</div>
+                </div>
+                <input type="number" class="setting-input" id="slippage" value="500">
+            </div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Intervalle</div>
+                    <div class="setting-desc">Cycle (sec)</div>
+                </div>
+                <select class="setting-input" id="interval">
+                    <option value="15">15s</option>
+                    <option value="30" selected>30s</option>
+                    <option value="60">60s</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-save" onclick="saveSettings()">💾 Sauvegarder</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- CHART MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="modal" id="chartModal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-hand-holding-usd text-danger"></i>
-                    Vendre Token
-                </div>
-                <button class="modal-close" onclick="closeSellModal()">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="modal-title" id="chartTitle">Token</div>
+                <button class="modal-close" onclick="closeChartModal()">×</button>
             </div>
-            
-            <div id="sellTokenInfo" class="mb-lg"></div>
-            
+            <div class="chart-container" id="chartContainer">
+                <!-- TradingView widget will be inserted here -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-buy" onclick="openBuyModalFromChart()">▲ Acheter</button>
+                <button class="btn btn-sell" onclick="openSellModalFromChart()">▼ Vendre</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- BUY MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="modal trade-modal" id="buyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">▲ Acheter</div>
+                <button class="modal-close" onclick="closeBuyModal()">×</button>
+            </div>
             <div class="form-group">
-                <label class="form-label">
-                    <i class="fas fa-coins"></i>
-                    Tokens à vendre
-                </label>
+                <label class="form-label">Token Address</label>
+                <input type="text" class="form-input" id="buyMint" placeholder="Coller l'adresse">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Montant (SOL)</label>
+                <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01">
+                <div class="quick-amounts">
+                    <div class="quick-btn" onclick="setBuyAmount(0.1)">0.1</div>
+                    <div class="quick-btn" onclick="setBuyAmount(0.25)">0.25</div>
+                    <div class="quick-btn" onclick="setBuyAmount(0.5)">0.5</div>
+                    <div class="quick-btn" onclick="setMaxBuy()">MAX</div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Slippage</label>
+                <select class="form-input" id="buySlippage">
+                    <option value="100">1%</option>
+                    <option value="300" selected>3%</option>
+                    <option value="500">5%</option>
+                </select>
+            </div>
+            <button class="btn btn-buy" onclick="executeBuy()">CONFIRMER</button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- SELL MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="modal trade-modal" id="sellModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">▼ Vendre</div>
+                <button class="modal-close" onclick="closeSellModal()">×</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Token</label>
+                <input type="text" class="form-input" id="sellMint" readonly style="background: var(--bg-hover);">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Balance</label>
+                <input type="text" class="form-input" id="sellBalance" readonly style="background: var(--bg-hover);">
+            </div>
+            <div class="form-group">
+                <label class="form-label">À vendre</label>
                 <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001">
                 <div class="quick-amounts">
-                    <div class="quick-amount" onclick="setSellPercent(25)">25%</div>
-                    <div class="quick-amount" onclick="setSellPercent(50)">50%</div>
-                    <div class="quick-amount" onclick="setSellPercent(75)">75%</div>
-                    <div class="quick-amount" onclick="setSellPercent(100)">100%</div>
+                    <div class="quick-btn" onclick="setSellPercent(25)">25%</div>
+                    <div class="quick-btn" onclick="setSellPercent(50)">50%</div>
+                    <div class="quick-btn" onclick="setSellPercent(75)">75%</div>
+                    <div class="quick-btn" onclick="setSellPercent(100)">100%</div>
                 </div>
             </div>
-            
-            <div class="form-group">
-                <label class="form-label">
-                    <i class="fas fa-sliders-h"></i>
-                    Slippage
-                </label>
-                <select class="form-input" id="sellSlippage">
-                    <option value="500">0.5%</option>
-                    <option value="1000" selected>1%</option>
-                    <option value="2000">2%</option>
-                    <option value="5000">5%</option>
-                </select>
-            </div>
-            
-            <button class="btn btn-danger btn-block btn-lg" onclick="executeSell()">
-                <i class="fas fa-exchange-alt"></i>
-                CONFIRMER LA VENTE
-            </button>
+            <button class="btn btn-sell" onclick="executeSell()">CONFIRMER</button>
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- TOAST CONTAINER -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <div class="toast-container" id="toastContainer"></div>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- BOTTOM NAV -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <nav class="bottom-nav">
+        <div class="nav-item active">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label">Portfolio</div>
+        </div>
+        <div class="nav-item" onclick="alert('Analytics - Bientôt disponible')">
+            <div class="nav-icon">📈</div>
+            <div class="nav-label">Analytics</div>
+        </div>
+        <div class="nav-item" onclick="toggleSettings()">
+            <div class="nav-icon">⚙</div>
+            <div class="nav-label">Config</div>
+        </div>
+    </nav>
 
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- JAVASCRIPT -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <script>
-        // ═══════════════════════════════════════════════════════════════════
-        // CONFIG & STATE
-        // ═══════════════════════════════════════════════════════════════════
-        const API_BASE = window.location.origin;
-        let portfolioData = [];
-        let statsData = {};
-        let configData = {};
-        let solBalance = 0;
-        let pnlChart = null;
+        const API = window.location.origin;
+        let portfolio = [];
+        let settings = {};
+        let currentToken = null;
 
-        // ═══════════════════════════════════════════════════════════════════
-        // INITIALIZATION
-        // ═══════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════
+        // INIT
+        // ═══════════════════════════════════════════════════════════════
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
-            loadConfig();
-            setInterval(loadData, 30000); // Auto-refresh every 30s
+            loadSettings();
+            setInterval(loadData, 30000);
         });
 
-        // ═══════════════════════════════════════════════════════════════════
-        // DATA LOADING
-        // ═══════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════
+        // DATA
+        // ═══════════════════════════════════════════════════════════════
         async function loadData() {
             try {
-                const [statsRes, portfolioRes, balanceRes] = await Promise.all([
-                    fetch(`${API_BASE}/api/stats`),
-                    fetch(`${API_BASE}/api/portfolio`),
-                    fetch(`${API_BASE}/api/sol-balance`)
+                const [stats, portfolioRes] = await Promise.all([
+                    fetch(`${API}/api/stats`),
+                    fetch(`${API}/api/portfolio`)
                 ]);
                 
-                statsData = await statsRes.json();
-                portfolioData = await portfolioRes.json();
-                const balanceData = await balanceRes.json();
-                solBalance = balanceData.balance || 0;
+                statsData = await stats.json();
+                portfolio = (await portfolioRes.json()).tokens || [];
                 
-                updateUI();
-            } catch (error) {
-                console.error('Error loading data:', error);
-                showToast('Erreur de connexion', 'error');
+                updateStats();
+                renderTokens();
+            } catch (err) {
+                console.error('Load error:', err);
             }
         }
 
-        async function loadConfig() {
+        async function loadSettings() {
             try {
-                const res = await fetch(`${API_BASE}/api/config`);
-                configData = await res.json();
-                updateConfigUI();
-            } catch (error) {
-                console.error('Error loading config:', error);
+                const res = await fetch(`${API}/api/config`);
+                settings = await res.json();
+                updateSettingsUI();
+            } catch (err) {
+                console.error('Settings load error:', err);
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // UI UPDATES
-        // ═══════════════════════════════════════════════════════════════════
-        function updateUI() {
-            // Update stats
+        function updateStats() {
             document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
-            document.getElementById('realizedPnl').textContent = `$${(statsData.pnlStats?.realized || 0).toFixed(2)}`;
+            document.getElementById('tokenCount').textContent = statsData.tokens || 0;
             
-            const pnlValue = statsData.pnlStats?.realized || 0;
-            const pnlEl = document.getElementById('realizedPnl');
-            pnlEl.className = `stat-value ${pnlValue >= 0 ? 'positive' : 'negative'}`;
+            const uptime = statsData.uptime || 0;
+            const h = Math.floor(uptime / 3600);
+            const m = Math.floor((uptime % 3600) / 60);
+            document.getElementById('uptime').textContent = `${h}h ${m}m`;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // TOKENS
+        // ═══════════════════════════════════════════════════════════════
+        function renderTokens() {
+            const list = document.getElementById('tokenList');
+            const search = document.getElementById('searchInput').value.toLowerCase();
             
-            document.getElementById('winRate').textContent = `${statsData.analytics?.winRate || 0}%`;
-            document.getElementById('totalTrades').textContent = statsData.analytics?.totalTrades || 0;
-            document.getElementById('winLossRecord').textContent = 
-                `${statsData.analytics?.winCount || 0}W / ${statsData.analytics?.lossCount || 0}L`;
-            
-            // Update portfolio
-            const portfolioList = document.getElementById('portfolioList');
-            
-            if (!portfolioData.tokens || portfolioData.tokens.length === 0) {
-                portfolioList.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <i class="fas fa-coins"></i>
-                        </div>
-                        <div class="empty-text">Aucun token</div>
-                        <div class="empty-subtext">Votre portfolio est vide</div>
-                        <button class="btn btn-primary btn-sm mt-md" onclick="openBuyModal()">
-                            <i class="fas fa-plus"></i>
-                            Acheter un token
-                        </button>
+            const filtered = portfolio.filter(t => 
+                !search || 
+                (t.symbol || '').toLowerCase().includes(search) || 
+                t.mintFull.toLowerCase().includes(search)
+            );
+
+            if (filtered.length === 0) {
+                list.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">💎</div>
+                        <div>Aucun token trouvé</div>
                     </div>
                 `;
                 return;
             }
-            
-            portfolioList.innerHTML = portfolioData.tokens.map(token => {
-                const pnlClass = token.pnl >= 0 ? 'positive' : 'negative';
+
+            list.innerHTML = filtered.map(token => {
+                const pnlClass = token.pnl >= 0 ? 'pos' : 'neg';
                 const pnlSign = token.pnl >= 0 ? '+' : '';
                 const logo = token.logo 
-                    ? `<img src="${token.logo}" alt="${token.symbol || '?'}" onerror="this.parentElement.innerHTML='<i class=\'fas fa-coins\'></i>'">`
-                    : '<i class="fas fa-coins"></i>';
-                
+                    ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'">`
+                    : '🪙';
+
                 return `
-                    <div class="token-card" onclick="openTokenDetail('${token.mintFull}')">
+                    <div class="token-card" onclick="openChart('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}')">
                         <div class="token-header">
                             <div class="token-info">
                                 <div class="token-logo">${logo}</div>
-                                <div class="token-details">
+                                <div>
                                     <div class="token-symbol">${token.symbol || token.mint.slice(0, 8)}</div>
-                                    <div class="token-address">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
+                                    <div class="token-name">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
                                 </div>
                             </div>
                             <div class="token-price">
                                 <div class="price-value">$${(token.price || 0).toFixed(6)}</div>
-                                <div class="price-change ${pnlClass}">
-                                    ${pnlSign}${(token.pnl || 0).toFixed(2)}%
-                                </div>
+                                <div class="price-change ${pnlClass}">${pnlSign}${(token.pnl || 0).toFixed(2)}%</div>
                             </div>
                         </div>
-                        
                         <div class="token-stats">
                             <div class="token-stat">
-                                <div class="token-stat-label">Balance</div>
-                                <div class="token-stat-value">${(token.balance || 0).toFixed(2)}</div>
-                            </div>
-                            <div class="token-stat">
-                                <div class="token-stat-label">Value</div>
+                                <div class="token-stat-label">Valeur</div>
                                 <div class="token-stat-value">$${(token.value || 0).toFixed(2)}</div>
                             </div>
                             <div class="token-stat">
-                                <div class="token-stat-label">Liquidity</div>
+                                <div class="token-stat-label">Balance</div>
+                                <div class="token-stat-value">${(token.balance || 0).toFixed(4)}</div>
+                            </div>
+                            <div class="token-stat">
+                                <div class="token-stat-label">Liq.</div>
                                 <div class="token-stat-value">$${((token.liquidity || 0) / 1000).toFixed(1)}k</div>
                             </div>
                         </div>
-                        
                         <div class="token-actions">
-                            <a href="https://dexscreener.com/solana/${token.mint}" target="_blank" class="btn btn-secondary btn-sm">
-                                <i class="fas fa-external-link-alt"></i>
-                                Dex
-                            </a>
-                            <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">
-                                <i class="fas fa-hand-holding-usd"></i>
-                                Sell
-                            </button>
+                            <button class="btn btn-buy" onclick="event.stopPropagation(); openBuyModal('${token.mintFull}')">Buy</button>
+                            <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">Sell</button>
+                            <button class="btn btn-chart" onclick="event.stopPropagation(); openChart('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}')">📊</button>
                         </div>
                     </div>
                 `;
             }).join('');
         }
 
-        function updateConfigUI() {
-            // Update toggles
-            document.getElementById('toggle-tpEnabled').classList.toggle('active', configData.takeProfitEnabled);
-            document.getElementById('toggle-slEnabled').classList.toggle('active', configData.stopLossEnabled);
-            document.getElementById('toggle-tsEnabled').classList.toggle('active', configData.trailingEnabled);
-            document.getElementById('toggle-arEnabled').classList.toggle('active', configData.antiRugEnabled);
+        // ═══════════════════════════════════════════════════════════════
+        // CHART
+        // ═══════════════════════════════════════════════════════════════
+        function openChart(mint, symbol) {
+            currentToken = { mint, symbol };
             
-            // Update values
-            document.getElementById('tpHysteresis').value = configData.hysteresis || 5;
-            document.getElementById('slPct').value = configData.stopLossPct || -50;
-            document.getElementById('tsPct').value = configData.trailingPct || 20;
-            document.getElementById('arPct').value = configData.antiRugPct || 60;
-            document.getElementById('defaultSlippage').value = configData.defaultSlippage || 500;
-            document.getElementById('minSolReserve').value = configData.minSolReserve || 0.05;
-            document.getElementById('intervalSec').value = configData.intervalSec || 30;
+            document.getElementById('chartTitle').textContent = `${symbol} - TradingView`;
+            document.getElementById('chartContainer').innerHTML = `
+                <iframe src="https://www.tradingview.com/chart/?symbol=DEXSCREENER:${mint}" 
+                    style="width:100%;height:100%;border:none;"></iframe>
+            `;
+            
+            document.getElementById('chartModal').classList.add('active');
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // TAB SWITCHING
-        // ═══════════════════════════════════════════════════════════════════
-        function switchTab(tabName) {
-            // Update tabs
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            
-            event.currentTarget.classList.add('active');
-            
-            // Update sections
-            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-            document.getElementById(tabName).classList.add('active');
-            
-            // Load analytics data if switching to analytics tab
-            if (tabName === 'analytics') {
-                loadAnalytics();
-            }
+        function closeChartModal() {
+            document.getElementById('chartModal').classList.remove('active');
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // ANALYTICS
-        // ═══════════════════════════════════════════════════════════════════
-        async function loadAnalytics() {
-            try {
-                const [analyticsRes, tradesRes] = await Promise.all([
-                    fetch(`${API_BASE}/api/analytics`),
-                    fetch(`${API_BASE}/api/trades`)
-                ]);
-                
-                const analytics = await analyticsRes.json();
-                const trades = await tradesRes.json();
-                
-                // Update analytics stats
-                document.getElementById('analyticsRoi').textContent = `${analytics.roi || 0}%`;
-                document.getElementById('avgWin').textContent = `+${analytics.avgWin || 0}%`;
-                document.getElementById('avgLoss').textContent = `${analytics.avgLoss || 0}%`;
-                document.getElementById('bestTrade').textContent = `+${analytics.bestTradePct || 0}%`;
-                
-                // Update PnL chart
-                updatePnlChart(analytics.pnlHistory || []);
-                
-                // Update recent trades
-                const recentTrades = trades.trades?.slice(0, 10) || [];
-                const tradesContainer = document.getElementById('recentTrades');
-                
-                if (recentTrades.length === 0) {
-                    tradesContainer.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-icon">
-                                <i class="fas fa-chart-line"></i>
-                            </div>
-                            <div class="empty-text">Aucun trade récent</div>
-                            <div class="empty-subtext">Les trades apparaîtront ici après exécution</div>
-                        </div>
-                    `;
-                    return;
+        function openBuyModalFromChart() {
+            closeChartModal();
+            openBuyModal(currentToken?.mint || '');
+        }
+
+        function openSellModalFromChart() {
+            closeChartModal();
+            if (currentToken) {
+                const token = portfolio.find(t => t.mintFull === currentToken.mint);
+                if (token) {
+                    openSellModal(token.mintFull, token.symbol || token.mint.slice(0,8), token.balance);
                 }
-                
-                tradesContainer.innerHTML = recentTrades.map(trade => {
-                    const pnlClass = trade.pnlPct >= 0 ? 'text-success' : 'text-danger';
-                    const pnlSign = trade.pnlPct >= 0 ? '+' : '';
-                    const date = new Date(trade.ts).toLocaleString('fr-FR');
-                    const icon = trade.type === 'buy' ? 'fa-shopping-cart' : 'fa-hand-holding-usd';
-                    const iconClass = trade.type === 'buy' ? 'text-accent' : 'text-danger';
-                    
-                    return `
-                        <div style="padding: var(--space-md); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                            <div class="flex items-center gap-md">
-                                <div style="width: 36px; height: 36px; background: var(--bg-card); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas ${icon} ${iconClass}"></i>
-                                </div>
-                                <div>
-                                    <div style="font-weight: 600;">${trade.symbol || trade.mint?.slice(0,8)}</div>
-                                    <div class="text-muted" style="font-size: 11px;">${trade.type.toUpperCase()} • ${date}</div>
-                                </div>
-                            </div>
-                            <div class="${pnlClass}" style="font-family: var(--font-mono); font-weight: 600;">
-                                ${pnlSign}${(trade.pnlPct || 0).toFixed(2)}%
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (error) {
-                console.error('Error loading analytics:', error);
             }
         }
 
-        function updatePnlChart(pnlHistory) {
-            const ctx = document.getElementById('pnlChart').getContext('2d');
-            
-            if (pnlChart) {
-                pnlChart.destroy();
-            }
-            
-            const labels = pnlHistory.slice(-30).map((_, i) => i + 1);
-            const data = pnlHistory.slice(-30).map(p => p.cumul);
-            
-            pnlChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'PnL Cumulé (SOL)',
-                        data: data,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            display: false
-                        },
-                        y: {
-                            grid: {
-                                color: 'rgba(55, 65, 81, 0.5)'
-                            },
-                            ticks: {
-                                color: '#9ca3af',
-                                font: {
-                                    family: 'JetBrains Mono',
-                                    size: 10
-                                }
-                            }
-                        }
-                    },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    }
-                }
-            });
+        // ═══════════════════════════════════════════════════════════════
+        // SETTINGS
+        // ═══════════════════════════════════════════════════════════════
+        function toggleSettings() {
+            document.getElementById('settingsPanel').classList.toggle('active');
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // CONFIG
-        // ═══════════════════════════════════════════════════════════════════
-        function toggleConfig(key) {
-            const toggle = document.getElementById(`toggle-${key.replace(/[A-Z]/g, l => '-' + l.toLowerCase()).replace('take-profit', 'tp').replace('stop-loss', 'sl').replace('trailing', 'ts').replace('anti-rug', 'ar')}`);
-            if (toggle) {
-                toggle.classList.toggle('active');
-            }
+        function toggleSetting(type) {
+            const toggle = document.getElementById(`toggle-${type}`);
+            toggle.classList.toggle('active');
         }
 
-        async function saveConfig() {
+        function updateSettingsUI() {
+            document.getElementById('toggle-tp').classList.toggle('active', settings.takeProfitEnabled);
+            document.getElementById('toggle-sl').classList.toggle('active', settings.stopLossEnabled);
+            document.getElementById('toggle-ts').classList.toggle('active', settings.trailingEnabled);
+            document.getElementById('toggle-ar').classList.toggle('active', settings.antiRugEnabled);
+            
+            document.getElementById('tpHysteresis').value = settings.hysteresis || 5;
+            document.getElementById('slPct').value = settings.stopLossPct || -50;
+            document.getElementById('tsPct').value = settings.trailingPct || 20;
+            document.getElementById('arPct').value = settings.antiRugPct || 60;
+            document.getElementById('slippage').value = settings.defaultSlippage || 500;
+            document.getElementById('interval').value = settings.intervalSec || 30;
+        }
+
+        async function saveSettings() {
             try {
                 const config = {
-                    takeProfitEnabled: document.getElementById('toggle-tpEnabled').classList.contains('active'),
-                    stopLossEnabled: document.getElementById('toggle-slEnabled').classList.contains('active'),
-                    trailingEnabled: document.getElementById('toggle-tsEnabled').classList.contains('active'),
-                    antiRugEnabled: document.getElementById('toggle-arEnabled').classList.contains('active'),
+                    takeProfitEnabled: document.getElementById('toggle-tp').classList.contains('active'),
+                    stopLossEnabled: document.getElementById('toggle-sl').classList.contains('active'),
+                    trailingEnabled: document.getElementById('toggle-ts').classList.contains('active'),
+                    antiRugEnabled: document.getElementById('toggle-ar').classList.contains('active'),
                     hysteresis: parseFloat(document.getElementById('tpHysteresis').value),
                     stopLossPct: parseFloat(document.getElementById('slPct').value),
                     trailingPct: parseFloat(document.getElementById('tsPct').value),
                     antiRugPct: parseFloat(document.getElementById('arPct').value),
-                    defaultSlippage: parseInt(document.getElementById('defaultSlippage').value),
-                    minSolReserve: parseFloat(document.getElementById('minSolReserve').value),
-                    intervalSec: parseInt(document.getElementById('intervalSec').value),
+                    defaultSlippage: parseInt(document.getElementById('slippage').value),
+                    intervalSec: parseInt(document.getElementById('interval').value),
                 };
-                
-                const res = await fetch(`${API_BASE}/api/config`, {
+
+                await fetch(`${API}/api/config`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
                 });
-                
-                const result = await res.json();
-                
-                if (result.success) {
-                    showToast('Configuration sauvegardée ✅', 'success');
-                    loadConfig();
-                } else {
-                    showToast('Erreur lors de la sauvegarde', 'error');
-                }
-            } catch (error) {
-                console.error('Error saving config:', error);
-                showToast('Erreur de connexion', 'error');
+
+                alert('✅ Paramètres sauvegardés');
+                toggleSettings();
+            } catch (err) {
+                alert('❌ Erreur: ' + err.message);
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // BUY MODAL
-        // ═══════════════════════════════════════════════════════════════════
-        function openBuyModal() {
+        // ═══════════════════════════════════════════════════════════════
+        // BUY/SELL
+        // ═══════════════════════════════════════════════════════════════
+        function openBuyModal(mint = '') {
+            document.getElementById('buyMint').value = mint;
             document.getElementById('buyModal').classList.add('active');
-            document.body.style.overflow = 'hidden';
         }
 
         function closeBuyModal() {
             document.getElementById('buyModal').classList.remove('active');
-            document.body.style.overflow = '';
         }
 
         function setBuyAmount(amount) {
             document.getElementById('buyAmount').value = amount;
-            updateQuickAmounts(amount, 'buy');
         }
 
         async function setMaxBuy() {
-            if (solBalance > 0) {
-                const maxAmount = Math.max(0, solBalance - 0.05); // Keep 0.05 SOL reserve
-                document.getElementById('buyAmount').value = maxAmount.toFixed(4);
-                updateQuickAmounts(maxAmount, 'buy');
+            try {
+                const res = await fetch(`${API}/api/sol-balance`);
+                const data = await res.json();
+                const max = Math.max(0, (data.balance || 0) - 0.05);
+                document.getElementById('buyAmount').value = max.toFixed(4);
+            } catch (err) {
+                console.error(err);
             }
-        }
-
-        function updateQuickAmounts(amount, type) {
-            const modalId = type === 'buy' ? 'buyModal' : 'sellModal';
-            document.querySelectorAll(`#${modalId} .quick-amount`).forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.textContent === amount.toString() || 
-                    (btn.textContent === 'MAX' && amount >= solBalance - 0.05)) {
-                    btn.classList.add('active');
-                }
-            });
         }
 
         async function executeBuy() {
-            const mint = document.getElementById('buyTokenAddress').value.trim();
-            const solAmount = parseFloat(document.getElementById('buyAmount').value);
-            const slippageBps = parseInt(document.getElementById('buySlippage').value);
-            
-            if (!mint || !solAmount || solAmount <= 0) {
-                showToast('Veuillez remplir tous les champs', 'error');
+            const mint = document.getElementById('buyMint').value.trim();
+            const amount = parseFloat(document.getElementById('buyAmount').value);
+            const slippage = parseInt(document.getElementById('buySlippage').value);
+
+            if (!mint || !amount) {
+                alert('❌ Remplis tous les champs');
                 return;
             }
-            
-            if (solAmount > solBalance) {
-                showToast('Solde SOL insuffisant', 'error');
-                return;
-            }
-            
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> En cours...';
-            
+
             try {
-                const response = await fetch(`${API_BASE}/api/buy`, {
+                const res = await fetch(`${API}/api/buy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, solAmount, slippageBps })
+                    body: JSON.stringify({ mint, solAmount: amount, slippageBps: slippage })
                 });
-                
-                const result = await response.json();
-                
+
+                const result = await res.json();
                 if (result.success) {
-                    showToast(`Achat réussi ! ${result.outAmount?.toFixed(4)} tokens`, 'success');
+                    alert(`✅ Achat réussi!\nTX: ${result.sig?.slice(0, 8)}...`);
                     closeBuyModal();
-                    setTimeout(() => loadData(), 3000);
+                    setTimeout(loadData, 3000);
                 } else {
-                    showToast(result.error || 'Échec de l\'achat', 'error');
+                    alert('❌ ' + result.error);
                 }
-            } catch (error) {
-                showToast('Erreur: ' + error.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
+            } catch (err) {
+                alert('❌ ' + err.message);
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // SELL MODAL
-        // ═══════════════════════════════════════════════════════════════════
         function openSellModal(mint, symbol, balance) {
-            window.sellBalance = balance;
-            window.sellMint = mint;
-            window.sellSymbol = symbol;
-            
-            document.getElementById('sellTokenInfo').innerHTML = `
-                <div style="background: var(--bg-card); padding: var(--space-lg); border-radius: var(--radius-md);">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <div style="font-weight: 600;">${symbol}</div>
-                            <div class="text-muted" style="font-size: 11px;">Balance: ${balance.toFixed(4)}</div>
-                        </div>
-                        <div class="text-right">
-                            <div style="font-weight: 600;">${mint.slice(0, 8)}...</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
+            document.getElementById('sellMint').value = `${symbol} (${mint.slice(0, 4)}...${mint.slice(-4)})`;
+            document.getElementById('sellBalance').value = balance.toFixed(4);
+            document.getElementById('sellModal').dataset.mint = mint;
             document.getElementById('sellModal').classList.add('active');
-            document.body.style.overflow = 'hidden';
         }
 
         function closeSellModal() {
             document.getElementById('sellModal').classList.remove('active');
-            document.body.style.overflow = '';
         }
 
         function setSellPercent(percent) {
-            if (window.sellBalance) {
-                const amount = (window.sellBalance * percent / 100).toFixed(4);
-                document.getElementById('sellAmount').value = amount;
-                updateQuickAmounts(percent, 'sell');
-            }
+            const balance = parseFloat(document.getElementById('sellBalance').value);
+            const amount = (balance * percent / 100).toFixed(4);
+            document.getElementById('sellAmount').value = amount;
         }
 
         async function executeSell() {
+            const mint = document.getElementById('sellModal').dataset.mint;
             const amount = parseFloat(document.getElementById('sellAmount').value);
-            const slippageBps = parseInt(document.getElementById('sellSlippage').value);
-            
-            if (!amount || amount <= 0) {
-                showToast('Veuillez entrer un montant valide', 'error');
+
+            if (!mint || !amount) {
+                alert('❌ Remplis tous les champs');
                 return;
             }
-            
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> En cours...';
-            
+
             try {
-                const response = await fetch(`${API_BASE}/api/sell`, {
+                const res = await fetch(`${API}/api/sell`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        mint: window.sellMint, 
-                        amount, 
-                        slippageBps, 
-                        reason: 'MANUAL' 
-                    })
+                    body: JSON.stringify({ mint, amount, reason: 'MANUAL' })
                 });
-                
-                const result = await response.json();
-                
+
+                const result = await res.json();
                 if (result.success) {
-                    showToast(`Vente réussie ! ${result.solOut?.toFixed(6)} SOL reçus`, 'success');
+                    alert(`✅ Vente réussie!\nSOL: ${result.solOut?.toFixed(6)}`);
                     closeSellModal();
-                    setTimeout(() => loadData(), 3000);
+                    setTimeout(loadData, 3000);
                 } else {
-                    showToast(result.error || 'Échec de la vente', 'error');
+                    alert('❌ ' + result.error);
                 }
-            } catch (error) {
-                showToast('Erreur: ' + error.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
+            } catch (err) {
+                alert('❌ ' + err.message);
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // TOAST NOTIFICATIONS
-        // ═══════════════════════════════════════════════════════════════════
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            
-            const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
-            const color = type === 'success' ? 'text-success' : type === 'error' ? 'text-danger' : 'text-accent';
-            
-            toast.innerHTML = `
-                <i class="fas ${icon} ${color}"></i>
-                <span>${message}</span>
-            `;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'toastIn 0.3s ease reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
+        // ═══════════════════════════════════════════════════════════════
+        // SEARCH
+        // ═══════════════════════════════════════════════════════════════
+        document.getElementById('searchInput').addEventListener('input', renderTokens);
 
-        // ═══════════════════════════════════════════════════════════════════
-        // UTILITIES
-        // ═══════════════════════════════════════════════════════════════════
-        function refreshData() {
-            loadData();
-            showToast('Données actualisées', 'success');
-        }
-
-        function openTokenDetail(mint) {
-            window.open(`https://dexscreener.com/solana/${mint}`, '_blank');
-        }
-
-        // Close modals on outside click
+        // ═══════════════════════════════════════════════════════════════
+        // CLOSE MODALS
+        // ═══════════════════════════════════════════════════════════════
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     modal.classList.remove('active');
-                    document.body.style.overflow = '';
                 }
             });
         });
-
-        // Close modals on ESC
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeBuyModal();
-                closeSellModal();
-            }
-        });
     </script>
 </body>
-                </html>
+</html>
