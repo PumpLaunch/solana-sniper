@@ -2,102 +2,168 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>SolBot Pro</title>
+    <title>SolBot Pro — Trading Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
-
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* CSS VARIABLES — Thème professionnel */
+        /* ═══════════════════════════════════════════════════════════════════ */
         :root {
             --bg-primary: #0f172a;
             --bg-secondary: #1e293b;
             --bg-card: #334155;
+            --bg-hover: #475569;
+            
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --border: #334155;
+            --border-hover: #475569;
+            
             --accent: #3b82f6;
+            --accent-hover: #2563eb;
             --accent-glow: rgba(59, 130, 246, 0.3);
+            
             --success: #10b981;
+            --success-bg: rgba(16, 185, 129, 0.15);
             --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.15);
             --danger: #ef4444;
-            --border: #475569;
+            --danger-bg: rgba(239, 68, 68, 0.15);
+            
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-xl: 20px;
+            
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+            --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+            
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 12px;
+            --spacing-lg: 16px;
+            --spacing-xl: 20px;
+            --spacing-2xl: 24px;
+            
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
         }
 
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* RESET & BASE */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        html { font-size: 14px; scroll-behavior: smooth; }
+        
         body {
+            font-family: var(--font-sans);
             background: var(--bg-primary);
             color: var(--text-primary);
+            line-height: 1.6;
             min-height: 100vh;
+            padding-top: var(--safe-top);
+            padding-bottom: calc(70px + var(--safe-bottom));
             overflow-x: hidden;
-            padding-bottom: env(safe-area-inset-bottom);
         }
 
-        /* Header */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* HEADER */
+        /* ═══════════════════════════════════════════════════════════════════ */
         .header {
-            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-            padding: 16px 20px;
             position: sticky;
             top: 0;
             z-index: 100;
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
             border-bottom: 1px solid var(--border);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            padding: var(--spacing-lg) var(--spacing-xl);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-md);
         }
 
         .header-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: var(--spacing-lg);
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: var(--spacing-md);
         }
 
         .logo-icon {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
-            border-radius: 12px;
+            border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 20px;
-            box-shadow: 0 4px 15px var(--accent-glow);
+            font-weight: 700;
+            color: white;
+            box-shadow: var(--shadow-glow);
+            transition: transform 0.2s;
         }
 
+        .logo-icon:hover { transform: scale(1.05); }
+
         .logo-text {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 700;
             background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
+        .logo-version {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--bg-card);
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            margin-left: var(--spacing-xs);
+        }
+
         .status-badge {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            background: rgba(16, 185, 129, 0.15);
+            gap: var(--spacing-xs);
+            padding: var(--spacing-xs) var(--spacing-md);
+            background: var(--success-bg);
             border: 1px solid var(--success);
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--success);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             background: var(--success);
             border-radius: 50%;
             animation: pulse 2s infinite;
@@ -108,110 +174,31 @@
             50% { opacity: 0.5; }
         }
 
-        /* Stats Grid */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* STATS GRID */
+        /* ═══════════════════════════════════════════════════════════════════ */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 16px;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        @media (min-width: 768px) {
+            .stats-grid { grid-template-columns: repeat(4, 1fr); }
         }
 
         .stat-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 14px;
-            transition: transform 0.2s;
-        }
-
-        .stat-card:active {
-            transform: scale(0.98);
-        }
-
-        .stat-label {
-            font-size: 11px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-
-        .stat-value {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .stat-value.positive { color: var(--success); }
-        .stat-value.negative { color: var(--danger); }
-
-        /* Portfolio Section */
-        .section {
-            padding: 16px 20px;
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 14px;
-        }
-
-        .section-title {
-            font-size: 18px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .section-icon {
-            width: 28px;
-            height: 28px;
-            background: var(--accent);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-        }
-
-        .btn-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
             transition: all 0.2s;
-        }
-
-        .btn-icon:active {
-            background: var(--accent);
-            transform: scale(0.95);
-        }
-
-        /* Portfolio Cards */
-        .portfolio-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .token-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 16px;
             position: relative;
             overflow: hidden;
-            transition: all 0.3s;
         }
 
-        .token-card::before {
+        .stat-card::before {
             content: '';
             position: absolute;
             top: 0;
@@ -220,37 +207,151 @@
             height: 3px;
             background: linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%);
             opacity: 0;
-            transition: opacity 0.3s;
+            transition: opacity 0.2s;
         }
 
-        .token-card.active::before {
-            opacity: 1;
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-card:hover::before { opacity: 1; }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--spacing-xs);
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-family: var(--font-mono);
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stat-value.positive { color: var(--success); }
+        .stat-value.negative { color: var(--danger); }
+
+        .stat-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: var(--spacing-xs);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* TABS */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .tabs {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-xl);
+            background: var(--bg-secondary);
+            padding: var(--spacing-sm);
+            border-radius: var(--radius-lg);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab {
+            flex: 1;
+            min-width: 80px;
+            padding: var(--spacing-md) var(--spacing-lg);
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* SECTIONS */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .section { display: none; }
+        .section.active { display: block; }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* PORTFOLIO */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .portfolio-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .token-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .token-card:hover {
+            border-color: var(--border-hover);
+            transform: translateX(4px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .token-card.active {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-glow);
         }
 
         .token-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 12px;
+            margin-bottom: var(--spacing-md);
         }
 
         .token-info {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: var(--spacing-md);
             flex: 1;
+            min-width: 0;
         }
 
         .token-logo {
             width: 44px;
             height: 44px;
+            border-radius: var(--radius-md);
             background: var(--bg-card);
-            border-radius: 12px;
+            border: 2px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
-            border: 2px solid var(--border);
+            font-size: 18px;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .token-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         .token-details {
@@ -259,8 +360,8 @@
         }
 
         .token-symbol {
-            font-size: 16px;
-            font-weight: 700;
+            font-weight: 600;
+            font-size: 15px;
             margin-bottom: 2px;
             white-space: nowrap;
             overflow: hidden;
@@ -268,9 +369,9 @@
         }
 
         .token-address {
+            font-family: var(--font-mono);
             font-size: 11px;
-            color: var(--text-secondary);
-            font-family: monospace;
+            color: var(--text-muted);
         }
 
         .token-price {
@@ -278,24 +379,36 @@
         }
 
         .price-value {
-            font-size: 16px;
-            font-weight: 700;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            font-size: 15px;
             margin-bottom: 2px;
         }
 
         .price-change {
-            font-size: 13px;
+            font-family: var(--font-mono);
+            font-size: 12px;
             font-weight: 600;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            display: inline-block;
         }
 
-        .price-change.positive { color: var(--success); }
-        .price-change.negative { color: var(--danger); }
+        .price-change.positive {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .price-change.negative {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
 
         .token-stats {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            padding-top: 12px;
+            gap: var(--spacing-md);
+            padding-top: var(--spacing-md);
             border-top: 1px solid var(--border);
         }
 
@@ -305,45 +418,67 @@
 
         .token-stat-label {
             font-size: 10px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
+            color: var(--text-muted);
+            margin-bottom: var(--spacing-xs);
+            text-transform: uppercase;
         }
 
         .token-stat-value {
-            font-size: 14px;
+            font-family: var(--font-mono);
             font-weight: 600;
+            font-size: 13px;
         }
 
         .token-actions {
             display: flex;
-            gap: 8px;
-            margin-top: 12px;
+            gap: var(--spacing-sm);
+            margin-top: var(--spacing-md);
         }
 
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* BUTTONS */
+        /* ═══════════════════════════════════════════════════════════════════ */
         .btn {
-            flex: 1;
-            padding: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-xs);
+            padding: var(--spacing-md) var(--spacing-lg);
             border: none;
-            border-radius: 10px;
-            font-size: 14px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
+            text-decoration: none;
+            white-space: nowrap;
         }
 
-        .btn:active {
-            transform: scale(0.98);
-        }
+        .btn:active { transform: scale(0.98); }
 
         .btn-primary {
             background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
             color: white;
-            box-shadow: 0 4px 15px var(--accent-glow);
+            box-shadow: var(--shadow-glow);
         }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover { background: #059669; }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover { background: #dc2626; }
 
         .btn-secondary {
             background: var(--bg-card);
@@ -351,76 +486,21 @@
             border: 1px solid var(--border);
         }
 
-        .btn-danger {
-            background: rgba(239, 68, 68, 0.15);
-            color: var(--danger);
-            border: 1px solid var(--danger);
+        .btn-secondary:hover {
+            border-color: var(--border-hover);
+            background: var(--bg-hover);
         }
 
-        /* Floating Action Button */
-        .fab {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            font-size: 28px;
-            cursor: pointer;
-            box-shadow: 0 8px 30px var(--accent-glow);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            z-index: 50;
+        .btn-sm {
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-size: 12px;
         }
 
-        .fab:active {
-            transform: scale(0.95);
-        }
+        .btn-block { width: 100%; }
 
-        /* Bottom Navigation */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: space-around;
-            padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
-            z-index: 100;
-        }
-
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            padding: 8px 16px;
-            cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text-secondary);
-        }
-
-        .nav-item.active {
-            color: var(--accent);
-        }
-
-        .nav-icon {
-            font-size: 22px;
-        }
-
-        .nav-label {
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        /* Modal */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* MODALS */
+        /* ═══════════════════════════════════════════════════════════════════ */
         .modal {
             display: none;
             position: fixed;
@@ -428,24 +508,24 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.8);
-            z-index: 200;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
             align-items: flex-end;
             justify-content: center;
+            backdrop-filter: blur(4px);
         }
 
-        .modal.active {
-            display: flex;
-        }
+        .modal.active { display: flex; }
 
         .modal-content {
             background: var(--bg-secondary);
-            border-radius: 24px 24px 0 0;
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
             width: 100%;
+            max-width: 600px;
             max-height: 85vh;
             overflow-y: auto;
-            padding: 24px;
-            animation: slideUp 0.3s;
+            padding: var(--spacing-2xl);
+            animation: slideUp 0.3s ease;
         }
 
         @keyframes slideUp {
@@ -457,11 +537,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: var(--spacing-xl);
         }
 
         .modal-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
         }
 
@@ -470,149 +550,342 @@
             height: 36px;
             background: var(--bg-card);
             border: none;
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             color: var(--text-primary);
             font-size: 20px;
             cursor: pointer;
+            transition: all 0.2s;
         }
 
-        /* Form Elements */
-        .form-group {
-            margin-bottom: 20px;
+        .modal-close:hover {
+            background: var(--danger);
+            color: white;
         }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* FORMS */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .form-group { margin-bottom: var(--spacing-xl); }
 
         .form-label {
             display: block;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: var(--spacing-sm);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .form-input {
             width: 100%;
-            padding: 14px 16px;
+            padding: var(--spacing-md) var(--spacing-lg);
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: var(--radius-md);
             color: var(--text-primary);
-            font-size: 16px;
-            outline: none;
+            font-size: 14px;
+            font-family: var(--font-sans);
             transition: all 0.2s;
         }
 
         .form-input:focus {
+            outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
 
+        .form-input::placeholder { color: var(--text-muted); }
+
         .quick-amounts {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-top: 8px;
+            gap: var(--spacing-sm);
+            margin-top: var(--spacing-sm);
         }
 
         .quick-amount {
-            padding: 10px;
+            padding: var(--spacing-sm);
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            text-align: center;
-            font-size: 13px;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            text-align: center;
         }
 
-        .quick-amount:active {
+        .quick-amount:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .quick-amount.active {
             background: var(--accent);
             border-color: var(--accent);
             color: white;
         }
 
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-secondary);
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* CONFIG */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .config-grid {
+            display: grid;
+            gap: var(--spacing-lg);
         }
 
-        .empty-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-            opacity: 0.5;
+        .config-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
         }
 
-        .empty-text {
-            font-size: 16px;
-            margin-bottom: 8px;
+        .config-section-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
         }
 
-        .empty-subtext {
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-md) 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .toggle-row:last-child { border-bottom: none; }
+
+        .toggle-label {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .toggle-title {
             font-size: 13px;
+            font-weight: 500;
         }
 
-        /* Loading */
+        .toggle-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .toggle-switch {
+            width: 48px;
+            height: 26px;
+            background: var(--bg-card);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .toggle-switch.active { background: var(--success); }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.2s;
+        }
+
+        .toggle-switch.active::after { transform: translateX(22px); }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* FLOATING ACTION BUTTON */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .fab {
+            position: fixed;
+            bottom: calc(80px + var(--safe-bottom));
+            right: var(--spacing-xl);
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg), var(--shadow-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 90;
+        }
+
+        .fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+        }
+
+        .fab:active { transform: scale(0.95); }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* BOTTOM NAVIGATION */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 100;
+            padding-bottom: var(--safe-bottom);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--spacing-xs);
+            padding: var(--spacing-sm) var(--spacing-md);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+        }
+
+        .nav-item:hover { color: var(--text-primary); }
+
+        .nav-item.active { color: var(--accent); }
+
+        .nav-icon { font-size: 22px; }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* LOADING & EMPTY STATES */
+        /* ═══════════════════════════════════════════════════════════════════ */
         .loading {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 40px;
+            padding: var(--spacing-2xl);
+            color: var(--text-muted);
         }
 
         .spinner {
-            width: 40px;
-            height: 40px;
+            width: 32px;
+            height: 32px;
             border: 3px solid var(--border);
             border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin-right: var(--spacing-md);
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-2xl);
+            color: var(--text-muted);
         }
 
-        /* Responsive */
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: var(--spacing-lg);
+            opacity: 0.5;
+        }
+
+        .empty-text {
+            font-size: 14px;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .empty-subtext {
+            font-size: 12px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ALERTS */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .alert {
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            font-size: 13px;
+        }
+
+        .alert-error {
+            background: var(--danger-bg);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .alert-success {
+            background: var(--success-bg);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .alert-warning {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning);
+            color: var(--warning);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* RESPONSIVE */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        @media (min-width: 768px) {
+            .modal { align-items: center; }
+            .modal-content {
+                border-radius: var(--radius-xl);
+                max-height: 80vh;
+            }
+            .fab {
+                bottom: var(--spacing-xl);
+                right: var(--spacing-xl);
+            }
+        }
+
         @media (max-width: 380px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .token-stats {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg-primary);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 3px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--accent);
+            .stats-grid { grid-template-columns: 1fr; }
+            .token-stats { grid-template-columns: 1fr; }
+            .quick-amounts { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- HEADER -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <header class="header">
         <div class="header-top">
             <div class="logo">
                 <div class="logo-icon">🤖</div>
-                <div class="logo-text">SolBot Pro</div>
+                <div>
+                    <div class="logo-text">SolBot Pro</div>
+                    <div class="logo-version">v3.0</div>
+                </div>
             </div>
             <div class="status-badge">
                 <div class="status-dot"></div>
@@ -624,135 +897,331 @@
             <div class="stat-card">
                 <div class="stat-label">Portfolio Value</div>
                 <div class="stat-value" id="totalValue">$0.00</div>
+                <div class="stat-sub" id="totalValueChange">—</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">PnL Réalisé</div>
                 <div class="stat-value" id="realizedPnl">$0.00</div>
+                <div class="stat-sub" id="realizedPnlChange">—</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Win Rate</div>
                 <div class="stat-value" id="winRate">0%</div>
+                <div class="stat-sub" id="winLossRecord">0W / 0L</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Trades</div>
+                <div class="stat-label">Total Trades</div>
                 <div class="stat-value" id="totalTrades">0</div>
+                <div class="stat-sub" id="tradesToday">0 aujourd'hui</div>
             </div>
         </div>
     </header>
 
-    <!-- Portfolio Section -->
-    <section class="section">
-        <div class="section-header">
-            <div class="section-title">
-                <div class="section-icon">📊</div>
-                Portfolio
-            </div>
-            <button class="btn-icon" onclick="refreshData()">🔄</button>
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- MAIN CONTENT -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <main class="container" style="padding: 0 var(--spacing-xl);">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('portfolio')">◈ Portfolio</button>
+            <button class="tab" onclick="switchTab('analytics')">⌇ Analytics</button>
+            <button class="tab" onclick="switchTab('config')">⚙ Config</button>
         </div>
-        
-        <div class="portfolio-list" id="portfolioList">
-            <div class="loading">
-                <div class="spinner"></div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Floating Action Button -->
+        <!-- Portfolio Section -->
+        <section id="portfolio" class="section active">
+            <div class="portfolio-list" id="portfolioList">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <span>Chargement du portfolio...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics" class="section">
+            <div class="stats-grid" style="margin-bottom: var(--spacing-xl);">
+                <div class="stat-card">
+                    <div class="stat-label">ROI</div>
+                    <div class="stat-value" id="analyticsRoi">0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Win</div>
+                    <div class="stat-value positive" id="avgWin">+0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Loss</div>
+                    <div class="stat-value negative" id="avgLoss">-0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Best Trade</div>
+                    <div class="stat-value positive" id="bestTrade">+0%</div>
+                </div>
+            </div>
+            
+            <div class="config-section">
+                <div class="config-section-title">📊 Derniers Trades</div>
+                <div id="recentTrades">
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div class="empty-text">Aucun trade récent</div>
+                        <div class="empty-subtext">Les trades apparaîtront ici</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Config Section -->
+        <section id="config" class="section">
+            <div class="config-grid">
+                <div class="config-section">
+                    <div class="config-section-title">🎯 Take-Profit</div>
+                    <div class="toggle-row">
+                        <div class="toggle-label">
+                            <div class="toggle-title">Actif</div>
+                            <div class="toggle-desc">Vente auto à chaque palier</div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-tpEnabled" onclick="toggleConfig('takeProfitEnabled')"></div>
+                    </div>
+                    <div class="form-group" style="margin-top: var(--spacing-lg);">
+                        <label class="form-label">Hysteresis (%)</label>
+                        <input type="number" class="form-input" id="tpHysteresis" value="5" min="0" max="50">
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: var(--spacing-xs);">
+                            Marge avant re-déclenchement
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <div class="config-section-title">🛡 Stop-Loss</div>
+                    <div class="toggle-row">
+                        <div class="toggle-label">
+                            <div class="toggle-title">Actif</div>
+                            <div class="toggle-desc">Vente forcée sous le seuil</div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-slEnabled" onclick="toggleConfig('stopLossEnabled')"></div>
+                    </div>
+                    <div class="form-group" style="margin-top: var(--spacing-lg);">
+                        <label class="form-label">Seuil (%)</label>
+                        <select class="form-input" id="slPct">
+                            <option value="-25">-25%</option>
+                            <option value="-40">-40%</option>
+                            <option value="-50" selected>-50%</option>
+                            <option value="-70">-70%</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <div class="config-section-title">📉 Trailing Stop</div>
+                    <div class="toggle-row">
+                        <div class="toggle-label">
+                            <div class="toggle-title">Actif</div>
+                            <div class="toggle-desc">Suit le peak, vend si recul</div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-tsEnabled" onclick="toggleConfig('trailingEnabled')"></div>
+                    </div>
+                    <div class="form-group" style="margin-top: var(--spacing-lg);">
+                        <label class="form-label">Recul max (%)</label>
+                        <select class="form-input" id="tsPct">
+                            <option value="10">10%</option>
+                            <option value="20" selected>20%</option>
+                            <option value="30">30%</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <div class="config-section-title">🚨 Anti-Rug</div>
+                    <div class="toggle-row">
+                        <div class="toggle-label">
+                            <div class="toggle-title">Actif</div>
+                            <div class="toggle-desc">Vente d'urgence si chute brutale</div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-arEnabled" onclick="toggleConfig('antiRugEnabled')"></div>
+                    </div>
+                    <div class="form-group" style="margin-top: var(--spacing-lg);">
+                        <label class="form-label">Chute (% / cycle)</label>
+                        <select class="form-input" id="arPct">
+                            <option value="40">40%</option>
+                            <option value="60" selected>60%</option>
+                            <option value="80">80%</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <div class="config-section-title">⚙ Général</div>
+                    <div class="form-group">
+                        <label class="form-label">Slippage défaut (bps)</label>
+                        <input type="number" class="form-input" id="defaultSlippage" value="500" min="10" max="5000">
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: var(--spacing-xs);">
+                            100 bps = 1%
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Réserve SOL min.</label>
+                        <input type="number" class="form-input" id="minSolReserve" value="0.05" step="0.01" min="0" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Intervalle (sec)</label>
+                        <select class="form-input" id="intervalSec">
+                            <option value="15">15s</option>
+                            <option value="30" selected>30s</option>
+                            <option value="60">60s</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-block" onclick="saveConfig()" style="margin-top: var(--spacing-xl); padding: var(--spacing-lg);">
+                ▸ SAUVEGARDER LA CONFIG ◂
+            </button>
+        </section>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- FLOATING ACTION BUTTON -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <button class="fab" onclick="openBuyModal()">+</button>
 
-    <!-- Bottom Navigation -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- BOTTOM NAVIGATION -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <nav class="bottom-nav">
         <div class="nav-item active" onclick="switchTab('portfolio')">
-            <div class="nav-icon">📊</div>
+            <div class="nav-icon">◈</div>
             <div class="nav-label">Portfolio</div>
         </div>
         <div class="nav-item" onclick="switchTab('analytics')">
-            <div class="nav-icon">📈</div>
+            <div class="nav-icon">⌇</div>
             <div class="nav-label">Analytics</div>
         </div>
         <div class="nav-item" onclick="switchTab('config')">
-            <div class="nav-icon">⚙️</div>
+            <div class="nav-icon">⚙</div>
             <div class="nav-label">Config</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('history')">
-            <div class="nav-icon">📜</div>
-            <div class="nav-label">Historique</div>
         </div>
     </nav>
 
-    <!-- Buy Modal -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- BUY MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <div class="modal" id="buyModal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title">🛒 Acheter Token</div>
-                <button class="modal-close" onclick="closeBuyModal()">×</button>
+                <div class="modal-title">▲ ACHETER</div>
+                <button class="modal-close" onclick="closeBuyModal()">&times;</button>
             </div>
             
             <div class="form-group">
                 <label class="form-label">Token Address</label>
-                <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse du token...">
+                <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse complète du token">
             </div>
             
             <div class="form-group">
                 <label class="form-label">Montant (SOL)</label>
-                <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01">
+                <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01" min="0.01">
                 <div class="quick-amounts">
                     <div class="quick-amount" onclick="setBuyAmount(0.1)">0.1</div>
                     <div class="quick-amount" onclick="setBuyAmount(0.25)">0.25</div>
                     <div class="quick-amount" onclick="setBuyAmount(0.5)">0.5</div>
-                    <div class="quick-amount" onclick="setBuyAmount(1)">1</div>
+                    <div class="quick-amount" onclick="setMaxBuy()">MAX</div>
                 </div>
             </div>
             
             <div class="form-group">
                 <label class="form-label">Slippage</label>
                 <select class="form-input" id="buySlippage">
-                    <option value="500">0.5%</option>
-                    <option value="1000" selected>1%</option>
-                    <option value="2000">2%</option>
-                    <option value="5000">5%</option>
+                    <option value="500">0.5% (Faible)</option>
+                    <option value="1000" selected>1% (Normal)</option>
+                    <option value="2000">2% (Élevé)</option>
+                    <option value="5000">5% (Max)</option>
                 </select>
             </div>
             
-            <button class="btn btn-primary" onclick="executeBuy()" style="width: 100%; padding: 16px; font-size: 16px;">
-                Confirmer l'achat
+            <div id="buyPreview" style="display: none; margin-bottom: var(--spacing-xl);">
+                <div class="alert alert-warning">
+                    ⚠️ Preview du swap non disponible
+                </div>
+            </div>
+            
+            <button class="btn btn-success btn-block" onclick="executeBuy()" style="padding: var(--spacing-lg); font-size: 15px;">
+                CONFIRMER L'ACHAT
             </button>
         </div>
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- JAVASCRIPT -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <script>
+        // ═══════════════════════════════════════════════════════════════════
+        // CONFIG & STATE
+        // ═══════════════════════════════════════════════════════════════════
         const API_BASE = window.location.origin;
         let portfolioData = [];
         let statsData = {};
+        let configData = {};
+        let solBalance = 0;
 
-        // Initialize
+        // ═══════════════════════════════════════════════════════════════════
+        // INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════════
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
+            loadConfig();
             setInterval(loadData, 30000); // Auto-refresh every 30s
         });
 
+        // ═══════════════════════════════════════════════════════════════════
+        // DATA LOADING
+        // ═══════════════════════════════════════════════════════════════════
         async function loadData() {
             try {
-                const [statsRes, portfolioRes] = await Promise.all([
+                const [statsRes, portfolioRes, balanceRes] = await Promise.all([
                     fetch(`${API_BASE}/api/stats`),
-                    fetch(`${API_BASE}/api/portfolio`)
+                    fetch(`${API_BASE}/api/portfolio`),
+                    fetch(`${API_BASE}/api/sol-balance`)
                 ]);
                 
                 statsData = await statsRes.json();
                 portfolioData = await portfolioRes.json();
+                const balanceData = await balanceRes.json();
+                solBalance = balanceData.balance || 0;
                 
                 updateUI();
             } catch (error) {
                 console.error('Error loading data:', error);
+                showToast('Erreur de connexion', 'error');
             }
         }
 
+        async function loadConfig() {
+            try {
+                const res = await fetch(`${API_BASE}/api/config`);
+                configData = await res.json();
+                updateConfigUI();
+            } catch (error) {
+                console.error('Error loading config:', error);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // UI UPDATES
+        // ═══════════════════════════════════════════════════════════════════
         function updateUI() {
             // Update stats
             document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
             document.getElementById('realizedPnl').textContent = `$${(statsData.pnlStats?.realized || 0).toFixed(2)}`;
+            
+            const pnlValue = statsData.pnlStats?.realized || 0;
+            const pnlEl = document.getElementById('realizedPnl');
+            pnlEl.className = `stat-value ${pnlValue >= 0 ? 'positive' : 'negative'}`;
+            
             document.getElementById('winRate').textContent = `${statsData.analytics?.winRate || 0}%`;
             document.getElementById('totalTrades').textContent = statsData.analytics?.totalTrades || 0;
+            document.getElementById('winLossRecord').textContent = 
+                `${statsData.analytics?.winCount || 0}W / ${statsData.analytics?.lossCount || 0}L`;
             
             // Update portfolio
             const portfolioList = document.getElementById('portfolioList');
@@ -763,66 +1232,239 @@
                         <div class="empty-icon">💎</div>
                         <div class="empty-text">Aucun token</div>
                         <div class="empty-subtext">Votre portfolio est vide</div>
+                        <button class="btn btn-primary btn-sm" onclick="openBuyModal()" style="margin-top: var(--spacing-md);">
+                            + Acheter un token
+                        </button>
                     </div>
                 `;
                 return;
             }
             
-            portfolioList.innerHTML = portfolioData.tokens.map(token => `
-                <div class="token-card ${token.pnl > 0 ? 'active' : ''}">
-                    <div class="token-header">
-                        <div class="token-info">
-                            <div class="token-logo">🪙</div>
-                            <div class="token-details">
-                                <div class="token-symbol">${token.symbol || token.mint.slice(0, 8)}</div>
-                                <div class="token-address">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
+            portfolioList.innerHTML = portfolioData.tokens.map(token => {
+                const pnlClass = token.pnl >= 0 ? 'positive' : 'negative';
+                const pnlSign = token.pnl >= 0 ? '+' : '';
+                const logo = token.logo 
+                    ? `<img src="${token.logo}" alt="${token.symbol || '?'}" onerror="this.parentElement.textContent='🪙'">`
+                    : '🪙';
+                
+                return `
+                    <div class="token-card" onclick="openTokenDetail('${token.mintFull}')">
+                        <div class="token-header">
+                            <div class="token-info">
+                                <div class="token-logo">${logo}</div>
+                                <div class="token-details">
+                                    <div class="token-symbol">${token.symbol || token.mint.slice(0, 8)}</div>
+                                    <div class="token-address">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
+                                </div>
+                            </div>
+                            <div class="token-price">
+                                <div class="price-value">$${(token.price || 0).toFixed(6)}</div>
+                                <div class="price-change ${pnlClass}">
+                                    ${pnlSign}${(token.pnl || 0).toFixed(2)}%
+                                </div>
                             </div>
                         </div>
-                        <div class="token-price">
-                            <div class="price-value">$${(token.price || 0).toFixed(6)}</div>
-                            <div class="price-change ${token.pnl >= 0 ? 'positive' : 'negative'}">
-                                ${token.pnl >= 0 ? '+' : ''}${(token.pnl || 0).toFixed(2)}%
+                        
+                        <div class="token-stats">
+                            <div class="token-stat">
+                                <div class="token-stat-label">Balance</div>
+                                <div class="token-stat-value">${(token.balance || 0).toFixed(2)}</div>
+                            </div>
+                            <div class="token-stat">
+                                <div class="token-stat-label">Value</div>
+                                <div class="token-stat-value">$${(token.value || 0).toFixed(2)}</div>
+                            </div>
+                            <div class="token-stat">
+                                <div class="token-stat-label">Liquidity</div>
+                                <div class="token-stat-value">$${((token.liquidity || 0) / 1000).toFixed(1)}k</div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="token-stats">
-                        <div class="token-stat">
-                            <div class="token-stat-label">Balance</div>
-                            <div class="token-stat-value">${(token.balance || 0).toFixed(2)}</div>
-                        </div>
-                        <div class="token-stat">
-                            <div class="token-stat-label">Value</div>
-                            <div class="token-stat-value">$${(token.value || 0).toFixed(2)}</div>
-                        </div>
-                        <div class="token-stat">
-                            <div class="token-stat-label">Liquidity</div>
-                            <div class="token-stat-value">$${((token.liquidity || 0) / 1000).toFixed(1)}k</div>
+                        
+                        <div class="token-actions">
+                            <a href="https://dexscreener.com/solana/${token.mint}" target="_blank" class="btn btn-secondary btn-sm">
+                                🦎 Dex
+                            </a>
+                            <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">
+                                💰 Sell
+                            </button>
                         </div>
                     </div>
-                    
-                    <div class="token-actions">
-                        <button class="btn btn-secondary" onclick="window.open('https://dexscreener.com/solana/${token.mint}', '_blank')">
-                            🦎 Dex
-                        </button>
-                        <button class="btn btn-primary" onclick="openSellModal('${token.mint}')">
-                            💰 Sell
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
+        function updateConfigUI() {
+            // Update toggles
+            document.getElementById('toggle-tpEnabled').classList.toggle('active', configData.takeProfitEnabled);
+            document.getElementById('toggle-slEnabled').classList.toggle('active', configData.stopLossEnabled);
+            document.getElementById('toggle-tsEnabled').classList.toggle('active', configData.trailingEnabled);
+            document.getElementById('toggle-arEnabled').classList.toggle('active', configData.antiRugEnabled);
+            
+            // Update values
+            document.getElementById('tpHysteresis').value = configData.hysteresis || 5;
+            document.getElementById('slPct').value = configData.stopLossPct || -50;
+            document.getElementById('tsPct').value = configData.trailingPct || 20;
+            document.getElementById('arPct').value = configData.antiRugPct || 60;
+            document.getElementById('defaultSlippage').value = configData.defaultSlippage || 500;
+            document.getElementById('minSolReserve').value = configData.minSolReserve || 0.05;
+            document.getElementById('intervalSec').value = configData.intervalSec || 30;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // TAB SWITCHING
+        // ═══════════════════════════════════════════════════════════════════
+        function switchTab(tabName) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            
+            event.currentTarget.classList.add('active');
+            
+            // Update sections
+            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            
+            // Load analytics data if switching to analytics tab
+            if (tabName === 'analytics') {
+                loadAnalytics();
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ANALYTICS
+        // ═══════════════════════════════════════════════════════════════════
+        async function loadAnalytics() {
+            try {
+                const [analyticsRes, tradesRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/analytics`),
+                    fetch(`${API_BASE}/api/trades`)
+                ]);
+                
+                const analytics = await analyticsRes.json();
+                const trades = await tradesRes.json();
+                
+                // Update analytics stats
+                document.getElementById('analyticsRoi').textContent = `${analytics.roi || 0}%`;
+                document.getElementById('avgWin').textContent = `+${analytics.avgWin || 0}%`;
+                document.getElementById('avgLoss').textContent = `${analytics.avgLoss || 0}%`;
+                document.getElementById('bestTrade').textContent = `+${analytics.bestTradePct || 0}%`;
+                
+                // Update recent trades
+                const recentTrades = trades.trades?.slice(0, 10) || [];
+                const tradesContainer = document.getElementById('recentTrades');
+                
+                if (recentTrades.length === 0) {
+                    tradesContainer.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">📊</div>
+                            <div class="empty-text">Aucun trade récent</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                tradesContainer.innerHTML = recentTrades.map(trade => {
+                    const pnlClass = trade.pnlPct >= 0 ? 'positive' : 'negative';
+                    const pnlSign = trade.pnlPct >= 0 ? '+' : '';
+                    const date = new Date(trade.ts).toLocaleString('fr-FR');
+                    
+                    return `
+                        <div style="padding: var(--spacing-md); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 600;">${trade.symbol || trade.mint?.slice(0,8)}</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">${trade.type} • ${date}</div>
+                            </div>
+                            <div class="${pnlClass}" style="font-family: var(--font-mono); font-weight: 600;">
+                                ${pnlSign}${(trade.pnlPct || 0).toFixed(2)}%
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // CONFIG
+        // ═══════════════════════════════════════════════════════════════════
+        function toggleConfig(key) {
+            const toggle = document.getElementById(`toggle-${key.replace(/[A-Z]/g, l => '-' + l.toLowerCase()).replace('take-profit', 'tp').replace('stop-loss', 'sl').replace('trailing', 'ts').replace('anti-rug', 'ar')}`);
+            if (toggle) {
+                toggle.classList.toggle('active');
+            }
+        }
+
+        async function saveConfig() {
+            try {
+                const config = {
+                    takeProfitEnabled: document.getElementById('toggle-tpEnabled').classList.contains('active'),
+                    stopLossEnabled: document.getElementById('toggle-slEnabled').classList.contains('active'),
+                    trailingEnabled: document.getElementById('toggle-tsEnabled').classList.contains('active'),
+                    antiRugEnabled: document.getElementById('toggle-arEnabled').classList.contains('active'),
+                    hysteresis: parseFloat(document.getElementById('tpHysteresis').value),
+                    stopLossPct: parseFloat(document.getElementById('slPct').value),
+                    trailingPct: parseFloat(document.getElementById('tsPct').value),
+                    antiRugPct: parseFloat(document.getElementById('arPct').value),
+                    defaultSlippage: parseInt(document.getElementById('defaultSlippage').value),
+                    minSolReserve: parseFloat(document.getElementById('minSolReserve').value),
+                    intervalSec: parseInt(document.getElementById('intervalSec').value),
+                };
+                
+                const res = await fetch(`${API_BASE}/api/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                const result = await res.json();
+                
+                if (result.success) {
+                    showToast('Configuration sauvegardée ✅', 'success');
+                    loadConfig();
+                } else {
+                    showToast('Erreur lors de la sauvegarde', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving config:', error);
+                showToast('Erreur de connexion', 'error');
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // BUY MODAL
+        // ═══════════════════════════════════════════════════════════════════
         function openBuyModal() {
             document.getElementById('buyModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
         }
 
         function closeBuyModal() {
             document.getElementById('buyModal').classList.remove('active');
+            document.body.style.overflow = '';
         }
 
         function setBuyAmount(amount) {
             document.getElementById('buyAmount').value = amount;
+            updateQuickAmounts(amount);
+        }
+
+        async function setMaxBuy() {
+            if (solBalance > 0) {
+                const maxAmount = Math.max(0, solBalance - 0.05); // Keep 0.05 SOL reserve
+                document.getElementById('buyAmount').value = maxAmount.toFixed(4);
+                updateQuickAmounts(maxAmount);
+            }
+        }
+
+        function updateQuickAmounts(amount) {
+            document.querySelectorAll('.quick-amount').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === amount.toString() || 
+                    (btn.textContent === 'MAX' && amount >= solBalance - 0.05)) {
+                    btn.classList.add('active');
+                }
+            });
         }
 
         async function executeBuy() {
@@ -830,10 +1472,20 @@
             const solAmount = parseFloat(document.getElementById('buyAmount').value);
             const slippageBps = parseInt(document.getElementById('buySlippage').value);
             
-            if (!mint || !solAmount) {
-                alert('Veuillez remplir tous les champs');
+            if (!mint || !solAmount || solAmount <= 0) {
+                showToast('Veuillez remplir tous les champs', 'error');
                 return;
             }
+            
+            if (solAmount > solBalance) {
+                showToast('Solde SOL insuffisant', 'error');
+                return;
+            }
+            
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px"></div> En cours...';
             
             try {
                 const response = await fetch(`${API_BASE}/api/buy`, {
@@ -845,62 +1497,192 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('Achat réussi!');
+                    showToast(`Achat réussi ! ${result.outAmount?.toFixed(4)} tokens`, 'success');
                     closeBuyModal();
-                    loadData();
+                    setTimeout(() => loadData(), 3000);
                 } else {
-                    alert('Erreur: ' + result.error);
+                    showToast(result.error || 'Échec de l\'achat', 'error');
                 }
             } catch (error) {
-                alert('Erreur: ' + error.message);
+                showToast('Erreur: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         }
 
-        async function executeSell(mint, percent) {
-            if (!confirm(`Vendre ${percent}% de cette position?`)) return;
+        // ═══════════════════════════════════════════════════════════════════
+        // SELL MODAL
+        // ═══════════════════════════════════════════════════════════════════
+        function openSellModal(mint, symbol, balance) {
+            // Create sell modal dynamically
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'sellModal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title">▼ VENDRE</div>
+                        <button class="modal-close" onclick="closeSellModal()">&times;</button>
+                    </div>
+                    
+                    <div style="background: var(--bg-card); padding: var(--spacing-lg); border-radius: var(--radius-md); margin-bottom: var(--spacing-xl);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 600;">${symbol}</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">Balance: ${balance.toFixed(4)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Tokens à vendre</label>
+                        <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001" min="0">
+                        <div class="quick-amounts">
+                            <div class="quick-amount" onclick="setSellPercent(25)">25%</div>
+                            <div class="quick-amount" onclick="setSellPercent(50)">50%</div>
+                            <div class="quick-amount" onclick="setSellPercent(75)">75%</div>
+                            <div class="quick-amount" onclick="setSellPercent(100)">100%</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Slippage</label>
+                        <select class="form-input" id="sellSlippage">
+                            <option value="500">0.5%</option>
+                            <option value="1000" selected>1%</option>
+                            <option value="2000">2%</option>
+                            <option value="5000">5%</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-danger btn-block" onclick="executeSell('${mint}')" style="padding: var(--spacing-lg); font-size: 15px;">
+                        CONFIRMER LA VENTE
+                    </button>
+                </div>
+            `;
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) closeSellModal();
+            };
+            
+            document.body.appendChild(modal);
+            document.body.style.overflow = 'hidden';
+            window.sellBalance = balance;
+        }
+
+        function closeSellModal() {
+            const modal = document.getElementById('sellModal');
+            if (modal) {
+                modal.remove();
+                document.body.style.overflow = '';
+            }
+        }
+
+        function setSellPercent(percent) {
+            if (window.sellBalance) {
+                const amount = (window.sellBalance * percent / 100).toFixed(4);
+                document.getElementById('sellAmount').value = amount;
+            }
+        }
+
+        async function executeSell(mint) {
+            const amount = parseFloat(document.getElementById('sellAmount').value);
+            const slippageBps = parseInt(document.getElementById('sellSlippage').value);
+            
+            if (!amount || amount <= 0) {
+                showToast('Veuillez entrer un montant valide', 'error');
+                return;
+            }
+            
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px"></div> En cours...';
             
             try {
                 const response = await fetch(`${API_BASE}/api/sell`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, percent, reason: 'MANUAL' })
+                    body: JSON.stringify({ mint, amount, slippageBps, reason: 'MANUAL' })
                 });
                 
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('Vente réussie!');
-                    loadData();
+                    showToast(`Vente réussie ! ${result.solOut?.toFixed(6)} SOL reçus`, 'success');
+                    closeSellModal();
+                    setTimeout(() => loadData(), 3000);
                 } else {
-                    alert('Erreur: ' + result.error);
+                    showToast(result.error || 'Échec de la vente', 'error');
                 }
             } catch (error) {
-                alert('Erreur: ' + error.message);
+                showToast('Erreur: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         }
 
-        function refreshData() {
-            loadData();
-        }
-
-        function switchTab(tab) {
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+        // ═══════════════════════════════════════════════════════════════════
+        // TOAST NOTIFICATIONS
+        // ═══════════════════════════════════════════════════════════════════
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: var(--spacing-md) var(--spacing-lg);
+                background: ${type === 'success' ? 'var(--success-bg)' : type === 'error' ? 'var(--danger-bg)' : 'var(--bg-card)'};
+                border: 1px solid ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--border)'};
+                border-radius: var(--radius-md);
+                color: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--text-primary)'};
+                font-size: 13px;
+                font-weight: 500;
+                z-index: 2000;
+                animation: slideIn 0.3s ease;
+                box-shadow: var(--shadow-lg);
+            `;
+            toast.textContent = message;
             
-            // TODO: Implement tab switching
-            if (tab === 'analytics') {
-                alert('Analytics - Coming soon');
-            } else if (tab === 'config') {
-                alert('Config - Coming soon');
-            } else if (tab === 'history') {
-                alert('History - Coming soon');
-            }
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
-        // Close modal on outside click
-        document.getElementById('buyModal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('buyModal')) {
+        // Add animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // ═══════════════════════════════════════════════════════════════════
+        // TOKEN DETAIL (Placeholder for future feature)
+        // ═══════════════════════════════════════════════════════════════════
+        function openTokenDetail(mint) {
+            // Future: Open token detail modal with chart, more info, etc.
+            window.open(`https://dexscreener.com/solana/${mint}`, '_blank');
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // CLOSE MODALS ON ESC
+        // ═══════════════════════════════════════════════════════════════════
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
                 closeBuyModal();
+                closeSellModal();
             }
         });
     </script>
