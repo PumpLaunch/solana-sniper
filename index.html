@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0a0e1a">
     <title>SolBot Pro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
@@ -24,7 +23,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
@@ -35,13 +34,12 @@
         /* HEADER */
         /* ═══════════════════════════════════════════════════════════════ */
         .header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 20px;
             position: sticky;
             top: 0;
             z-index: 100;
-            background: rgba(10, 14, 26, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border);
-            padding: 16px 20px;
         }
 
         .header-top {
@@ -67,7 +65,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 20px;
         }
 
         .status {
@@ -102,14 +100,14 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .stat-card {
-            background: var(--bg-card);
+            background: var(--bg-hover);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 16px;
+            padding: 14px;
         }
 
         .stat-label {
@@ -120,7 +118,6 @@
         }
 
         .stat-value {
-            font-family: 'JetBrains Mono', monospace;
             font-size: 18px;
             font-weight: 600;
         }
@@ -129,21 +126,16 @@
         .stat-value.neg { color: var(--danger); }
 
         /* ═══════════════════════════════════════════════════════════════ */
-        /* SEARCH & FILTERS */
+        /* SEARCH */
         /* ═══════════════════════════════════════════════════════════════ */
         .search-bar {
-            position: sticky;
-            top: 70px;
-            z-index: 90;
-            background: var(--bg);
-            padding: 12px 20px;
-            border-bottom: 1px solid var(--border);
+            margin-bottom: 16px;
         }
 
         .search-input {
             width: 100%;
             padding: 12px 16px;
-            background: var(--bg-card);
+            background: var(--bg-hover);
             border: 1px solid var(--border);
             border-radius: var(--radius);
             color: var(--text);
@@ -159,7 +151,6 @@
         /* TOKEN LIST */
         /* ═══════════════════════════════════════════════════════════════ */
         .token-list {
-            padding: 16px 20px;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -221,9 +212,10 @@
             margin-bottom: 2px;
         }
 
-        .token-name {
+        .token-address {
             font-size: 11px;
             color: var(--text-muted);
+            font-family: monospace;
         }
 
         .token-price {
@@ -231,14 +223,12 @@
         }
 
         .price-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
             font-size: 15px;
+            font-weight: 600;
             margin-bottom: 2px;
         }
 
         .price-change {
-            font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
             padding: 2px 8px;
             border-radius: 4px;
@@ -274,7 +264,6 @@
         }
 
         .token-stat-value {
-            font-family: 'JetBrains Mono', monospace;
             font-size: 13px;
             font-weight: 600;
         }
@@ -285,6 +274,9 @@
             margin-top: 12px;
         }
 
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* BUTTONS */
+        /* ═══════════════════════════════════════════════════════════════ */
         .btn {
             flex: 1;
             padding: 10px;
@@ -294,7 +286,13 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
+
+        .btn:active { transform: scale(0.98); }
 
         .btn-buy {
             background: var(--success);
@@ -310,6 +308,58 @@
             background: var(--bg-hover);
             color: var(--text);
             border: 1px solid var(--border);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-hover);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* FLOATING BUTTONS */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .fab-buy {
+            position: fixed;
+            bottom: 90px;
+            left: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--success), #059669);
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+            z-index: 90;
+        }
+
+        .fab-settings {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--bg-hover), var(--border));
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--text);
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            z-index: 90;
         }
 
         /* ═══════════════════════════════════════════════════════════════ */
@@ -385,13 +435,19 @@
         }
 
         .setting-label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .setting-title-text {
             font-size: 13px;
+            font-weight: 500;
         }
 
         .setting-desc {
             font-size: 11px;
             color: var(--text-muted);
-            margin-top: 2px;
         }
 
         .toggle {
@@ -435,19 +491,6 @@
             text-align: center;
         }
 
-        .btn-save {
-            width: 100%;
-            padding: 14px;
-            background: var(--accent);
-            color: white;
-            border: none;
-            border-radius: var(--radius);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-
         /* ═══════════════════════════════════════════════════════════════ */
         /* CHART MODAL */
         /* ═══════════════════════════════════════════════════════════════ */
@@ -474,7 +517,7 @@
             border-radius: var(--radius);
             width: 100%;
             max-width: 900px;
-            max-height: 90vh;
+            max-height: 85vh;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -507,6 +550,7 @@
         .chart-container {
             flex: 1;
             min-height: 500px;
+            background: #000;
         }
 
         .chart-container iframe {
@@ -520,11 +564,6 @@
             gap: 12px;
             padding: 16px 20px;
             border-top: 1px solid var(--border);
-        }
-
-        .modal-actions .btn {
-            flex: 1;
-            padding: 12px;
         }
 
         /* ═══════════════════════════════════════════════════════════════ */
@@ -586,46 +625,6 @@
         }
 
         /* ═══════════════════════════════════════════════════════════════ */
-        /* FLOATING BUTTONS */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .fab-settings {
-            position: fixed;
-            bottom: 90px;
-            right: 20px;
-            width: 56px;
-            height: 56px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            cursor: pointer;
-            z-index: 90;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-
-        .fab-buy {
-            position: fixed;
-            bottom: 90px;
-            left: 20px;
-            width: 56px;
-            height: 56px;
-            background: var(--success);
-            border: none;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            color: white;
-            cursor: pointer;
-            z-index: 90;
-            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
         /* BOTTOM NAV */
         /* ═══════════════════════════════════════════════════════════════ */
         .bottom-nav {
@@ -672,7 +671,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 60px 20px;
+            padding: 60px;
             color: var(--text-muted);
         }
 
@@ -710,6 +709,11 @@
             .token-stats { grid-template-columns: repeat(5, 1fr); }
             .settings-panel { max-width: 450px; }
         }
+
+        @media (max-width: 380px) {
+            .stats { grid-template-columns: 1fr 1fr; }
+            .token-stats { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -720,7 +724,10 @@
         <div class="header-top">
             <div class="logo">
                 <div class="logo-icon">🤖</div>
-                <span>SolBot Pro</span>
+                <div>
+                    <div>SolBot Pro</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">v5.0</div>
+                </div>
             </div>
             <div class="status">
                 <div class="status-dot"></div>
@@ -734,36 +741,37 @@
                 <div class="stat-value" id="totalValue">$0.00</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">PnL</div>
-                <div class="stat-value" id="pnlValue">$0.00</div>
+                <div class="stat-label">PnL Réalisé</div>
+                <div class="stat-value" id="realizedPnl">$0.00</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Tokens</div>
-                <div class="stat-value" id="tokenCount">0</div>
+                <div class="stat-label">Win Rate</div>
+                <div class="stat-value" id="winRate">0%</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Uptime</div>
-                <div class="stat-value" id="uptime">0h 0m</div>
+                <div class="stat-label">Trades</div>
+                <div class="stat-value" id="totalTrades">0</div>
             </div>
         </div>
     </header>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- SEARCH -->
+    <!-- MAIN CONTENT -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="search-bar">
-        <input type="text" class="search-input" id="searchInput" placeholder="🔍 Rechercher un token...">
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- TOKEN LIST -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="token-list" id="tokenList">
-        <div class="loading">
-            <div class="spinner"></div>
-            <span>Chargement des tokens...</span>
+    <main style="padding: 0 20px;">
+        <!-- Search -->
+        <div class="search-bar">
+            <input type="text" class="search-input" id="searchInput" placeholder="🔍 Rechercher un token...">
         </div>
-    </div>
+
+        <!-- Token List -->
+        <div class="token-list" id="tokenList">
+            <div class="loading">
+                <div class="spinner"></div>
+                <span>Chargement des tokens...</span>
+            </div>
+        </div>
+    </main>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- FLOATING BUTTONS -->
@@ -772,7 +780,7 @@
     <button class="fab-settings" onclick="toggleSettings()">⚙</button>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- SETTINGS PANEL -->
+    <!-- SETTINGS PANEL (UNIQUE) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="settings-panel" id="settingsPanel">
         <div class="settings-header">
@@ -783,15 +791,15 @@
         <div class="setting-group">
             <div class="setting-title">🎯 Take-Profit</div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Actif</div>
-                    <div class="setting-desc">Vente auto aux paliers</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Actif</div>
+                    <div class="setting-desc">Vente auto à chaque palier</div>
                 </div>
                 <div class="toggle" id="toggle-tp" onclick="toggleSetting('tp')"></div>
             </div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Hysteresis</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Hysteresis</div>
                     <div class="setting-desc">Marge avant reset (%)</div>
                 </div>
                 <input type="number" class="setting-input" id="tpHysteresis" value="5">
@@ -801,15 +809,15 @@
         <div class="setting-group">
             <div class="setting-title">🛡 Stop-Loss</div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Actif</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Actif</div>
                     <div class="setting-desc">Vente si perte</div>
                 </div>
                 <div class="toggle" id="toggle-sl" onclick="toggleSetting('sl')"></div>
             </div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Seuil</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Seuil</div>
                     <div class="setting-desc">Perte max (%)</div>
                 </div>
                 <select class="setting-input" id="slPct">
@@ -823,15 +831,15 @@
         <div class="setting-group">
             <div class="setting-title">📉 Trailing Stop</div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Actif</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Actif</div>
                     <div class="setting-desc">Suit le peak</div>
                 </div>
                 <div class="toggle" id="toggle-ts" onclick="toggleSetting('ts')"></div>
             </div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Recul</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Recul</div>
                     <div class="setting-desc">Max depuis peak (%)</div>
                 </div>
                 <select class="setting-input" id="tsPct">
@@ -845,15 +853,15 @@
         <div class="setting-group">
             <div class="setting-title">🚨 Anti-Rug</div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Actif</div>
-                    <div class="setting-desc">Vente urgence</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Actif</div>
+                    <div class="setting-desc">Vente d'urgence</div>
                 </div>
                 <div class="toggle" id="toggle-ar" onclick="toggleSetting('ar')"></div>
             </div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Chute</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Chute</div>
                     <div class="setting-desc">Max par cycle (%)</div>
                 </div>
                 <select class="setting-input" id="arPct">
@@ -867,15 +875,15 @@
         <div class="setting-group">
             <div class="setting-title">⚙ Général</div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Slippage</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Slippage</div>
                     <div class="setting-desc">Défaut (bps)</div>
                 </div>
                 <input type="number" class="setting-input" id="slippage" value="500">
             </div>
             <div class="setting-item">
-                <div>
-                    <div class="setting-label">Intervalle</div>
+                <div class="setting-label">
+                    <div class="setting-title-text">Intervalle</div>
                     <div class="setting-desc">Cycle (sec)</div>
                 </div>
                 <select class="setting-input" id="interval">
@@ -886,20 +894,22 @@
             </div>
         </div>
 
-        <button class="btn-save" onclick="saveSettings()">💾 Sauvegarder</button>
+        <button class="btn btn-primary" onclick="saveSettings()" style="width: 100%; padding: 14px;">
+            💾 SAUVEGARDER
+        </button>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- CHART MODAL -->
+    <!-- CHART MODAL (DexScreener) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="modal" id="chartModal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title" id="chartTitle">Token</div>
+                <div class="modal-title" id="chartTitle">📊 DexScreener</div>
                 <button class="modal-close" onclick="closeChartModal()">×</button>
             </div>
             <div class="chart-container" id="chartContainer">
-                <!-- TradingView widget will be inserted here -->
+                <!-- DexScreener widget will be inserted here -->
             </div>
             <div class="modal-actions">
                 <button class="btn btn-buy" onclick="openBuyModalFromChart()">▲ Acheter</button>
@@ -914,12 +924,12 @@
     <div class="modal trade-modal" id="buyModal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title">▲ Acheter</div>
+                <div class="modal-title">▲ ACHETER</div>
                 <button class="modal-close" onclick="closeBuyModal()">×</button>
             </div>
             <div class="form-group">
                 <label class="form-label">Token Address</label>
-                <input type="text" class="form-input" id="buyMint" placeholder="Coller l'adresse">
+                <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse complète">
             </div>
             <div class="form-group">
                 <label class="form-label">Montant (SOL)</label>
@@ -939,7 +949,9 @@
                     <option value="500">5%</option>
                 </select>
             </div>
-            <button class="btn btn-buy" onclick="executeBuy()">CONFIRMER</button>
+            <button class="btn btn-buy" onclick="executeBuy()" style="width: 100%; padding: 14px;">
+                CONFIRMER L'ACHAT
+            </button>
         </div>
     </div>
 
@@ -949,12 +961,12 @@
     <div class="modal trade-modal" id="sellModal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title">▼ Vendre</div>
+                <div class="modal-title">▼ VENDRE</div>
                 <button class="modal-close" onclick="closeSellModal()">×</button>
             </div>
             <div class="form-group">
                 <label class="form-label">Token</label>
-                <input type="text" class="form-input" id="sellMint" readonly style="background: var(--bg-hover);">
+                <input type="text" class="form-input" id="sellTokenInfo" readonly style="background: var(--bg-hover);">
             </div>
             <div class="form-group">
                 <label class="form-label">Balance</label>
@@ -970,7 +982,9 @@
                     <div class="quick-btn" onclick="setSellPercent(100)">100%</div>
                 </div>
             </div>
-            <button class="btn btn-sell" onclick="executeSell()">CONFIRMER</button>
+            <button class="btn btn-sell" onclick="executeSell()" style="width: 100%; padding: 14px;">
+                CONFIRMER LA VENTE
+            </button>
         </div>
     </div>
 
@@ -978,12 +992,12 @@
     <!-- BOTTOM NAV -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <nav class="bottom-nav">
-        <div class="nav-item active">
-            <div class="nav-icon">📊</div>
+        <div class="nav-item active" onclick="switchTab('portfolio')">
+            <div class="nav-icon">◈</div>
             <div class="nav-label">Portfolio</div>
         </div>
-        <div class="nav-item" onclick="alert('Analytics - Bientôt disponible')">
-            <div class="nav-icon">📈</div>
+        <div class="nav-item" onclick="switchTab('analytics')">
+            <div class="nav-icon">⌇</div>
             <div class="nav-label">Analytics</div>
         </div>
         <div class="nav-item" onclick="toggleSettings()">
@@ -1007,23 +1021,28 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
             loadSettings();
-            setInterval(loadData, 30000);
+            setInterval(() => loadData(), 30000);
         });
 
         // ═══════════════════════════════════════════════════════════════
-        // DATA
+        // DATA LOADING
         // ═══════════════════════════════════════════════════════════════
         async function loadData() {
             try {
-                const [stats, portfolioRes] = await Promise.all([
+                const [statsRes, portfolioRes] = await Promise.all([
                     fetch(`${API}/api/stats`),
                     fetch(`${API}/api/portfolio`)
                 ]);
                 
-                statsData = await stats.json();
+                const statsData = await statsRes.json();
                 portfolio = (await portfolioRes.json()).tokens || [];
                 
-                updateStats();
+                // Update stats
+                document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
+                document.getElementById('realizedPnl').textContent = `$${(statsData.pnlStats?.realized || 0).toFixed(2)}`;
+                document.getElementById('winRate').textContent = `${statsData.analytics?.winRate || 0}%`;
+                document.getElementById('totalTrades').textContent = statsData.analytics?.totalTrades || 0;
+                
                 renderTokens();
             } catch (err) {
                 console.error('Load error:', err);
@@ -1040,18 +1059,8 @@
             }
         }
 
-        function updateStats() {
-            document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
-            document.getElementById('tokenCount').textContent = statsData.tokens || 0;
-            
-            const uptime = statsData.uptime || 0;
-            const h = Math.floor(uptime / 3600);
-            const m = Math.floor((uptime % 3600) / 60);
-            document.getElementById('uptime').textContent = `${h}h ${m}m`;
-        }
-
         // ═══════════════════════════════════════════════════════════════
-        // TOKENS
+        // RENDER TOKENS
         // ═══════════════════════════════════════════════════════════════
         function renderTokens() {
             const list = document.getElementById('tokenList');
@@ -1081,13 +1090,13 @@
                     : '🪙';
 
                 return `
-                    <div class="token-card" onclick="openChart('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}')">
+                    <div class="token-card ${token.pnl >= 20 ? 'active' : ''}" onclick="openChart('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}')">
                         <div class="token-header">
                             <div class="token-info">
                                 <div class="token-logo">${logo}</div>
                                 <div>
-                                    <div class="token-symbol">${token.symbol || token.mint.slice(0, 8)}</div>
-                                    <div class="token-name">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
+                                    <div class="token-symbol">${token.symbol || token.mint.slice(0, 8)}...</div>
+                                    <div class="token-address">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
                                 </div>
                             </div>
                             <div class="token-price">
@@ -1095,6 +1104,7 @@
                                 <div class="price-change ${pnlClass}">${pnlSign}${(token.pnl || 0).toFixed(2)}%</div>
                             </div>
                         </div>
+                        
                         <div class="token-stats">
                             <div class="token-stat">
                                 <div class="token-stat-label">Valeur</div>
@@ -1109,10 +1119,11 @@
                                 <div class="token-stat-value">$${((token.liquidity || 0) / 1000).toFixed(1)}k</div>
                             </div>
                         </div>
+                        
                         <div class="token-actions">
                             <button class="btn btn-buy" onclick="event.stopPropagation(); openBuyModal('${token.mintFull}')">Buy</button>
-                            <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">Sell</button>
-                            <button class="btn btn-chart" onclick="event.stopPropagation(); openChart('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}')">📊</button>
+                            <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}', ${token.balance})">Sell</button>
+                            <button class="btn btn-chart" onclick="event.stopPropagation(); openChart('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}')">📊</button>
                         </div>
                     </div>
                 `;
@@ -1120,41 +1131,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // CHART
-        // ═══════════════════════════════════════════════════════════════
-        function openChart(mint, symbol) {
-            currentToken = { mint, symbol };
-            
-            document.getElementById('chartTitle').textContent = `${symbol} - TradingView`;
-            document.getElementById('chartContainer').innerHTML = `
-                <iframe src="https://www.tradingview.com/chart/?symbol=DEXSCREENER:${mint}" 
-                    style="width:100%;height:100%;border:none;"></iframe>
-            `;
-            
-            document.getElementById('chartModal').classList.add('active');
-        }
-
-        function closeChartModal() {
-            document.getElementById('chartModal').classList.remove('active');
-        }
-
-        function openBuyModalFromChart() {
-            closeChartModal();
-            openBuyModal(currentToken?.mint || '');
-        }
-
-        function openSellModalFromChart() {
-            closeChartModal();
-            if (currentToken) {
-                const token = portfolio.find(t => t.mintFull === currentToken.mint);
-                if (token) {
-                    openSellModal(token.mintFull, token.symbol || token.mint.slice(0,8), token.balance);
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // SETTINGS
+        // SETTINGS PANEL
         // ═══════════════════════════════════════════════════════════════
         function toggleSettings() {
             document.getElementById('settingsPanel').classList.toggle('active');
@@ -1162,7 +1139,7 @@
 
         function toggleSetting(type) {
             const toggle = document.getElementById(`toggle-${type}`);
-            toggle.classList.toggle('active');
+            if (toggle) toggle.classList.toggle('active');
         }
 
         function updateSettingsUI() {
@@ -1193,25 +1170,69 @@
                     defaultSlippage: parseInt(document.getElementById('slippage').value),
                     intervalSec: parseInt(document.getElementById('interval').value),
                 };
-
-                await fetch(`${API}/api/config`, {
+                
+                const res = await fetch(`${API}/api/config`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
+                    body: JSON.stringify(config),
                 });
-
-                alert('✅ Paramètres sauvegardés');
-                toggleSettings();
+                
+                if (res.ok) {
+                    showToast('✅ Configuration sauvegardée', 'success');
+                    toggleSettings();
+                    loadSettings();
+                } else {
+                    showToast('❌ Erreur lors de la sauvegarde', 'error');
+                }
             } catch (err) {
-                alert('❌ Erreur: ' + err.message);
+                showToast('❌ ' + err.message, 'error');
             }
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // BUY/SELL
+        // CHART MODAL (DexScreener)
+        // ═══════════════════════════════════════════════════════════════
+        function openChart(mint, symbol) {
+            currentToken = { mint, symbol };
+            
+            document.getElementById('chartTitle').textContent = `📊 ${symbol} - DexScreener`;
+            document.getElementById('chartContainer').innerHTML = `
+                <iframe 
+                    src="https://dexscreener.com/solana/${mint}?embed=true" 
+                    style="width:100%;height:100%;border:none;"
+                    allowfullscreen
+                    loading="lazy">
+                </iframe>
+            `;
+            
+            document.getElementById('chartModal').classList.add('active');
+        }
+
+        function closeChartModal() {
+            document.getElementById('chartModal').classList.remove('active');
+            document.getElementById('chartContainer').innerHTML = '';
+        }
+
+        function openBuyModalFromChart() {
+            closeChartModal();
+            openBuyModal(currentToken?.mint || '');
+        }
+
+        function openSellModalFromChart() {
+            closeChartModal();
+            if (currentToken) {
+                const token = portfolio.find(t => t.mintFull === currentToken.mint);
+                if (token) {
+                    openSellModal(token.mintFull, token.symbol || token.mint.slice(0, 8), token.balance);
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // BUY MODAL
         // ═══════════════════════════════════════════════════════════════
         function openBuyModal(mint = '') {
-            document.getElementById('buyMint').value = mint;
+            document.getElementById('buyTokenAddress').value = mint;
             document.getElementById('buyModal').classList.add('active');
         }
 
@@ -1230,42 +1251,54 @@
                 const max = Math.max(0, (data.balance || 0) - 0.05);
                 document.getElementById('buyAmount').value = max.toFixed(4);
             } catch (err) {
-                console.error(err);
+                console.error('Balance error:', err);
             }
         }
 
         async function executeBuy() {
-            const mint = document.getElementById('buyMint').value.trim();
+            const mint = document.getElementById('buyTokenAddress').value.trim();
             const amount = parseFloat(document.getElementById('buyAmount').value);
             const slippage = parseInt(document.getElementById('buySlippage').value);
-
+            
             if (!mint || !amount) {
-                alert('❌ Remplis tous les champs');
+                showToast('❌ Veuillez remplir tous les champs', 'error');
                 return;
             }
-
+            
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px"></div> En cours...';
+            
             try {
                 const res = await fetch(`${API}/api/buy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, solAmount: amount, slippageBps: slippage })
+                    body: JSON.stringify({ mint, solAmount: amount, slippageBps: slippage }),
                 });
-
+                
                 const result = await res.json();
+                
                 if (result.success) {
-                    alert(`✅ Achat réussi!\nTX: ${result.sig?.slice(0, 8)}...`);
+                    showToast(`✅ Achat réussi ! ${result.outAmount?.toFixed(4)} tokens`, 'success');
                     closeBuyModal();
-                    setTimeout(loadData, 3000);
+                    setTimeout(() => loadData(), 3000);
                 } else {
-                    alert('❌ ' + result.error);
+                    showToast('❌ ' + result.error, 'error');
                 }
             } catch (err) {
-                alert('❌ ' + err.message);
+                showToast('❌ ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // SELL MODAL
+        // ═══════════════════════════════════════════════════════════════
         function openSellModal(mint, symbol, balance) {
-            document.getElementById('sellMint').value = `${symbol} (${mint.slice(0, 4)}...${mint.slice(-4)})`;
+            document.getElementById('sellTokenInfo').value = `${symbol} (${mint.slice(0, 4)}...${mint.slice(-4)})`;
             document.getElementById('sellBalance').value = balance.toFixed(4);
             document.getElementById('sellModal').dataset.mint = mint;
             document.getElementById('sellModal').classList.add('active');
@@ -1284,29 +1317,83 @@
         async function executeSell() {
             const mint = document.getElementById('sellModal').dataset.mint;
             const amount = parseFloat(document.getElementById('sellAmount').value);
-
+            
             if (!mint || !amount) {
-                alert('❌ Remplis tous les champs');
+                showToast('❌ Veuillez entrer un montant valide', 'error');
                 return;
             }
-
+            
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px"></div> En cours...';
+            
             try {
                 const res = await fetch(`${API}/api/sell`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, amount, reason: 'MANUAL' })
+                    body: JSON.stringify({ mint, amount, reason: 'MANUAL' }),
                 });
-
+                
                 const result = await res.json();
+                
                 if (result.success) {
-                    alert(`✅ Vente réussie!\nSOL: ${result.solOut?.toFixed(6)}`);
+                    showToast(`✅ Vente réussie ! ${result.solOut?.toFixed(6)} SOL reçus`, 'success');
                     closeSellModal();
-                    setTimeout(loadData, 3000);
+                    setTimeout(() => loadData(), 3000);
                 } else {
-                    alert('❌ ' + result.error);
+                    showToast('❌ ' + result.error, 'error');
                 }
             } catch (err) {
-                alert('❌ ' + err.message);
+                showToast('❌ ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // TOAST NOTIFICATIONS
+        // ═══════════════════════════════════════════════════════════════
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer') || (() => {
+                const div = document.createElement('div');
+                div.id = 'toastContainer';
+                div.style.cssText = 'position:fixed;top:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:10px;';
+                document.body.appendChild(div);
+                return div;
+            })();
+            
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                padding: 12px 16px;
+                background: ${type === 'success' ? 'rgba(16, 185, 129, 0.15)' : type === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-card)'};
+                border: 1px solid ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--border)'};
+                border-radius: 8px;
+                color: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--text)'};
+                font-size: 13px;
+                animation: slideIn 0.3s ease;
+                min-width: 280px;
+            `;
+            toast.textContent = message;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // TAB SWITCHING
+        // ═══════════════════════════════════════════════════════════════
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            if (tabName === 'analytics') {
+                showToast('📊 Analytics - Bientôt disponible', 'info');
             }
         }
 
@@ -1316,7 +1403,7 @@
         document.getElementById('searchInput').addEventListener('input', renderTokens);
 
         // ═══════════════════════════════════════════════════════════════
-        // CLOSE MODALS
+        // CLOSE MODALS ON OUTSIDE CLICK
         // ═══════════════════════════════════════════════════════════════
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
