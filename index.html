@@ -2,32 +2,46 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0e1a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>SolBot Pro — Trading Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta name="description" content="SolBot Pro — Trading Bot Solana Professionnel">
+    <title>SolBot Pro | Trading Dashboard</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
     <style>
         /* ═══════════════════════════════════════════════════════════════════ */
         /* CSS VARIABLES — Thème professionnel */
         /* ═══════════════════════════════════════════════════════════════════ */
         :root {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-card: #334155;
-            --bg-hover: #475569;
+            /* Colors */
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1f2937;
+            --bg-hover: #374151;
+            --bg-active: #2563eb;
             
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
             
-            --border: #334155;
-            --border-hover: #475569;
+            --border: #374151;
+            --border-hover: #4b5563;
             
             --accent: #3b82f6;
             --accent-hover: #2563eb;
-            --accent-glow: rgba(59, 130, 246, 0.3);
+            --accent-glow: rgba(59, 130, 246, 0.4);
             
             --success: #10b981;
             --success-bg: rgba(16, 185, 129, 0.15);
@@ -36,28 +50,38 @@
             --danger: #ef4444;
             --danger-bg: rgba(239, 68, 68, 0.15);
             
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 12px;
+            --space-lg: 16px;
+            --space-xl: 24px;
+            --space-2xl: 32px;
+            
+            /* Radius */
             --radius-sm: 6px;
             --radius-md: 10px;
             --radius-lg: 14px;
             --radius-xl: 20px;
             
+            /* Shadows */
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
             --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
             --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-            --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+            --shadow-glow: 0 0 20px var(--accent-glow);
             
-            --spacing-xs: 4px;
-            --spacing-sm: 8px;
-            --spacing-md: 12px;
-            --spacing-lg: 16px;
-            --spacing-xl: 20px;
-            --spacing-2xl: 24px;
+            /* Transitions */
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.25s ease;
+            --transition-slow: 0.4s ease;
             
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
-            
+            /* Safe areas */
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
+            
+            /* Fonts */
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
         }
 
         /* ═══════════════════════════════════════════════════════════════════ */
@@ -65,7 +89,12 @@
         /* ═══════════════════════════════════════════════════════════════════ */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
-        html { font-size: 14px; scroll-behavior: smooth; }
+        html { 
+            font-size: 14px; 
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
         
         body {
             font-family: var(--font-sans);
@@ -74,16 +103,29 @@
             line-height: 1.6;
             min-height: 100vh;
             padding-top: var(--safe-top);
-            padding-bottom: calc(70px + var(--safe-bottom));
+            padding-bottom: calc(80px + var(--safe-bottom));
             overflow-x: hidden;
         }
 
+        /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: var(--bg-primary); }
-        ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { 
+            background: var(--border-hover); 
+            border-radius: 3px;
+            transition: background var(--transition-fast);
+        }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        /* Selection */
+        ::selection { background: var(--accent); color: white; }
+
+        /* Focus */
+        :focus-visible { 
+            outline: 2px solid var(--accent); 
+            outline-offset: 2px;
+            border-radius: var(--radius-sm);
+        }
 
         /* ═══════════════════════════════════════════════════════════════════ */
         /* HEADER */
@@ -92,10 +134,11 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, rgba(17, 24, 39, 0.95) 100%);
             border-bottom: 1px solid var(--border);
-            padding: var(--spacing-lg) var(--spacing-xl);
-            backdrop-filter: blur(10px);
+            padding: var(--space-lg) var(--space-xl);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             box-shadow: var(--shadow-md);
         }
 
@@ -103,13 +146,17 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: var(--spacing-lg);
+            margin-bottom: var(--space-lg);
+            flex-wrap: wrap;
+            gap: var(--space-md);
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: var(--spacing-md);
+            gap: var(--space-md);
+            text-decoration: none;
+            color: var(--text-primary);
         }
 
         .logo-icon {
@@ -124,17 +171,21 @@
             font-weight: 700;
             color: white;
             box-shadow: var(--shadow-glow);
-            transition: transform 0.2s;
+            transition: transform var(--transition-normal), box-shadow var(--transition-normal);
         }
 
-        .logo-icon:hover { transform: scale(1.05); }
+        .logo:hover .logo-icon {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
 
         .logo-text {
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 22px;
+            font-weight: 800;
             background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .logo-version {
@@ -143,14 +194,15 @@
             background: var(--bg-card);
             padding: 2px 8px;
             border-radius: var(--radius-sm);
-            margin-left: var(--spacing-xs);
+            margin-left: var(--space-xs);
+            font-family: var(--font-mono);
         }
 
         .status-badge {
             display: flex;
             align-items: center;
-            gap: var(--spacing-xs);
-            padding: var(--spacing-xs) var(--spacing-md);
+            gap: var(--space-xs);
+            padding: var(--space-xs) var(--space-md);
             background: var(--success-bg);
             border: 1px solid var(--success);
             border-radius: 20px;
@@ -159,6 +211,12 @@
             color: var(--success);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px var(--success-bg); }
+            50% { box-shadow: 0 0 15px var(--success-bg); }
         }
 
         .status-dot {
@@ -170,8 +228,8 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
         }
 
         /* ═══════════════════════════════════════════════════════════════════ */
@@ -180,8 +238,8 @@
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: var(--spacing-md);
-            margin-bottom: var(--spacing-xl);
+            gap: var(--space-md);
+            margin-bottom: var(--space-xl);
         }
 
         @media (min-width: 768px) {
@@ -192,8 +250,8 @@
             background: var(--bg-secondary);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: var(--spacing-lg);
-            transition: all 0.2s;
+            padding: var(--space-lg);
+            transition: all var(--transition-normal);
             position: relative;
             overflow: hidden;
         }
@@ -207,60 +265,94 @@
             height: 3px;
             background: linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%);
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: opacity var(--transition-normal);
         }
 
         .stat-card:hover {
             transform: translateY(-2px);
             border-color: var(--border-hover);
-            box-shadow: var(--shadow-md);
+            box-shadow: var(--shadow-lg);
         }
 
         .stat-card:hover::before { opacity: 1; }
+
+        .stat-card.compact {
+            padding: var(--space-md);
+        }
 
         .stat-label {
             font-size: 11px;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: var(--spacing-xs);
+            margin-bottom: var(--space-xs);
             font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
         }
+
+        .stat-label i { font-size: 12px; }
 
         .stat-value {
             font-family: var(--font-mono);
             font-size: 20px;
             font-weight: 600;
             color: var(--text-primary);
+            letter-spacing: -0.5px;
         }
 
-        .stat-value.positive { color: var(--success); }
-        .stat-value.negative { color: var(--danger); }
+        .stat-value.positive { 
+            color: var(--success);
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+        
+        .stat-value.negative { 
+            color: var(--danger);
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+        }
 
         .stat-sub {
             font-size: 11px;
             color: var(--text-muted);
-            margin-top: var(--spacing-xs);
+            margin-top: var(--space-xs);
+            font-family: var(--font-mono);
         }
+
+        .stat-change {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            margin-left: var(--space-xs);
+        }
+
+        .stat-change.up { background: var(--success-bg); color: var(--success); }
+        .stat-change.down { background: var(--danger-bg); color: var(--danger); }
 
         /* ═══════════════════════════════════════════════════════════════════ */
         /* TABS */
         /* ═══════════════════════════════════════════════════════════════════ */
         .tabs {
             display: flex;
-            gap: var(--spacing-sm);
-            margin-bottom: var(--spacing-xl);
+            gap: var(--space-sm);
+            margin-bottom: var(--space-xl);
             background: var(--bg-secondary);
-            padding: var(--spacing-sm);
+            padding: var(--space-sm);
             border-radius: var(--radius-lg);
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
         }
+
+        .tabs::-webkit-scrollbar { display: none; }
 
         .tab {
             flex: 1;
             min-width: 80px;
-            padding: var(--spacing-md) var(--spacing-lg);
+            padding: var(--space-md) var(--space-lg);
             text-align: center;
             background: transparent;
             border: none;
@@ -269,9 +361,15 @@
             font-size: 13px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition-fast);
             white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-xs);
         }
+
+        .tab i { font-size: 14px; }
 
         .tab:hover {
             background: var(--bg-hover);
@@ -287,49 +385,106 @@
         /* ═══════════════════════════════════════════════════════════════════ */
         /* SECTIONS */
         /* ═══════════════════════════════════════════════════════════════════ */
-        .section { display: none; }
+        .section { display: none; animation: fadeIn 0.3s ease; }
         .section.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
         /* ═══════════════════════════════════════════════════════════════════ */
         /* PORTFOLIO */
         /* ═══════════════════════════════════════════════════════════════════ */
+        .portfolio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-lg);
+            flex-wrap: wrap;
+            gap: var(--space-md);
+        }
+
+        .portfolio-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .portfolio-title i {
+            width: 28px;
+            height: 28px;
+            background: var(--accent);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .portfolio-actions {
+            display: flex;
+            gap: var(--space-sm);
+        }
+
         .portfolio-list {
             display: flex;
             flex-direction: column;
-            gap: var(--spacing-md);
+            gap: var(--space-md);
         }
 
         .token-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: var(--spacing-lg);
-            transition: all 0.2s;
+            padding: var(--space-lg);
+            transition: all var(--transition-normal);
             cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .token-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity var(--transition-normal);
         }
 
         .token-card:hover {
             border-color: var(--border-hover);
             transform: translateX(4px);
-            box-shadow: var(--shadow-sm);
+            box-shadow: var(--shadow-md);
         }
+
+        .token-card:hover::after { opacity: 1; }
 
         .token-card.active {
             border-color: var(--accent);
             box-shadow: var(--shadow-glow);
         }
 
+        .token-card.active::after { opacity: 1; }
+
         .token-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: var(--spacing-md);
+            margin-bottom: var(--space-md);
+            gap: var(--space-md);
         }
 
         .token-info {
             display: flex;
             align-items: center;
-            gap: var(--spacing-md);
+            gap: var(--space-md);
             flex: 1;
             min-width: 0;
         }
@@ -346,7 +501,10 @@
             font-size: 18px;
             flex-shrink: 0;
             overflow: hidden;
+            transition: border-color var(--transition-fast);
         }
+
+        .token-card:hover .token-logo { border-color: var(--accent); }
 
         .token-logo img {
             width: 100%;
@@ -366,16 +524,21 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: var(--text-primary);
         }
 
         .token-address {
             font-family: var(--font-mono);
             font-size: 11px;
             color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .token-price {
             text-align: right;
+            flex-shrink: 0;
         }
 
         .price-value {
@@ -383,6 +546,7 @@
             font-weight: 600;
             font-size: 15px;
             margin-bottom: 2px;
+            color: var(--text-primary);
         }
 
         .price-change {
@@ -407,8 +571,8 @@
         .token-stats {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: var(--spacing-md);
-            padding-top: var(--spacing-md);
+            gap: var(--space-md);
+            padding-top: var(--space-md);
             border-top: 1px solid var(--border);
         }
 
@@ -419,20 +583,22 @@
         .token-stat-label {
             font-size: 10px;
             color: var(--text-muted);
-            margin-bottom: var(--spacing-xs);
+            margin-bottom: var(--space-xs);
             text-transform: uppercase;
+            font-weight: 500;
         }
 
         .token-stat-value {
             font-family: var(--font-mono);
             font-weight: 600;
             font-size: 13px;
+            color: var(--text-primary);
         }
 
         .token-actions {
             display: flex;
-            gap: var(--spacing-sm);
-            margin-top: var(--spacing-md);
+            gap: var(--space-sm);
+            margin-top: var(--space-md);
         }
 
         /* ═══════════════════════════════════════════════════════════════════ */
@@ -442,17 +608,20 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: var(--spacing-xs);
-            padding: var(--spacing-md) var(--spacing-lg);
+            gap: var(--space-xs);
+            padding: var(--space-md) var(--space-lg);
             border: none;
             border-radius: var(--radius-md);
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition-fast);
             text-decoration: none;
             white-space: nowrap;
+            font-family: var(--font-sans);
         }
+
+        .btn i { font-size: 14px; }
 
         .btn:active { transform: scale(0.98); }
 
@@ -463,7 +632,8 @@
         }
 
         .btn-primary:hover {
-            box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+            box-shadow: 0 0 30px var(--accent-glow);
+            transform: translateY(-1px);
         }
 
         .btn-success {
@@ -471,14 +641,20 @@
             color: white;
         }
 
-        .btn-success:hover { background: #059669; }
+        .btn-success:hover { 
+            background: #059669;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        }
 
         .btn-danger {
             background: var(--danger);
             color: white;
         }
 
-        .btn-danger:hover { background: #dc2626; }
+        .btn-danger:hover { 
+            background: #dc2626;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+        }
 
         .btn-secondary {
             background: var(--bg-card);
@@ -492,11 +668,23 @@
         }
 
         .btn-sm {
-            padding: var(--spacing-sm) var(--spacing-md);
+            padding: var(--space-sm) var(--space-md);
             font-size: 12px;
         }
 
+        .btn-lg {
+            padding: var(--space-lg) var(--space-xl);
+            font-size: 14px;
+        }
+
         .btn-block { width: 100%; }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: var(--radius-md);
+        }
 
         /* ═══════════════════════════════════════════════════════════════════ */
         /* MODALS */
@@ -513,9 +701,18 @@
             align-items: flex-end;
             justify-content: center;
             backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
 
-        .modal.active { display: flex; }
+        .modal.active { 
+            display: flex;
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
 
         .modal-content {
             background: var(--bg-secondary);
@@ -524,8 +721,19 @@
             max-width: 600px;
             max-height: 85vh;
             overflow-y: auto;
-            padding: var(--spacing-2xl);
+            padding: var(--space-xl);
             animation: slideUp 0.3s ease;
+            border: 1px solid var(--border);
+            border-bottom: none;
+        }
+
+        @media (min-width: 768px) {
+            .modal { align-items: center; }
+            .modal-content {
+                border-radius: var(--radius-xl);
+                max-height: 80vh;
+                border: 1px solid var(--border);
+            }
         }
 
         @keyframes slideUp {
@@ -537,12 +745,17 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: var(--spacing-xl);
+            margin-bottom: var(--space-xl);
+            padding-bottom: var(--space-md);
+            border-bottom: 1px solid var(--border);
         }
 
         .modal-title {
             font-size: 18px;
             font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
         }
 
         .modal-close {
@@ -552,60 +765,85 @@
             border: none;
             border-radius: var(--radius-md);
             color: var(--text-primary);
-            font-size: 20px;
+            font-size: 18px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .modal-close:hover {
             background: var(--danger);
             color: white;
+            transform: rotate(90deg);
         }
 
         /* ═══════════════════════════════════════════════════════════════════ */
         /* FORMS */
         /* ═══════════════════════════════════════════════════════════════════ */
-        .form-group { margin-bottom: var(--spacing-xl); }
+        .form-group { margin-bottom: var(--space-xl); }
 
         .form-label {
             display: block;
             font-size: 12px;
             font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: var(--spacing-sm);
+            margin-bottom: var(--space-sm);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
         }
+
+        .form-label i { font-size: 12px; }
 
         .form-input {
             width: 100%;
-            padding: var(--spacing-md) var(--spacing-lg);
+            padding: var(--space-md) var(--space-lg);
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
             color: var(--text-primary);
             font-size: 14px;
             font-family: var(--font-sans);
-            transition: all 0.2s;
+            transition: all var(--transition-fast);
         }
 
         .form-input:focus {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-glow);
+            background: var(--bg-hover);
         }
 
         .form-input::placeholder { color: var(--text-muted); }
 
+        .form-input.error {
+            border-color: var(--danger);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-md);
+        }
+
+        @media (max-width: 640px) {
+            .form-row { grid-template-columns: 1fr; }
+        }
+
         .quick-amounts {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: var(--spacing-sm);
-            margin-top: var(--spacing-sm);
+            gap: var(--space-sm);
+            margin-top: var(--space-sm);
         }
 
         .quick-amount {
-            padding: var(--spacing-sm);
+            padding: var(--space-sm);
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
@@ -613,13 +851,14 @@
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition-fast);
             text-align: center;
         }
 
         .quick-amount:hover {
             border-color: var(--accent);
             color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
         }
 
         .quick-amount.active {
@@ -633,44 +872,70 @@
         /* ═══════════════════════════════════════════════════════════════════ */
         .config-grid {
             display: grid;
-            gap: var(--spacing-lg);
+            gap: var(--space-lg);
         }
 
         .config-section {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: var(--spacing-lg);
+            padding: var(--space-lg);
+            transition: border-color var(--transition-fast);
+        }
+
+        .config-section:hover {
+            border-color: var(--border-hover);
         }
 
         .config-section-title {
             font-size: 14px;
             font-weight: 700;
-            margin-bottom: var(--spacing-lg);
+            margin-bottom: var(--space-lg);
             display: flex;
             align-items: center;
-            gap: var(--spacing-sm);
+            gap: var(--space-sm);
+            color: var(--text-primary);
+        }
+
+        .config-section-title i {
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
         }
 
         .toggle-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: var(--spacing-md) 0;
+            padding: var(--space-md) 0;
             border-bottom: 1px solid var(--border);
         }
 
-        .toggle-row:last-child { border-bottom: none; }
+        .toggle-row:last-child { 
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .toggle-row:first-child {
+            padding-top: 0;
+        }
 
         .toggle-label {
             display: flex;
             flex-direction: column;
-            gap: var(--spacing-xs);
+            gap: var(--space-xs);
+            flex: 1;
         }
 
         .toggle-title {
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 600;
+            color: var(--text-primary);
         }
 
         .toggle-desc {
@@ -685,10 +950,15 @@
             border-radius: 13px;
             position: relative;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background var(--transition-fast);
+            flex-shrink: 0;
+            margin-left: var(--space-md);
         }
 
-        .toggle-switch.active { background: var(--success); }
+        .toggle-switch.active { 
+            background: var(--success);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        }
 
         .toggle-switch::after {
             content: '';
@@ -699,37 +969,40 @@
             border-radius: 50%;
             top: 3px;
             left: 3px;
-            transition: transform 0.2s;
+            transition: transform var(--transition-fast);
+            box-shadow: var(--shadow-sm);
         }
 
-        .toggle-switch.active::after { transform: translateX(22px); }
+        .toggle-switch.active::after { 
+            transform: translateX(22px);
+        }
 
         /* ═══════════════════════════════════════════════════════════════════ */
         /* FLOATING ACTION BUTTON */
         /* ═══════════════════════════════════════════════════════════════════ */
         .fab {
             position: fixed;
-            bottom: calc(80px + var(--safe-bottom));
-            right: var(--spacing-xl);
-            width: 60px;
-            height: 60px;
+            bottom: calc(90px + var(--safe-bottom));
+            right: var(--space-xl);
+            width: 56px;
+            height: 56px;
             background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
             border: none;
             border-radius: 50%;
             color: white;
-            font-size: 28px;
+            font-size: 24px;
             cursor: pointer;
             box-shadow: var(--shadow-lg), var(--shadow-glow);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s;
+            transition: all var(--transition-normal);
             z-index: 90;
         }
 
         .fab:hover {
-            transform: scale(1.1);
-            box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 0 40px var(--accent-glow);
         }
 
         .fab:active { transform: scale(0.95); }
@@ -750,29 +1023,39 @@
             align-items: center;
             z-index: 100;
             padding-bottom: var(--safe-bottom);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
 
         .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: var(--spacing-xs);
-            padding: var(--spacing-sm) var(--spacing-md);
+            gap: var(--space-xs);
+            padding: var(--space-sm) var(--space-md);
             color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition-fast);
             flex: 1;
+            text-decoration: none;
         }
 
         .nav-item:hover { color: var(--text-primary); }
 
         .nav-item.active { color: var(--accent); }
 
-        .nav-icon { font-size: 22px; }
+        .nav-icon { 
+            font-size: 20px;
+            transition: transform var(--transition-fast);
+        }
+
+        .nav-item.active .nav-icon {
+            transform: translateY(-2px);
+        }
 
         .nav-label {
-            font-size: 11px;
-            font-weight: 500;
+            font-size: 10px;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -784,8 +1067,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: var(--spacing-2xl);
+            padding: var(--space-2xl);
             color: var(--text-muted);
+            gap: var(--space-md);
         }
 
         .spinner {
@@ -795,43 +1079,52 @@
             border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-right: var(--spacing-md);
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
 
         .empty-state {
             text-align: center;
-            padding: var(--spacing-2xl);
+            padding: var(--space-2xl);
             color: var(--text-muted);
         }
 
         .empty-icon {
             font-size: 64px;
-            margin-bottom: var(--spacing-lg);
-            opacity: 0.5;
+            margin-bottom: var(--space-lg);
+            opacity: 0.3;
         }
 
         .empty-text {
             font-size: 14px;
-            margin-bottom: var(--spacing-sm);
+            margin-bottom: var(--space-sm);
+            color: var(--text-secondary);
         }
 
         .empty-subtext {
             font-size: 12px;
+            opacity: 0.7;
         }
 
         /* ═══════════════════════════════════════════════════════════════════ */
-        /* ALERTS */
+        /* ALERTS & TOASTS */
         /* ═══════════════════════════════════════════════════════════════════ */
         .alert {
-            padding: var(--spacing-md) var(--spacing-lg);
+            padding: var(--space-md) var(--space-lg);
             border-radius: var(--radius-md);
-            margin-bottom: var(--spacing-lg);
+            margin-bottom: var(--space-lg);
             display: flex;
             align-items: center;
-            gap: var(--spacing-sm);
+            gap: var(--space-sm);
             font-size: 13px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
         .alert-error {
@@ -852,26 +1145,138 @@
             color: var(--warning);
         }
 
+        .toast-container {
+            position: fixed;
+            top: calc(var(--space-xl) + var(--safe-top));
+            right: var(--space-xl);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .toast {
+            padding: var(--space-md) var(--space-lg);
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-size: 13px;
+            animation: toastIn 0.3s ease;
+            border-left: 4px solid var(--accent);
+            min-width: 280px;
+            max-width: 400px;
+        }
+
+        @keyframes toastIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .toast.success { border-left-color: var(--success); }
+        .toast.error { border-left-color: var(--danger); }
+        .toast.warning { border-left-color: var(--warning); }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* CHARTS */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .chart-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-xl);
+            height: 300px;
+            position: relative;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* BADGES */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-success { background: var(--success-bg); color: var(--success); }
+        .badge-warning { background: var(--warning-bg); color: var(--warning); }
+        .badge-danger { background: var(--danger-bg); color: var(--danger); }
+        .badge-info { background: var(--accent-glow); color: var(--accent); }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* PROGRESS BARS */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-card);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: var(--space-xs);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%);
+            border-radius: 3px;
+            transition: width var(--transition-slow);
+        }
+
         /* ═══════════════════════════════════════════════════════════════════ */
         /* RESPONSIVE */
         /* ═══════════════════════════════════════════════════════════════════ */
+        @media (max-width: 640px) {
+            .header { padding: var(--space-md); }
+            .logo-text { font-size: 18px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .token-stats { grid-template-columns: 1fr; }
+            .quick-amounts { grid-template-columns: repeat(2, 1fr); }
+            .portfolio-header { flex-direction: column; align-items: stretch; }
+            .portfolio-actions { justify-content: flex-end; }
+        }
+
         @media (min-width: 768px) {
-            .modal { align-items: center; }
-            .modal-content {
-                border-radius: var(--radius-xl);
-                max-height: 80vh;
-            }
             .fab {
-                bottom: var(--spacing-xl);
-                right: var(--spacing-xl);
+                bottom: var(--space-xl);
+                right: var(--space-xl);
             }
         }
 
-        @media (max-width: 380px) {
-            .stats-grid { grid-template-columns: 1fr; }
-            .token-stats { grid-template-columns: 1fr; }
-            .quick-amounts { grid-template-columns: repeat(2, 1fr); }
-        }
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* UTILITIES */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-muted { color: var(--text-muted); }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+        .text-warning { color: var(--warning); }
+        .text-accent { color: var(--accent); }
+
+        .mt-sm { margin-top: var(--space-sm); }
+        .mt-md { margin-top: var(--space-md); }
+        .mt-lg { margin-top: var(--space-lg); }
+        .mb-sm { margin-bottom: var(--space-sm); }
+        .mb-md { margin-bottom: var(--space-md); }
+        .mb-lg { margin-bottom: var(--space-lg); }
+
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-sm { gap: var(--space-sm); }
+        .gap-md { gap: var(--space-md); }
+        .gap-lg { gap: var(--space-lg); }
     </style>
 </head>
 <body>
@@ -880,37 +1285,51 @@
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <header class="header">
         <div class="header-top">
-            <div class="logo">
-                <div class="logo-icon">🤖</div>
+            <a href="#" class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
                 <div>
                     <div class="logo-text">SolBot Pro</div>
-                    <div class="logo-version">v3.0</div>
+                    <div class="logo-version">v4.0</div>
                 </div>
-            </div>
+            </a>
             <div class="status-badge">
                 <div class="status-dot"></div>
-                LIVE
+                <span id="statusText">LIVE</span>
             </div>
         </div>
         
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label">Portfolio Value</div>
+                <div class="stat-label">
+                    <i class="fas fa-wallet"></i>
+                    Portfolio Value
+                </div>
                 <div class="stat-value" id="totalValue">$0.00</div>
                 <div class="stat-sub" id="totalValueChange">—</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">PnL Réalisé</div>
+                <div class="stat-label">
+                    <i class="fas fa-chart-line"></i>
+                    PnL Réalisé
+                </div>
                 <div class="stat-value" id="realizedPnl">$0.00</div>
                 <div class="stat-sub" id="realizedPnlChange">—</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Win Rate</div>
+                <div class="stat-label">
+                    <i class="fas fa-percent"></i>
+                    Win Rate
+                </div>
                 <div class="stat-value" id="winRate">0%</div>
                 <div class="stat-sub" id="winLossRecord">0W / 0L</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Total Trades</div>
+                <div class="stat-label">
+                    <i class="fas fa-exchange-alt"></i>
+                    Total Trades
+                </div>
                 <div class="stat-value" id="totalTrades">0</div>
                 <div class="stat-sub" id="tradesToday">0 aujourd'hui</div>
             </div>
@@ -920,16 +1339,37 @@
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- MAIN CONTENT -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <main class="container" style="padding: 0 var(--spacing-xl);">
+    <main class="container" style="padding: 0 var(--space-xl);">
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('portfolio')">◈ Portfolio</button>
-            <button class="tab" onclick="switchTab('analytics')">⌇ Analytics</button>
-            <button class="tab" onclick="switchTab('config')">⚙ Config</button>
+            <button class="tab active" onclick="switchTab('portfolio')">
+                <i class="fas fa-chart-pie"></i>
+                Portfolio
+            </button>
+            <button class="tab" onclick="switchTab('analytics')">
+                <i class="fas fa-chart-bar"></i>
+                Analytics
+            </button>
+            <button class="tab" onclick="switchTab('config')">
+                <i class="fas fa-cog"></i>
+                Config
+            </button>
         </div>
 
         <!-- Portfolio Section -->
         <section id="portfolio" class="section active">
+            <div class="portfolio-header">
+                <div class="portfolio-title">
+                    <i class="fas fa-coins"></i>
+                    Positions Actives
+                </div>
+                <div class="portfolio-actions">
+                    <button class="btn btn-secondary btn-sm btn-icon" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
             <div class="portfolio-list" id="portfolioList">
                 <div class="loading">
                     <div class="spinner"></div>
@@ -940,32 +1380,54 @@
 
         <!-- Analytics Section -->
         <section id="analytics" class="section">
-            <div class="stats-grid" style="margin-bottom: var(--spacing-xl);">
-                <div class="stat-card">
-                    <div class="stat-label">ROI</div>
+            <!-- PnL Chart -->
+            <div class="chart-container">
+                <canvas id="pnlChart"></canvas>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card compact">
+                    <div class="stat-label">
+                        <i class="fas fa-rocket"></i>
+                        ROI
+                    </div>
                     <div class="stat-value" id="analyticsRoi">0%</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">Avg Win</div>
+                <div class="stat-card compact">
+                    <div class="stat-label">
+                        <i class="fas fa-arrow-up"></i>
+                        Avg Win
+                    </div>
                     <div class="stat-value positive" id="avgWin">+0%</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">Avg Loss</div>
+                <div class="stat-card compact">
+                    <div class="stat-label">
+                        <i class="fas fa-arrow-down"></i>
+                        Avg Loss
+                    </div>
                     <div class="stat-value negative" id="avgLoss">-0%</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">Best Trade</div>
+                <div class="stat-card compact">
+                    <div class="stat-label">
+                        <i class="fas fa-trophy"></i>
+                        Best Trade
+                    </div>
                     <div class="stat-value positive" id="bestTrade">+0%</div>
                 </div>
             </div>
-            
+
             <div class="config-section">
-                <div class="config-section-title">📊 Derniers Trades</div>
+                <div class="config-section-title">
+                    <i class="fas fa-history"></i>
+                    Historique des Trades
+                </div>
                 <div id="recentTrades">
                     <div class="empty-state">
-                        <div class="empty-icon">📊</div>
+                        <div class="empty-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
                         <div class="empty-text">Aucun trade récent</div>
-                        <div class="empty-subtext">Les trades apparaîtront ici</div>
+                        <div class="empty-subtext">Les trades apparaîtront ici après exécution</div>
                     </div>
                 </div>
             </div>
@@ -974,8 +1436,12 @@
         <!-- Config Section -->
         <section id="config" class="section">
             <div class="config-grid">
+                <!-- Take-Profit -->
                 <div class="config-section">
-                    <div class="config-section-title">🎯 Take-Profit</div>
+                    <div class="config-section-title">
+                        <i class="fas fa-bullseye"></i>
+                        Take-Profit
+                    </div>
                     <div class="toggle-row">
                         <div class="toggle-label">
                             <div class="toggle-title">Actif</div>
@@ -983,17 +1449,24 @@
                         </div>
                         <div class="toggle-switch" id="toggle-tpEnabled" onclick="toggleConfig('takeProfitEnabled')"></div>
                     </div>
-                    <div class="form-group" style="margin-top: var(--spacing-lg);">
-                        <label class="form-label">Hysteresis (%)</label>
+                    <div class="form-group mt-md">
+                        <label class="form-label">
+                            <i class="fas fa-sliders-h"></i>
+                            Hysteresis (%)
+                        </label>
                         <input type="number" class="form-input" id="tpHysteresis" value="5" min="0" max="50">
-                        <div style="font-size: 11px; color: var(--text-muted); margin-top: var(--spacing-xs);">
+                        <div class="text-muted" style="font-size: 11px; margin-top: var(--space-xs);">
                             Marge avant re-déclenchement
                         </div>
                     </div>
                 </div>
 
+                <!-- Stop-Loss -->
                 <div class="config-section">
-                    <div class="config-section-title">🛡 Stop-Loss</div>
+                    <div class="config-section-title">
+                        <i class="fas fa-shield-alt"></i>
+                        Stop-Loss
+                    </div>
                     <div class="toggle-row">
                         <div class="toggle-label">
                             <div class="toggle-title">Actif</div>
@@ -1001,8 +1474,11 @@
                         </div>
                         <div class="toggle-switch" id="toggle-slEnabled" onclick="toggleConfig('stopLossEnabled')"></div>
                     </div>
-                    <div class="form-group" style="margin-top: var(--spacing-lg);">
-                        <label class="form-label">Seuil (%)</label>
+                    <div class="form-group mt-md">
+                        <label class="form-label">
+                            <i class="fas fa-percentage"></i>
+                            Seuil (%)
+                        </label>
                         <select class="form-input" id="slPct">
                             <option value="-25">-25%</option>
                             <option value="-40">-40%</option>
@@ -1012,8 +1488,12 @@
                     </div>
                 </div>
 
+                <!-- Trailing Stop -->
                 <div class="config-section">
-                    <div class="config-section-title">📉 Trailing Stop</div>
+                    <div class="config-section-title">
+                        <i class="fas fa-chart-line"></i>
+                        Trailing Stop
+                    </div>
                     <div class="toggle-row">
                         <div class="toggle-label">
                             <div class="toggle-title">Actif</div>
@@ -1021,8 +1501,11 @@
                         </div>
                         <div class="toggle-switch" id="toggle-tsEnabled" onclick="toggleConfig('trailingEnabled')"></div>
                     </div>
-                    <div class="form-group" style="margin-top: var(--spacing-lg);">
-                        <label class="form-label">Recul max (%)</label>
+                    <div class="form-group mt-md">
+                        <label class="form-label">
+                            <i class="fas fa-arrows-alt-v"></i>
+                            Recul max (%)
+                        </label>
                         <select class="form-input" id="tsPct">
                             <option value="10">10%</option>
                             <option value="20" selected>20%</option>
@@ -1031,8 +1514,12 @@
                     </div>
                 </div>
 
+                <!-- Anti-Rug -->
                 <div class="config-section">
-                    <div class="config-section-title">🚨 Anti-Rug</div>
+                    <div class="config-section-title">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Anti-Rug
+                    </div>
                     <div class="toggle-row">
                         <div class="toggle-label">
                             <div class="toggle-title">Actif</div>
@@ -1040,8 +1527,11 @@
                         </div>
                         <div class="toggle-switch" id="toggle-arEnabled" onclick="toggleConfig('antiRugEnabled')"></div>
                     </div>
-                    <div class="form-group" style="margin-top: var(--spacing-lg);">
-                        <label class="form-label">Chute (% / cycle)</label>
+                    <div class="form-group mt-md">
+                        <label class="form-label">
+                            <i class="fas fa-arrow-down"></i>
+                            Chute (% / cycle)
+                        </label>
                         <select class="form-input" id="arPct">
                             <option value="40">40%</option>
                             <option value="60" selected>60%</option>
@@ -1050,21 +1540,36 @@
                     </div>
                 </div>
 
+                <!-- General -->
                 <div class="config-section">
-                    <div class="config-section-title">⚙ Général</div>
-                    <div class="form-group">
-                        <label class="form-label">Slippage défaut (bps)</label>
-                        <input type="number" class="form-input" id="defaultSlippage" value="500" min="10" max="5000">
-                        <div style="font-size: 11px; color: var(--text-muted); margin-top: var(--spacing-xs);">
-                            100 bps = 1%
+                    <div class="config-section-title">
+                        <i class="fas fa-cogs"></i>
+                        Général
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-percent"></i>
+                                Slippage (bps)
+                            </label>
+                            <input type="number" class="form-input" id="defaultSlippage" value="500" min="10" max="5000">
+                            <div class="text-muted" style="font-size: 11px; margin-top: var(--space-xs);">
+                                100 bps = 1%
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-coins"></i>
+                                Réserve SOL
+                            </label>
+                            <input type="number" class="form-input" id="minSolReserve" value="0.05" step="0.01" min="0" max="10">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Réserve SOL min.</label>
-                        <input type="number" class="form-input" id="minSolReserve" value="0.05" step="0.01" min="0" max="10">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Intervalle (sec)</label>
+                        <label class="form-label">
+                            <i class="fas fa-clock"></i>
+                            Intervalle (sec)
+                        </label>
                         <select class="form-input" id="intervalSec">
                             <option value="15">15s</option>
                             <option value="30" selected>30s</option>
@@ -1074,8 +1579,9 @@
                 </div>
             </div>
 
-            <button class="btn btn-primary btn-block" onclick="saveConfig()" style="margin-top: var(--spacing-xl); padding: var(--spacing-lg);">
-                ▸ SAUVEGARDER LA CONFIG ◂
+            <button class="btn btn-primary btn-block btn-lg mt-lg" onclick="saveConfig()">
+                <i class="fas fa-save"></i>
+                SAUVEGARDER LA CONFIG
             </button>
         </section>
     </main>
@@ -1083,24 +1589,32 @@
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- FLOATING ACTION BUTTON -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <button class="fab" onclick="openBuyModal()">+</button>
+    <button class="fab" onclick="openBuyModal()" title="Acheter un token">
+        <i class="fas fa-plus"></i>
+    </button>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- BOTTOM NAVIGATION -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <nav class="bottom-nav">
-        <div class="nav-item active" onclick="switchTab('portfolio')">
-            <div class="nav-icon">◈</div>
+        <a href="#" class="nav-item active" onclick="switchTab('portfolio'); return false;">
+            <div class="nav-icon">
+                <i class="fas fa-chart-pie"></i>
+            </div>
             <div class="nav-label">Portfolio</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('analytics')">
-            <div class="nav-icon">⌇</div>
+        </a>
+        <a href="#" class="nav-item" onclick="switchTab('analytics'); return false;">
+            <div class="nav-icon">
+                <i class="fas fa-chart-bar"></i>
+            </div>
             <div class="nav-label">Analytics</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('config')">
-            <div class="nav-icon">⚙</div>
+        </a>
+        <a href="#" class="nav-item" onclick="switchTab('config'); return false;">
+            <div class="nav-icon">
+                <i class="fas fa-cog"></i>
+            </div>
             <div class="nav-label">Config</div>
-        </div>
+        </a>
     </nav>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
@@ -1109,17 +1623,28 @@
     <div class="modal" id="buyModal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title">▲ ACHETER</div>
-                <button class="modal-close" onclick="closeBuyModal()">&times;</button>
+                <div class="modal-title">
+                    <i class="fas fa-shopping-cart text-accent"></i>
+                    Acheter Token
+                </div>
+                <button class="modal-close" onclick="closeBuyModal()">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             
             <div class="form-group">
-                <label class="form-label">Token Address</label>
+                <label class="form-label">
+                    <i class="fas fa-link"></i>
+                    Token Address
+                </label>
                 <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse complète du token">
             </div>
             
             <div class="form-group">
-                <label class="form-label">Montant (SOL)</label>
+                <label class="form-label">
+                    <i class="fas fa-coins"></i>
+                    Montant (SOL)
+                </label>
                 <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01" min="0.01">
                 <div class="quick-amounts">
                     <div class="quick-amount" onclick="setBuyAmount(0.1)">0.1</div>
@@ -1130,7 +1655,10 @@
             </div>
             
             <div class="form-group">
-                <label class="form-label">Slippage</label>
+                <label class="form-label">
+                    <i class="fas fa-sliders-h"></i>
+                    Slippage
+                </label>
                 <select class="form-input" id="buySlippage">
                     <option value="500">0.5% (Faible)</option>
                     <option value="1000" selected>1% (Normal)</option>
@@ -1139,17 +1667,75 @@
                 </select>
             </div>
             
-            <div id="buyPreview" style="display: none; margin-bottom: var(--spacing-xl);">
+            <div id="buyPreview" class="hidden">
                 <div class="alert alert-warning">
-                    ⚠️ Preview du swap non disponible
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Preview du swap non disponible</span>
                 </div>
             </div>
             
-            <button class="btn btn-success btn-block" onclick="executeBuy()" style="padding: var(--spacing-lg); font-size: 15px;">
+            <button class="btn btn-success btn-block btn-lg" onclick="executeBuy()">
+                <i class="fas fa-check-circle"></i>
                 CONFIRMER L'ACHAT
             </button>
         </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SELL MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div class="modal" id="sellModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-hand-holding-usd text-danger"></i>
+                    Vendre Token
+                </div>
+                <button class="modal-close" onclick="closeSellModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div id="sellTokenInfo" class="mb-lg"></div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-coins"></i>
+                    Tokens à vendre
+                </label>
+                <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001">
+                <div class="quick-amounts">
+                    <div class="quick-amount" onclick="setSellPercent(25)">25%</div>
+                    <div class="quick-amount" onclick="setSellPercent(50)">50%</div>
+                    <div class="quick-amount" onclick="setSellPercent(75)">75%</div>
+                    <div class="quick-amount" onclick="setSellPercent(100)">100%</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-sliders-h"></i>
+                    Slippage
+                </label>
+                <select class="form-input" id="sellSlippage">
+                    <option value="500">0.5%</option>
+                    <option value="1000" selected>1%</option>
+                    <option value="2000">2%</option>
+                    <option value="5000">5%</option>
+                </select>
+            </div>
+            
+            <button class="btn btn-danger btn-block btn-lg" onclick="executeSell()">
+                <i class="fas fa-exchange-alt"></i>
+                CONFIRMER LA VENTE
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TOAST CONTAINER -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- JAVASCRIPT -->
@@ -1163,6 +1749,7 @@
         let statsData = {};
         let configData = {};
         let solBalance = 0;
+        let pnlChart = null;
 
         // ═══════════════════════════════════════════════════════════════════
         // INITIALIZATION
@@ -1229,11 +1816,14 @@
             if (!portfolioData.tokens || portfolioData.tokens.length === 0) {
                 portfolioList.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-icon">💎</div>
+                        <div class="empty-icon">
+                            <i class="fas fa-coins"></i>
+                        </div>
                         <div class="empty-text">Aucun token</div>
                         <div class="empty-subtext">Votre portfolio est vide</div>
-                        <button class="btn btn-primary btn-sm" onclick="openBuyModal()" style="margin-top: var(--spacing-md);">
-                            + Acheter un token
+                        <button class="btn btn-primary btn-sm mt-md" onclick="openBuyModal()">
+                            <i class="fas fa-plus"></i>
+                            Acheter un token
                         </button>
                     </div>
                 `;
@@ -1244,8 +1834,8 @@
                 const pnlClass = token.pnl >= 0 ? 'positive' : 'negative';
                 const pnlSign = token.pnl >= 0 ? '+' : '';
                 const logo = token.logo 
-                    ? `<img src="${token.logo}" alt="${token.symbol || '?'}" onerror="this.parentElement.textContent='🪙'">`
-                    : '🪙';
+                    ? `<img src="${token.logo}" alt="${token.symbol || '?'}" onerror="this.parentElement.innerHTML='<i class=\'fas fa-coins\'></i>'">`
+                    : '<i class="fas fa-coins"></i>';
                 
                 return `
                     <div class="token-card" onclick="openTokenDetail('${token.mintFull}')">
@@ -1282,10 +1872,12 @@
                         
                         <div class="token-actions">
                             <a href="https://dexscreener.com/solana/${token.mint}" target="_blank" class="btn btn-secondary btn-sm">
-                                🦎 Dex
+                                <i class="fas fa-external-link-alt"></i>
+                                Dex
                             </a>
                             <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">
-                                💰 Sell
+                                <i class="fas fa-hand-holding-usd"></i>
+                                Sell
                             </button>
                         </div>
                     </div>
@@ -1349,6 +1941,9 @@
                 document.getElementById('avgLoss').textContent = `${analytics.avgLoss || 0}%`;
                 document.getElementById('bestTrade').textContent = `+${analytics.bestTradePct || 0}%`;
                 
+                // Update PnL chart
+                updatePnlChart(analytics.pnlHistory || []);
+                
                 // Update recent trades
                 const recentTrades = trades.trades?.slice(0, 10) || [];
                 const tradesContainer = document.getElementById('recentTrades');
@@ -1356,23 +1951,33 @@
                 if (recentTrades.length === 0) {
                     tradesContainer.innerHTML = `
                         <div class="empty-state">
-                            <div class="empty-icon">📊</div>
+                            <div class="empty-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
                             <div class="empty-text">Aucun trade récent</div>
+                            <div class="empty-subtext">Les trades apparaîtront ici après exécution</div>
                         </div>
                     `;
                     return;
                 }
                 
                 tradesContainer.innerHTML = recentTrades.map(trade => {
-                    const pnlClass = trade.pnlPct >= 0 ? 'positive' : 'negative';
+                    const pnlClass = trade.pnlPct >= 0 ? 'text-success' : 'text-danger';
                     const pnlSign = trade.pnlPct >= 0 ? '+' : '';
                     const date = new Date(trade.ts).toLocaleString('fr-FR');
+                    const icon = trade.type === 'buy' ? 'fa-shopping-cart' : 'fa-hand-holding-usd';
+                    const iconClass = trade.type === 'buy' ? 'text-accent' : 'text-danger';
                     
                     return `
-                        <div style="padding: var(--spacing-md); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-weight: 600;">${trade.symbol || trade.mint?.slice(0,8)}</div>
-                                <div style="font-size: 11px; color: var(--text-muted);">${trade.type} • ${date}</div>
+                        <div style="padding: var(--space-md); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                            <div class="flex items-center gap-md">
+                                <div style="width: 36px; height: 36px; background: var(--bg-card); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas ${icon} ${iconClass}"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600;">${trade.symbol || trade.mint?.slice(0,8)}</div>
+                                    <div class="text-muted" style="font-size: 11px;">${trade.type.toUpperCase()} • ${date}</div>
+                                </div>
                             </div>
                             <div class="${pnlClass}" style="font-family: var(--font-mono); font-weight: 600;">
                                 ${pnlSign}${(trade.pnlPct || 0).toFixed(2)}%
@@ -1383,6 +1988,65 @@
             } catch (error) {
                 console.error('Error loading analytics:', error);
             }
+        }
+
+        function updatePnlChart(pnlHistory) {
+            const ctx = document.getElementById('pnlChart').getContext('2d');
+            
+            if (pnlChart) {
+                pnlChart.destroy();
+            }
+            
+            const labels = pnlHistory.slice(-30).map((_, i) => i + 1);
+            const data = pnlHistory.slice(-30).map(p => p.cumul);
+            
+            pnlChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'PnL Cumulé (SOL)',
+                        data: data,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(55, 65, 81, 0.5)'
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                font: {
+                                    family: 'JetBrains Mono',
+                                    size: 10
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -1446,19 +2110,20 @@
 
         function setBuyAmount(amount) {
             document.getElementById('buyAmount').value = amount;
-            updateQuickAmounts(amount);
+            updateQuickAmounts(amount, 'buy');
         }
 
         async function setMaxBuy() {
             if (solBalance > 0) {
                 const maxAmount = Math.max(0, solBalance - 0.05); // Keep 0.05 SOL reserve
                 document.getElementById('buyAmount').value = maxAmount.toFixed(4);
-                updateQuickAmounts(maxAmount);
+                updateQuickAmounts(maxAmount, 'buy');
             }
         }
 
-        function updateQuickAmounts(amount) {
-            document.querySelectorAll('.quick-amount').forEach(btn => {
+        function updateQuickAmounts(amount, type) {
+            const modalId = type === 'buy' ? 'buyModal' : 'sellModal';
+            document.querySelectorAll(`#${modalId} .quick-amount`).forEach(btn => {
                 btn.classList.remove('active');
                 if (btn.textContent === amount.toString() || 
                     (btn.textContent === 'MAX' && amount >= solBalance - 0.05)) {
@@ -1485,7 +2150,7 @@
             const btn = event.currentTarget;
             const originalText = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px"></div> En cours...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> En cours...';
             
             try {
                 const response = await fetch(`${API_BASE}/api/buy`, {
@@ -1515,78 +2180,42 @@
         // SELL MODAL
         // ═══════════════════════════════════════════════════════════════════
         function openSellModal(mint, symbol, balance) {
-            // Create sell modal dynamically
-            const modal = document.createElement('div');
-            modal.className = 'modal active';
-            modal.id = 'sellModal';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <div class="modal-title">▼ VENDRE</div>
-                        <button class="modal-close" onclick="closeSellModal()">&times;</button>
-                    </div>
-                    
-                    <div style="background: var(--bg-card); padding: var(--spacing-lg); border-radius: var(--radius-md); margin-bottom: var(--spacing-xl);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-weight: 600;">${symbol}</div>
-                                <div style="font-size: 11px; color: var(--text-muted);">Balance: ${balance.toFixed(4)}</div>
-                            </div>
+            window.sellBalance = balance;
+            window.sellMint = mint;
+            window.sellSymbol = symbol;
+            
+            document.getElementById('sellTokenInfo').innerHTML = `
+                <div style="background: var(--bg-card); padding: var(--space-lg); border-radius: var(--radius-md);">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div style="font-weight: 600;">${symbol}</div>
+                            <div class="text-muted" style="font-size: 11px;">Balance: ${balance.toFixed(4)}</div>
+                        </div>
+                        <div class="text-right">
+                            <div style="font-weight: 600;">${mint.slice(0, 8)}...</div>
                         </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Tokens à vendre</label>
-                        <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001" min="0">
-                        <div class="quick-amounts">
-                            <div class="quick-amount" onclick="setSellPercent(25)">25%</div>
-                            <div class="quick-amount" onclick="setSellPercent(50)">50%</div>
-                            <div class="quick-amount" onclick="setSellPercent(75)">75%</div>
-                            <div class="quick-amount" onclick="setSellPercent(100)">100%</div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Slippage</label>
-                        <select class="form-input" id="sellSlippage">
-                            <option value="500">0.5%</option>
-                            <option value="1000" selected>1%</option>
-                            <option value="2000">2%</option>
-                            <option value="5000">5%</option>
-                        </select>
-                    </div>
-                    
-                    <button class="btn btn-danger btn-block" onclick="executeSell('${mint}')" style="padding: var(--spacing-lg); font-size: 15px;">
-                        CONFIRMER LA VENTE
-                    </button>
                 </div>
             `;
             
-            modal.onclick = (e) => {
-                if (e.target === modal) closeSellModal();
-            };
-            
-            document.body.appendChild(modal);
+            document.getElementById('sellModal').classList.add('active');
             document.body.style.overflow = 'hidden';
-            window.sellBalance = balance;
         }
 
         function closeSellModal() {
-            const modal = document.getElementById('sellModal');
-            if (modal) {
-                modal.remove();
-                document.body.style.overflow = '';
-            }
+            document.getElementById('sellModal').classList.remove('active');
+            document.body.style.overflow = '';
         }
 
         function setSellPercent(percent) {
             if (window.sellBalance) {
                 const amount = (window.sellBalance * percent / 100).toFixed(4);
                 document.getElementById('sellAmount').value = amount;
+                updateQuickAmounts(percent, 'sell');
             }
         }
 
-        async function executeSell(mint) {
+        async function executeSell() {
             const amount = parseFloat(document.getElementById('sellAmount').value);
             const slippageBps = parseInt(document.getElementById('sellSlippage').value);
             
@@ -1598,13 +2227,18 @@
             const btn = event.currentTarget;
             const originalText = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px"></div> En cours...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> En cours...';
             
             try {
                 const response = await fetch(`${API_BASE}/api/sell`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, amount, slippageBps, reason: 'MANUAL' })
+                    body: JSON.stringify({ 
+                        mint: window.sellMint, 
+                        amount, 
+                        slippageBps, 
+                        reason: 'MANUAL' 
+                    })
                 });
                 
                 const result = await response.json();
@@ -1628,57 +2262,49 @@
         // TOAST NOTIFICATIONS
         // ═══════════════════════════════════════════════════════════════════
         function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
-            toast.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: var(--spacing-md) var(--spacing-lg);
-                background: ${type === 'success' ? 'var(--success-bg)' : type === 'error' ? 'var(--danger-bg)' : 'var(--bg-card)'};
-                border: 1px solid ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--border)'};
-                border-radius: var(--radius-md);
-                color: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--text-primary)'};
-                font-size: 13px;
-                font-weight: 500;
-                z-index: 2000;
-                animation: slideIn 0.3s ease;
-                box-shadow: var(--shadow-lg);
-            `;
-            toast.textContent = message;
+            toast.className = `toast ${type}`;
             
-            document.body.appendChild(toast);
+            const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+            const color = type === 'success' ? 'text-success' : type === 'error' ? 'text-danger' : 'text-accent';
+            
+            toast.innerHTML = `
+                <i class="fas ${icon} ${color}"></i>
+                <span>${message}</span>
+            `;
+            
+            container.appendChild(toast);
             
             setTimeout(() => {
-                toast.style.animation = 'slideOut 0.3s ease';
+                toast.style.animation = 'toastIn 0.3s ease reverse';
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
 
-        // Add animations
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
+        // ═══════════════════════════════════════════════════════════════════
+        // UTILITIES
+        // ═══════════════════════════════════════════════════════════════════
+        function refreshData() {
+            loadData();
+            showToast('Données actualisées', 'success');
+        }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // TOKEN DETAIL (Placeholder for future feature)
-        // ═══════════════════════════════════════════════════════════════════
         function openTokenDetail(mint) {
-            // Future: Open token detail modal with chart, more info, etc.
             window.open(`https://dexscreener.com/solana/${mint}`, '_blank');
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // CLOSE MODALS ON ESC
-        // ═══════════════════════════════════════════════════════════════════
+        // Close modals on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+        });
+
+        // Close modals on ESC
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeBuyModal();
@@ -1687,4 +2313,4 @@
         });
     </script>
 </body>
-</html>
+                </html>
