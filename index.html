@@ -1,1417 +1,533 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0a0e1a">
-    <title>SolBot Pro</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
-        :root {
-            --bg: #0a0e1a;
-            --bg-card: #151a28;
-            --bg-hover: #1e2538;
-            --border: #2a3550;
-            --text: #ffffff;
-            --text-muted: #6b7a99;
-            --accent: #3b82f6;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --radius: 12px;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding-bottom: 80px;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* HEADER */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .header {
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            padding: 16px 20px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 20px;
-            font-weight: 700;
-        }
-
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 14px;
-            background: rgba(16, 185, 129, 0.15);
-            border: 1px solid var(--success);
-            border-radius: 20px;
-            font-size: 12px;
-            color: var(--success);
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--success);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* STATS */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .stat-card {
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 14px;
-        }
-
-        .stat-label {
-            font-size: 11px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            margin-bottom: 6px;
-        }
-
-        .stat-value {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .stat-value.pos { color: var(--success); }
-        .stat-value.neg { color: var(--danger); }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* SEARCH */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .search-bar {
-            margin-bottom: 16px;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 12px 16px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            color: var(--text);
-            font-size: 14px;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* TOKEN LIST */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .token-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .token-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 16px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .token-card:hover {
-            border-color: var(--accent);
-            transform: translateX(4px);
-        }
-
-        .token-card.active {
-            border-color: var(--accent);
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
-        }
-
-        .token-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .token-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .token-logo {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            background: var(--bg-hover);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            overflow: hidden;
-        }
-
-        .token-logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .token-symbol {
-            font-weight: 600;
-            font-size: 15px;
-            margin-bottom: 2px;
-        }
-
-        .token-address {
-            font-size: 11px;
-            color: var(--text-muted);
-            font-family: monospace;
-        }
-
-        .token-price {
-            text-align: right;
-        }
-
-        .price-value {
-            font-size: 15px;
-            font-weight: 600;
-            margin-bottom: 2px;
-        }
-
-        .price-change {
-            font-size: 12px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .price-change.pos {
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--success);
-        }
-
-        .price-change.neg {
-            background: rgba(239, 68, 68, 0.15);
-            color: var(--danger);
-        }
-
-        .token-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            padding-top: 12px;
-            border-top: 1px solid var(--border);
-        }
-
-        .token-stat {
-            text-align: center;
-        }
-
-        .token-stat-label {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-
-        .token-stat-value {
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .token-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* BUTTONS */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-
-        .btn:active { transform: scale(0.98); }
-
-        .btn-buy {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-sell {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-chart {
-            background: var(--bg-hover);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: var(--bg-hover);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* FLOATING BUTTONS */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .fab-buy {
-            position: fixed;
-            bottom: 90px;
-            left: 20px;
-            width: 56px;
-            height: 56px;
-            background: linear-gradient(135deg, var(--success), #059669);
-            border: none;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            color: white;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
-            z-index: 90;
-        }
-
-        .fab-settings {
-            position: fixed;
-            bottom: 90px;
-            right: 20px;
-            width: 56px;
-            height: 56px;
-            background: linear-gradient(135deg, var(--bg-hover), var(--border));
-            border: 1px solid var(--border);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: var(--text);
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            z-index: 90;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* SETTINGS PANEL */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .settings-panel {
-            position: fixed;
-            top: 0;
-            right: -100%;
-            width: 100%;
-            max-width: 400px;
-            height: 100vh;
-            background: var(--bg-card);
-            border-left: 1px solid var(--border);
-            z-index: 200;
-            transition: right 0.3s ease;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        .settings-panel.active {
-            right: 0;
-        }
-
-        .settings-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .settings-title {
-            font-size: 18px;
-            font-weight: 700;
-        }
-
-        .settings-close {
-            width: 36px;
-            height: 36px;
-            background: var(--bg-hover);
-            border: none;
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 20px;
-            cursor: pointer;
-        }
-
-        .setting-group {
-            margin-bottom: 24px;
-        }
-
-        .setting-title {
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .setting-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .setting-item:last-child {
-            border-bottom: none;
-        }
-
-        .setting-label {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .setting-title-text {
-            font-size: 13px;
-            font-weight: 500;
-        }
-
-        .setting-desc {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .toggle {
-            width: 50px;
-            height: 28px;
-            background: var(--bg-hover);
-            border-radius: 14px;
-            position: relative;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .toggle.active {
-            background: var(--success);
-        }
-
-        .toggle::after {
-            content: '';
-            position: absolute;
-            width: 22px;
-            height: 22px;
-            background: white;
-            border-radius: 50%;
-            top: 3px;
-            left: 3px;
-            transition: transform 0.2s;
-        }
-
-        .toggle.active::after {
-            transform: translateX(22px);
-        }
-
-        .setting-input {
-            width: 100px;
-            padding: 8px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            font-size: 13px;
-            text-align: center;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* CHART MODAL */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 300;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: var(--bg-card);
-            border-radius: var(--radius);
-            width: 100%;
-            max-width: 900px;
-            max-height: 85vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .modal-title {
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .modal-close {
-            width: 36px;
-            height: 36px;
-            background: var(--bg-hover);
-            border: none;
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 20px;
-            cursor: pointer;
-        }
-
-        .chart-container {
-            flex: 1;
-            min-height: 500px;
-            background: #000;
-        }
-
-        .chart-container iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-            padding: 16px 20px;
-            border-top: 1px solid var(--border);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* BUY/SELL MODAL */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .trade-modal .modal-content {
-            max-width: 500px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 12px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 14px;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        .quick-amounts {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-top: 8px;
-        }
-
-        .quick-btn {
-            padding: 8px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-muted);
-            font-size: 12px;
-            cursor: pointer;
-            text-align: center;
-        }
-
-        .quick-btn.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* BOTTOM NAV */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 70px;
-            background: var(--bg-card);
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            z-index: 100;
-        }
-
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            padding: 8px 16px;
-            color: var(--text-muted);
-            cursor: pointer;
-        }
-
-        .nav-item.active {
-            color: var(--accent);
-        }
-
-        .nav-icon {
-            font-size: 20px;
-        }
-
-        .nav-label {
-            font-size: 11px;
-            font-weight: 500;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* LOADING & EMPTY */
-        /* ═══════════════════════════════════════════════════════════════ */
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 60px;
-            color: var(--text-muted);
-        }
-
-        .spinner {
-            width: 32px;
-            height: 32px;
-            border: 3px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 12px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .empty {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-muted);
-        }
-
-        .empty-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-            opacity: 0.3;
-        }
-
-        /* ═══════════════════════════════════════════════════════════════ */
-        /* RESPONSIVE */
-        /* ═══════════════════════════════════════════════════════════════ */
-        @media (min-width: 768px) {
-            .stats { grid-template-columns: repeat(4, 1fr); }
-            .token-stats { grid-template-columns: repeat(5, 1fr); }
-            .settings-panel { max-width: 450px; }
-        }
-
-        @media (max-width: 380px) {
-            .stats { grid-template-columns: 1fr 1fr; }
-            .token-stats { grid-template-columns: 1fr; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0e1a">
+  <title>SolBot Pro</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #0a0e1a; --bg-card: #151a28; --bg-hover: #1e2538;
+      --border: #2a3550; --text: #fff; --text-muted: #6b7a99;
+      --accent: #3b82f6; --success: #10b981; --danger: #ef4444;
+      --radius: 12px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; padding-bottom: 80px;
+    }
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--bg-card); border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+    }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .status {
+      display: flex; align-items: center; gap: 6px; padding: 4px 12px;
+      background: rgba(16,185,129,0.15); border: 1px solid var(--success);
+      border-radius: 20px; font-size: 11px; color: var(--success);
+    }
+    .status-dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .stats { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 16px; }
+    .stat-card { background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+    .stat-value { font-size: 16px; font-weight: 600; }
+    .stat-value.pos { color: var(--success); } .stat-value.neg { color: var(--danger); }
+
+    .search-bar { margin: 0 20px 16px; }
+    .search-input {
+      width: 100%; padding: 10px 14px; background: var(--bg-hover);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); font-size: 14px;
+    }
+    .search-input:focus { outline: none; border-color: var(--accent); }
+
+    .token-list { padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
+    .token-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .token-card:hover { border-color: var(--accent); transform: translateX(3px); }
+    .token-card:active { transform: scale(0.99); }
+
+    .token-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .token-info { display: flex; align-items: center; gap: 10px; }
+    .token-logo {
+      width: 40px; height: 40px; border-radius: 10px; background: var(--bg-hover);
+      display: flex; align-items: center; justify-content: center; font-size: 18px; overflow: hidden;
+    }
+    .token-logo img { width: 100%; height: 100%; object-fit: cover; }
+    .token-symbol { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+    .token-address { font-size: 10px; color: var(--text-muted); font-family: monospace; }
+    .token-price { text-align: right; }
+    .price-value { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .price-change {
+      font-size: 11px; padding: 2px 6px; border-radius: 4px; display: inline-block;
+    }
+    .price-change.pos { background: rgba(16,185,129,0.15); color: var(--success); }
+    .price-change.neg { background: rgba(239,68,68,0.15); color: var(--danger); }
+
+    .token-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .token-stat { text-align: center; }
+    .token-stat-label { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
+    .token-stat-value { font-size: 12px; font-weight: 600; }
+
+    .token-actions { display: flex; gap: 6px; margin-top: 10px; }
+    .btn {
+      flex: 1; padding: 8px; border: none; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-buy { background: var(--success); color: white; }
+    .btn-sell { background: var(--danger); color: white; }
+    .btn-secondary { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
+
+    /* Floating buttons - ONLY ONE SETTINGS BUTTON */
+    .fab-buy {
+      position: fixed; bottom: 90px; left: 20px;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--success), #059669);
+      border: none; color: white; font-size: 26px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 4px 16px rgba(16,185,129,0.4); z-index: 90;
+    }
+    .fab-settings {
+      position: fixed; bottom: 90px; right: 20px;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--bg-hover); border: 1px solid var(--border);
+      color: var(--text); font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.3); z-index: 90;
+    }
+
+    /* Settings Panel - SINGLE PANEL */
+    .settings-panel {
+      position: fixed; top: 0; right: -100%; width: 100%; max-width: 380px;
+      height: 100vh; background: var(--bg-card); border-left: 1px solid var(--border);
+      z-index: 200; transition: right 0.3s ease; overflow-y: auto; padding: 16px;
+    }
+    .settings-panel.active { right: 0; }
+    .settings-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .settings-title { font-size: 16px; font-weight: 700; }
+    .settings-close { width: 32px; height: 32px; background: var(--bg-hover); border: none; border-radius: 8px; color: var(--text); font-size: 18px; cursor: pointer; }
+
+    .setting-group { margin-bottom: 18px; }
+    .setting-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+    .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .setting-item:last-child { border-bottom: none; }
+    .setting-label { display: flex; flex-direction: column; gap: 3px; }
+    .setting-title-text { font-size: 12px; font-weight: 500; }
+    .setting-desc { font-size: 10px; color: var(--text-muted); }
+    .toggle {
+      width: 46px; height: 26px; background: var(--bg-hover); border-radius: 13px;
+      position: relative; cursor: pointer; transition: background 0.2s;
+    }
+    .toggle.active { background: var(--success); }
+    .toggle::after {
+      content: ''; position: absolute; width: 20px; height: 20px;
+      background: white; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s;
+    }
+    .toggle.active::after { transform: translateX(20px); }
+    .setting-input {
+      width: 90px; padding: 6px; background: var(--bg-hover); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 12px; text-align: center;
+    }
+
+    /* Modals */
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85); z-index: 300;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: var(--bg-card); border-radius: var(--radius);
+      width: 100%; max-width: 480px; max-height: 90vh; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .modal-title { font-size: 15px; font-weight: 600; }
+    .modal-close { width: 32px; height: 32px; background: var(--bg-hover); border: none; border-radius: 8px; color: var(--text); font-size: 18px; cursor: pointer; }
+    .modal-body { padding: 18px; overflow-y: auto; }
+    .modal-actions { display: flex; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border); }
+
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; }
+    .form-input {
+      width: 100%; padding: 10px; background: var(--bg-hover); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 14px;
+    }
+    .form-input:focus { outline: none; border-color: var(--accent); }
+    .quick-amounts { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-top: 6px; }
+    .quick-btn {
+      padding: 6px; background: var(--bg-hover); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-muted); font-size: 11px; cursor: pointer; text-align: center;
+    }
+    .quick-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+    /* Bottom Nav */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 66px;
+      background: var(--bg-card); border-top: 1px solid var(--border);
+      display: flex; justify-content: space-around; align-items: center; z-index: 100;
+    }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 12px; color: var(--text-muted); cursor: pointer; }
+    .nav-item.active { color: var(--accent); }
+    .nav-icon { font-size: 18px; }
+    .nav-label { font-size: 10px; font-weight: 500; }
+
+    /* Loading / Empty */
+    .loading, .empty { display: flex; align-items: center; justify-content: center; padding: 50px 20px; color: var(--text-muted); text-align: center; }
+    .spinner {
+      width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+
+    @media (min-width: 768px) {
+      .stats { grid-template-columns: repeat(4,1fr); }
+      .token-stats { grid-template-columns: repeat(5,1fr); }
+      .settings-panel { max-width: 420px; }
+    }
+  </style>
 </head>
 <body>
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- HEADER -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <header class="header">
-        <div class="header-top">
-            <div class="logo">
-                <div class="logo-icon">🤖</div>
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon">🤖</div>
+        <span>SolBot Pro</span>
+      </div>
+      <div class="status"><div class="status-dot"></div><span id="statusText">LIVE</span></div>
+    </div>
+    <div class="stats">
+      <div class="stat-card"><div class="stat-label">Portfolio</div><div class="stat-value" id="totalValue">$0.00</div></div>
+      <div class="stat-card"><div class="stat-label">PnL</div><div class="stat-value" id="pnlValue">$0.00</div></div>
+      <div class="stat-card"><div class="stat-label">Tokens</div><div class="stat-value" id="tokenCount">0</div></div>
+      <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value" id="winRate">0%</div></div>
+    </div>
+  </header>
+
+  <!-- SEARCH -->
+  <div class="search-bar">
+    <input type="text" class="search-input" id="searchInput" placeholder="🔍 Rechercher un token...">
+  </div>
+
+  <!-- TOKEN LIST -->
+  <div class="token-list" id="tokenList">
+    <div class="loading"><div class="spinner"></div><span>Chargement...</span></div>
+  </div>
+
+  <!-- FLOATING BUTTONS (ONLY 2: BUY + SETTINGS) -->
+  <button class="fab-buy" onclick="openBuyModal()">+</button>
+  <button class="fab-settings" onclick="toggleSettings()">⚙</button>
+
+  <!-- SETTINGS PANEL (SINGLE) -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-header">
+      <div class="settings-title">⚙ Paramètres</div>
+      <button class="settings-close" onclick="toggleSettings()">×</button>
+    </div>
+    <div class="setting-group">
+      <div class="setting-title">🎯 Take-Profit</div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Actif</div><div class="setting-desc">Vente auto aux paliers</div></div>
+        <div class="toggle" id="toggle-tp" onclick="toggleSetting('tp')"></div>
+      </div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Hysteresis</div><div class="setting-desc">Marge avant reset (%)</div></div>
+        <input type="number" class="setting-input" id="tpHysteresis" value="5">
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-title">🛡 Stop-Loss</div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Actif</div><div class="setting-desc">Vente si perte</div></div>
+        <div class="toggle" id="toggle-sl" onclick="toggleSetting('sl')"></div>
+      </div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Seuil</div><div class="setting-desc">Perte max (%)</div></div>
+        <select class="setting-input" id="slPct"><option value="-25">-25%</option><option value="-50" selected>-50%</option><option value="-70">-70%</option></select>
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-title">📉 Trailing Stop</div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Actif</div><div class="setting-desc">Suit le peak</div></div>
+        <div class="toggle" id="toggle-ts" onclick="toggleSetting('ts')"></div>
+      </div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Recul</div><div class="setting-desc">Max depuis peak (%)</div></div>
+        <select class="setting-input" id="tsPct"><option value="10">10%</option><option value="20" selected>20%</option><option value="30">30%</option></select>
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-title">🚨 Anti-Rug</div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Actif</div><div class="setting-desc">Vente urgence</div></div>
+        <div class="toggle" id="toggle-ar" onclick="toggleSetting('ar')"></div>
+      </div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Chute</div><div class="setting-desc">Max par cycle (%)</div></div>
+        <select class="setting-input" id="arPct"><option value="40">40%</option><option value="60" selected>60%</option><option value="80">80%</option></select>
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-title">⚙ Général</div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Slippage</div><div class="setting-desc">Défaut (bps)</div></div>
+        <input type="number" class="setting-input" id="slippage" value="500">
+      </div>
+      <div class="setting-item">
+        <div class="setting-label"><div class="setting-title-text">Intervalle</div><div class="setting-desc">Cycle (sec)</div></div>
+        <select class="setting-input" id="interval"><option value="15">15s</option><option value="30" selected>30s</option><option value="60">60s</option></select>
+      </div>
+    </div>
+    <button class="btn btn-buy" onclick="saveSettings()" style="width:100%;padding:12px;margin-top:10px">💾 SAUVEGARDER</button>
+  </div>
+
+  <!-- BUY MODAL -->
+  <div class="modal" id="buyModal">
+    <div class="modal-content">
+      <div class="modal-header"><div class="modal-title">▲ ACHETER</div><button class="modal-close" onclick="closeBuyModal()">×</button></div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Token Address</label>
+          <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Montant (SOL)</label>
+          <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01">
+          <div class="quick-amounts">
+            <div class="quick-btn" onclick="setBuyAmount(0.1)">0.1</div>
+            <div class="quick-btn" onclick="setBuyAmount(0.25)">0.25</div>
+            <div class="quick-btn" onclick="setBuyAmount(0.5)">0.5</div>
+            <div class="quick-btn" onclick="setMaxBuy()">MAX</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Slippage</label>
+          <select class="form-input" id="buySlippage"><option value="100">1%</option><option value="300" selected>3%</option><option value="500">5%</option></select>
+        </div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-buy" onclick="executeBuy()" style="flex:1">CONFIRMER</button></div>
+    </div>
+  </div>
+
+  <!-- SELL MODAL -->
+  <div class="modal" id="sellModal">
+    <div class="modal-content">
+      <div class="modal-header"><div class="modal-title">▼ VENDRE</div><button class="modal-close" onclick="closeSellModal()">×</button></div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Token</label>
+          <input type="text" class="form-input" id="sellTokenInfo" readonly style="background:var(--bg-hover)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Balance</label>
+          <input type="text" class="form-input" id="sellBalance" readonly style="background:var(--bg-hover)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">À vendre</label>
+          <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001">
+          <div class="quick-amounts">
+            <div class="quick-btn" onclick="setSellPercent(25)">25%</div>
+            <div class="quick-btn" onclick="setSellPercent(50)">50%</div>
+            <div class="quick-btn" onclick="setSellPercent(75)">75%</div>
+            <div class="quick-btn" onclick="setSellPercent(100)">100%</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-sell" onclick="executeSell()" style="flex:1">CONFIRMER</button></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <div class="nav-item active"><div class="nav-icon">◈</div><div class="nav-label">Portfolio</div></div>
+    <div class="nav-item"><div class="nav-icon">⌇</div><div class="nav-label">Analytics</div></div>
+    <div class="nav-item" onclick="toggleSettings()"><div class="nav-icon">⚙</div><div class="nav-label">Config</div></div>
+  </nav>
+
+  <script>
+    const API = window.location.origin;
+    let portfolio = [], settings = {};
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadData(); loadSettings();
+      setInterval(loadData, 30000);
+    });
+
+    async function loadData() {
+      try {
+        const [statsRes, portfolioRes] = await Promise.all([
+          fetch(`${API}/api/stats`), fetch(`${API}/api/portfolio`)
+        ]);
+        const stats = await statsRes.json();
+        portfolio = (await portfolioRes.json()).tokens || [];
+        document.getElementById('totalValue').textContent = `$${(stats.totalValue||0).toFixed(2)}`;
+        document.getElementById('pnlValue').textContent = `$${(stats.pnlStats?.realized||0).toFixed(2)}`;
+        document.getElementById('winRate').textContent = `${stats.analytics?.winRate||0}%`;
+        document.getElementById('tokenCount').textContent = stats.tokens || 0;
+        renderTokens();
+      } catch(e) { console.error('Load error:', e); }
+    }
+
+    async function loadSettings() {
+      try {
+        const res = await fetch(`${API}/api/config`);
+        settings = await res.json();
+        updateSettingsUI();
+      } catch(e) { console.error('Settings error:', e); }
+    }
+
+    function renderTokens() {
+      const list = document.getElementById('tokenList');
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = portfolio.filter(t =>
+        !search || (t.symbol||'').toLowerCase().includes(search) || t.mintFull.toLowerCase().includes(search)
+      );
+      if (filtered.length === 0) {
+        list.innerHTML = `<div class="empty"><div class="empty-icon">💎</div><div>Aucun token trouvé</div></div>`;
+        return;
+      }
+      list.innerHTML = filtered.map(token => {
+        const pnlClass = token.pnl >= 0 ? 'pos' : 'neg';
+        const pnlSign = token.pnl >= 0 ? '+' : '';
+        const logo = token.logo ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'">` : '🪙';
+        return `
+          <div class="token-card" onclick="openDexScreener('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}')">
+            <div class="token-header">
+              <div class="token-info">
+                <div class="token-logo">${logo}</div>
                 <div>
-                    <div>SolBot Pro</div>
-                    <div style="font-size: 11px; color: var(--text-muted);">v5.0</div>
+                  <div class="token-symbol">${token.symbol || token.mint.slice(0,8)}...</div>
+                  <div class="token-address">${token.mint.slice(0,4)}...${token.mint.slice(-4)}</div>
                 </div>
+              </div>
+              <div class="token-price">
+                <div class="price-value">$${(token.price||0).toFixed(6)}</div>
+                <div class="price-change ${pnlClass}">${pnlSign}${(token.pnl||0).toFixed(2)}%</div>
+              </div>
             </div>
-            <div class="status">
-                <div class="status-dot"></div>
-                <span id="statusText">LIVE</span>
+            <div class="token-stats">
+              <div class="token-stat"><div class="token-stat-label">Valeur</div><div class="token-stat-value">$${(token.value||0).toFixed(2)}</div></div>
+              <div class="token-stat"><div class="token-stat-label">Balance</div><div class="token-stat-value">${(token.balance||0).toFixed(4)}</div></div>
+              <div class="token-stat"><div class="token-stat-label">Liq.</div><div class="token-stat-value">$${((token.liquidity||0)/1000).toFixed(1)}k</div></div>
             </div>
-        </div>
-        
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-label">Portfolio</div>
-                <div class="stat-value" id="totalValue">$0.00</div>
+            <div class="token-actions">
+              <button class="btn btn-buy" onclick="event.stopPropagation(); openBuyModal('${token.mintFull}')">Buy</button>
+              <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol||token.mint.slice(0,8)}', ${token.balance})">Sell</button>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">PnL Réalisé</div>
-                <div class="stat-value" id="realizedPnl">$0.00</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Win Rate</div>
-                <div class="stat-value" id="winRate">0%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Trades</div>
-                <div class="stat-value" id="totalTrades">0</div>
-            </div>
-        </div>
-    </header>
+          </div>`;
+      }).join('');
+    }
 
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- MAIN CONTENT -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <main style="padding: 0 20px;">
-        <!-- Search -->
-        <div class="search-bar">
-            <input type="text" class="search-input" id="searchInput" placeholder="🔍 Rechercher un token...">
-        </div>
+    // ✅ KEY FUNCTION: Open DexScreener in new tab
+    function openDexScreener(mint, symbol) {
+      window.open(`https://dexscreener.com/solana/${mint}`, '_blank', 'noopener,noreferrer');
+    }
 
-        <!-- Token List -->
-        <div class="token-list" id="tokenList">
-            <div class="loading">
-                <div class="spinner"></div>
-                <span>Chargement des tokens...</span>
-            </div>
-        </div>
-    </main>
+    // Settings
+    function toggleSettings() { document.getElementById('settingsPanel').classList.toggle('active'); }
+    function toggleSetting(type) { document.getElementById(`toggle-${type}`).classList.toggle('active'); }
+    function updateSettingsUI() {
+      document.getElementById('toggle-tp').classList.toggle('active', settings.takeProfitEnabled);
+      document.getElementById('toggle-sl').classList.toggle('active', settings.stopLossEnabled);
+      document.getElementById('toggle-ts').classList.toggle('active', settings.trailingEnabled);
+      document.getElementById('toggle-ar').classList.toggle('active', settings.antiRugEnabled);
+      document.getElementById('tpHysteresis').value = settings.hysteresis || 5;
+      document.getElementById('slPct').value = settings.stopLossPct || -50;
+      document.getElementById('tsPct').value = settings.trailingPct || 20;
+      document.getElementById('arPct').value = settings.antiRugPct || 60;
+      document.getElementById('slippage').value = settings.defaultSlippage || 500;
+      document.getElementById('interval').value = settings.intervalSec || 30;
+    }
+    async function saveSettings() {
+      try {
+        const config = {
+          takeProfitEnabled: document.getElementById('toggle-tp').classList.contains('active'),
+          stopLossEnabled: document.getElementById('toggle-sl').classList.contains('active'),
+          trailingEnabled: document.getElementById('toggle-ts').classList.contains('active'),
+          antiRugEnabled: document.getElementById('toggle-ar').classList.contains('active'),
+          hysteresis: parseFloat(document.getElementById('tpHysteresis').value),
+          stopLossPct: parseFloat(document.getElementById('slPct').value),
+          trailingPct: parseFloat(document.getElementById('tsPct').value),
+          antiRugPct: parseFloat(document.getElementById('arPct').value),
+          defaultSlippage: parseInt(document.getElementById('slippage').value),
+          intervalSec: parseInt(document.getElementById('interval').value),
+        };
+        await fetch(`${API}/api/config`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(config) });
+        toggleSettings(); loadSettings();
+      } catch(e) { alert('❌ ' + e.message); }
+    }
 
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- FLOATING BUTTONS -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <button class="fab-buy" onclick="openBuyModal()">+</button>
-    <button class="fab-settings" onclick="toggleSettings()">⚙</button>
+    // Buy/Sell modals
+    function openBuyModal(mint='') { document.getElementById('buyTokenAddress').value = mint; document.getElementById('buyModal').classList.add('active'); }
+    function closeBuyModal() { document.getElementById('buyModal').classList.remove('active'); }
+    function setBuyAmount(v) { document.getElementById('buyAmount').value = v; }
+    async function setMaxBuy() {
+      const res = await fetch(`${API}/api/sol-balance`);
+      const data = await res.json();
+      const max = Math.max(0, (data.balance||0) - 0.05);
+      document.getElementById('buyAmount').value = max.toFixed(4);
+    }
+    async function executeBuy() {
+      const mint = document.getElementById('buyTokenAddress').value.trim();
+      const amount = parseFloat(document.getElementById('buyAmount').value);
+      const slippage = parseInt(document.getElementById('buySlippage').value);
+      if (!mint || !amount) { alert('❌ Remplis tous les champs'); return; }
+      const btn = event.currentTarget; btn.disabled = true; btn.textContent = 'En cours...';
+      try {
+        const res = await fetch(`${API}/api/buy`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mint,solAmount:amount,slippageBps:slippage}) });
+        const result = await res.json();
+        if (result.success) { alert(`✅ Achat réussi !`); closeBuyModal(); setTimeout(loadData,3000); }
+        else alert('❌ ' + result.error);
+      } catch(e) { alert('❌ ' + e.message); }
+      finally { btn.disabled = false; btn.textContent = 'CONFIRMER'; }
+    }
 
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- SETTINGS PANEL (UNIQUE) -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="settings-panel" id="settingsPanel">
-        <div class="settings-header">
-            <div class="settings-title">⚙ Paramètres</div>
-            <button class="settings-close" onclick="toggleSettings()">×</button>
-        </div>
+    function openSellModal(mint, symbol, balance) {
+      document.getElementById('sellTokenInfo').value = `${symbol} (${mint.slice(0,4)}...${mint.slice(-4)})`;
+      document.getElementById('sellBalance').value = balance.toFixed(4);
+      document.getElementById('sellModal').dataset.mint = mint;
+      document.getElementById('sellModal').classList.add('active');
+    }
+    function closeSellModal() { document.getElementById('sellModal').classList.remove('active'); }
+    function setSellPercent(pct) {
+      const bal = parseFloat(document.getElementById('sellBalance').value);
+      document.getElementById('sellAmount').value = (bal * pct / 100).toFixed(4);
+    }
+    async function executeSell() {
+      const mint = document.getElementById('sellModal').dataset.mint;
+      const amount = parseFloat(document.getElementById('sellAmount').value);
+      if (!mint || !amount) { alert('❌ Montant invalide'); return; }
+      const btn = event.currentTarget; btn.disabled = true; btn.textContent = 'En cours...';
+      try {
+        const res = await fetch(`${API}/api/sell`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mint,amount,reason:'MANUAL'}) });
+        const result = await res.json();
+        if (result.success) { alert(`✅ Vente réussie !`); closeSellModal(); setTimeout(loadData,3000); }
+        else alert('❌ ' + result.error);
+      } catch(e) { alert('❌ ' + e.message); }
+      finally { btn.disabled = false; btn.textContent = 'CONFIRMER'; }
+    }
 
-        <div class="setting-group">
-            <div class="setting-title">🎯 Take-Profit</div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Actif</div>
-                    <div class="setting-desc">Vente auto à chaque palier</div>
-                </div>
-                <div class="toggle" id="toggle-tp" onclick="toggleSetting('tp')"></div>
-            </div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Hysteresis</div>
-                    <div class="setting-desc">Marge avant reset (%)</div>
-                </div>
-                <input type="number" class="setting-input" id="tpHysteresis" value="5">
-            </div>
-        </div>
-
-        <div class="setting-group">
-            <div class="setting-title">🛡 Stop-Loss</div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Actif</div>
-                    <div class="setting-desc">Vente si perte</div>
-                </div>
-                <div class="toggle" id="toggle-sl" onclick="toggleSetting('sl')"></div>
-            </div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Seuil</div>
-                    <div class="setting-desc">Perte max (%)</div>
-                </div>
-                <select class="setting-input" id="slPct">
-                    <option value="-25">-25%</option>
-                    <option value="-50" selected>-50%</option>
-                    <option value="-70">-70%</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="setting-group">
-            <div class="setting-title">📉 Trailing Stop</div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Actif</div>
-                    <div class="setting-desc">Suit le peak</div>
-                </div>
-                <div class="toggle" id="toggle-ts" onclick="toggleSetting('ts')"></div>
-            </div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Recul</div>
-                    <div class="setting-desc">Max depuis peak (%)</div>
-                </div>
-                <select class="setting-input" id="tsPct">
-                    <option value="10">10%</option>
-                    <option value="20" selected>20%</option>
-                    <option value="30">30%</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="setting-group">
-            <div class="setting-title">🚨 Anti-Rug</div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Actif</div>
-                    <div class="setting-desc">Vente d'urgence</div>
-                </div>
-                <div class="toggle" id="toggle-ar" onclick="toggleSetting('ar')"></div>
-            </div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Chute</div>
-                    <div class="setting-desc">Max par cycle (%)</div>
-                </div>
-                <select class="setting-input" id="arPct">
-                    <option value="40">40%</option>
-                    <option value="60" selected>60%</option>
-                    <option value="80">80%</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="setting-group">
-            <div class="setting-title">⚙ Général</div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Slippage</div>
-                    <div class="setting-desc">Défaut (bps)</div>
-                </div>
-                <input type="number" class="setting-input" id="slippage" value="500">
-            </div>
-            <div class="setting-item">
-                <div class="setting-label">
-                    <div class="setting-title-text">Intervalle</div>
-                    <div class="setting-desc">Cycle (sec)</div>
-                </div>
-                <select class="setting-input" id="interval">
-                    <option value="15">15s</option>
-                    <option value="30" selected>30s</option>
-                    <option value="60">60s</option>
-                </select>
-            </div>
-        </div>
-
-        <button class="btn btn-primary" onclick="saveSettings()" style="width: 100%; padding: 14px;">
-            💾 SAUVEGARDER
-        </button>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- CHART MODAL (DexScreener) -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="modal" id="chartModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title" id="chartTitle">📊 DexScreener</div>
-                <button class="modal-close" onclick="closeChartModal()">×</button>
-            </div>
-            <div class="chart-container" id="chartContainer">
-                <!-- DexScreener widget will be inserted here -->
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-buy" onclick="openBuyModalFromChart()">▲ Acheter</button>
-                <button class="btn btn-sell" onclick="openSellModalFromChart()">▼ Vendre</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- BUY MODAL -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="modal trade-modal" id="buyModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">▲ ACHETER</div>
-                <button class="modal-close" onclick="closeBuyModal()">×</button>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Token Address</label>
-                <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse complète">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Montant (SOL)</label>
-                <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01">
-                <div class="quick-amounts">
-                    <div class="quick-btn" onclick="setBuyAmount(0.1)">0.1</div>
-                    <div class="quick-btn" onclick="setBuyAmount(0.25)">0.25</div>
-                    <div class="quick-btn" onclick="setBuyAmount(0.5)">0.5</div>
-                    <div class="quick-btn" onclick="setMaxBuy()">MAX</div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Slippage</label>
-                <select class="form-input" id="buySlippage">
-                    <option value="100">1%</option>
-                    <option value="300" selected>3%</option>
-                    <option value="500">5%</option>
-                </select>
-            </div>
-            <button class="btn btn-buy" onclick="executeBuy()" style="width: 100%; padding: 14px;">
-                CONFIRMER L'ACHAT
-            </button>
-        </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- SELL MODAL -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="modal trade-modal" id="sellModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">▼ VENDRE</div>
-                <button class="modal-close" onclick="closeSellModal()">×</button>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Token</label>
-                <input type="text" class="form-input" id="sellTokenInfo" readonly style="background: var(--bg-hover);">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Balance</label>
-                <input type="text" class="form-input" id="sellBalance" readonly style="background: var(--bg-hover);">
-            </div>
-            <div class="form-group">
-                <label class="form-label">À vendre</label>
-                <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001">
-                <div class="quick-amounts">
-                    <div class="quick-btn" onclick="setSellPercent(25)">25%</div>
-                    <div class="quick-btn" onclick="setSellPercent(50)">50%</div>
-                    <div class="quick-btn" onclick="setSellPercent(75)">75%</div>
-                    <div class="quick-btn" onclick="setSellPercent(100)">100%</div>
-                </div>
-            </div>
-            <button class="btn btn-sell" onclick="executeSell()" style="width: 100%; padding: 14px;">
-                CONFIRMER LA VENTE
-            </button>
-        </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- BOTTOM NAV -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <nav class="bottom-nav">
-        <div class="nav-item active" onclick="switchTab('portfolio')">
-            <div class="nav-icon">◈</div>
-            <div class="nav-label">Portfolio</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('analytics')">
-            <div class="nav-icon">⌇</div>
-            <div class="nav-label">Analytics</div>
-        </div>
-        <div class="nav-item" onclick="toggleSettings()">
-            <div class="nav-icon">⚙</div>
-            <div class="nav-label">Config</div>
-        </div>
-    </nav>
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- JAVASCRIPT -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <script>
-        const API = window.location.origin;
-        let portfolio = [];
-        let settings = {};
-        let currentToken = null;
-
-        // ═══════════════════════════════════════════════════════════════
-        // INIT
-        // ═══════════════════════════════════════════════════════════════
-        document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-            loadSettings();
-            setInterval(() => loadData(), 30000);
-        });
-
-        // ═══════════════════════════════════════════════════════════════
-        // DATA LOADING
-        // ═══════════════════════════════════════════════════════════════
-        async function loadData() {
-            try {
-                const [statsRes, portfolioRes] = await Promise.all([
-                    fetch(`${API}/api/stats`),
-                    fetch(`${API}/api/portfolio`)
-                ]);
-                
-                const statsData = await statsRes.json();
-                portfolio = (await portfolioRes.json()).tokens || [];
-                
-                // Update stats
-                document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
-                document.getElementById('realizedPnl').textContent = `$${(statsData.pnlStats?.realized || 0).toFixed(2)}`;
-                document.getElementById('winRate').textContent = `${statsData.analytics?.winRate || 0}%`;
-                document.getElementById('totalTrades').textContent = statsData.analytics?.totalTrades || 0;
-                
-                renderTokens();
-            } catch (err) {
-                console.error('Load error:', err);
-            }
-        }
-
-        async function loadSettings() {
-            try {
-                const res = await fetch(`${API}/api/config`);
-                settings = await res.json();
-                updateSettingsUI();
-            } catch (err) {
-                console.error('Settings load error:', err);
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // RENDER TOKENS
-        // ═══════════════════════════════════════════════════════════════
-        function renderTokens() {
-            const list = document.getElementById('tokenList');
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            
-            const filtered = portfolio.filter(t => 
-                !search || 
-                (t.symbol || '').toLowerCase().includes(search) || 
-                t.mintFull.toLowerCase().includes(search)
-            );
-
-            if (filtered.length === 0) {
-                list.innerHTML = `
-                    <div class="empty">
-                        <div class="empty-icon">💎</div>
-                        <div>Aucun token trouvé</div>
-                    </div>
-                `;
-                return;
-            }
-
-            list.innerHTML = filtered.map(token => {
-                const pnlClass = token.pnl >= 0 ? 'pos' : 'neg';
-                const pnlSign = token.pnl >= 0 ? '+' : '';
-                const logo = token.logo 
-                    ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'">`
-                    : '🪙';
-
-                return `
-                    <div class="token-card ${token.pnl >= 20 ? 'active' : ''}" onclick="openChart('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}')">
-                        <div class="token-header">
-                            <div class="token-info">
-                                <div class="token-logo">${logo}</div>
-                                <div>
-                                    <div class="token-symbol">${token.symbol || token.mint.slice(0, 8)}...</div>
-                                    <div class="token-address">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
-                                </div>
-                            </div>
-                            <div class="token-price">
-                                <div class="price-value">$${(token.price || 0).toFixed(6)}</div>
-                                <div class="price-change ${pnlClass}">${pnlSign}${(token.pnl || 0).toFixed(2)}%</div>
-                            </div>
-                        </div>
-                        
-                        <div class="token-stats">
-                            <div class="token-stat">
-                                <div class="token-stat-label">Valeur</div>
-                                <div class="token-stat-value">$${(token.value || 0).toFixed(2)}</div>
-                            </div>
-                            <div class="token-stat">
-                                <div class="token-stat-label">Balance</div>
-                                <div class="token-stat-value">${(token.balance || 0).toFixed(4)}</div>
-                            </div>
-                            <div class="token-stat">
-                                <div class="token-stat-label">Liq.</div>
-                                <div class="token-stat-value">$${((token.liquidity || 0) / 1000).toFixed(1)}k</div>
-                            </div>
-                        </div>
-                        
-                        <div class="token-actions">
-                            <button class="btn btn-buy" onclick="event.stopPropagation(); openBuyModal('${token.mintFull}')">Buy</button>
-                            <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}', ${token.balance})">Sell</button>
-                            <button class="btn btn-chart" onclick="event.stopPropagation(); openChart('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}')">📊</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // SETTINGS PANEL
-        // ═══════════════════════════════════════════════════════════════
-        function toggleSettings() {
-            document.getElementById('settingsPanel').classList.toggle('active');
-        }
-
-        function toggleSetting(type) {
-            const toggle = document.getElementById(`toggle-${type}`);
-            if (toggle) toggle.classList.toggle('active');
-        }
-
-        function updateSettingsUI() {
-            document.getElementById('toggle-tp').classList.toggle('active', settings.takeProfitEnabled);
-            document.getElementById('toggle-sl').classList.toggle('active', settings.stopLossEnabled);
-            document.getElementById('toggle-ts').classList.toggle('active', settings.trailingEnabled);
-            document.getElementById('toggle-ar').classList.toggle('active', settings.antiRugEnabled);
-            
-            document.getElementById('tpHysteresis').value = settings.hysteresis || 5;
-            document.getElementById('slPct').value = settings.stopLossPct || -50;
-            document.getElementById('tsPct').value = settings.trailingPct || 20;
-            document.getElementById('arPct').value = settings.antiRugPct || 60;
-            document.getElementById('slippage').value = settings.defaultSlippage || 500;
-            document.getElementById('interval').value = settings.intervalSec || 30;
-        }
-
-        async function saveSettings() {
-            try {
-                const config = {
-                    takeProfitEnabled: document.getElementById('toggle-tp').classList.contains('active'),
-                    stopLossEnabled: document.getElementById('toggle-sl').classList.contains('active'),
-                    trailingEnabled: document.getElementById('toggle-ts').classList.contains('active'),
-                    antiRugEnabled: document.getElementById('toggle-ar').classList.contains('active'),
-                    hysteresis: parseFloat(document.getElementById('tpHysteresis').value),
-                    stopLossPct: parseFloat(document.getElementById('slPct').value),
-                    trailingPct: parseFloat(document.getElementById('tsPct').value),
-                    antiRugPct: parseFloat(document.getElementById('arPct').value),
-                    defaultSlippage: parseInt(document.getElementById('slippage').value),
-                    intervalSec: parseInt(document.getElementById('interval').value),
-                };
-                
-                const res = await fetch(`${API}/api/config`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config),
-                });
-                
-                if (res.ok) {
-                    showToast('✅ Configuration sauvegardée', 'success');
-                    toggleSettings();
-                    loadSettings();
-                } else {
-                    showToast('❌ Erreur lors de la sauvegarde', 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // CHART MODAL (DexScreener)
-        // ═══════════════════════════════════════════════════════════════
-        function openChart(mint, symbol) {
-            currentToken = { mint, symbol };
-            
-            document.getElementById('chartTitle').textContent = `📊 ${symbol} - DexScreener`;
-            document.getElementById('chartContainer').innerHTML = `
-                <iframe 
-                    src="https://dexscreener.com/solana/${mint}?embed=true" 
-                    style="width:100%;height:100%;border:none;"
-                    allowfullscreen
-                    loading="lazy">
-                </iframe>
-            `;
-            
-            document.getElementById('chartModal').classList.add('active');
-        }
-
-        function closeChartModal() {
-            document.getElementById('chartModal').classList.remove('active');
-            document.getElementById('chartContainer').innerHTML = '';
-        }
-
-        function openBuyModalFromChart() {
-            closeChartModal();
-            openBuyModal(currentToken?.mint || '');
-        }
-
-        function openSellModalFromChart() {
-            closeChartModal();
-            if (currentToken) {
-                const token = portfolio.find(t => t.mintFull === currentToken.mint);
-                if (token) {
-                    openSellModal(token.mintFull, token.symbol || token.mint.slice(0, 8), token.balance);
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // BUY MODAL
-        // ═══════════════════════════════════════════════════════════════
-        function openBuyModal(mint = '') {
-            document.getElementById('buyTokenAddress').value = mint;
-            document.getElementById('buyModal').classList.add('active');
-        }
-
-        function closeBuyModal() {
-            document.getElementById('buyModal').classList.remove('active');
-        }
-
-        function setBuyAmount(amount) {
-            document.getElementById('buyAmount').value = amount;
-        }
-
-        async function setMaxBuy() {
-            try {
-                const res = await fetch(`${API}/api/sol-balance`);
-                const data = await res.json();
-                const max = Math.max(0, (data.balance || 0) - 0.05);
-                document.getElementById('buyAmount').value = max.toFixed(4);
-            } catch (err) {
-                console.error('Balance error:', err);
-            }
-        }
-
-        async function executeBuy() {
-            const mint = document.getElementById('buyTokenAddress').value.trim();
-            const amount = parseFloat(document.getElementById('buyAmount').value);
-            const slippage = parseInt(document.getElementById('buySlippage').value);
-            
-            if (!mint || !amount) {
-                showToast('❌ Veuillez remplir tous les champs', 'error');
-                return;
-            }
-            
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px"></div> En cours...';
-            
-            try {
-                const res = await fetch(`${API}/api/buy`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, solAmount: amount, slippageBps: slippage }),
-                });
-                
-                const result = await res.json();
-                
-                if (result.success) {
-                    showToast(`✅ Achat réussi ! ${result.outAmount?.toFixed(4)} tokens`, 'success');
-                    closeBuyModal();
-                    setTimeout(() => loadData(), 3000);
-                } else {
-                    showToast('❌ ' + result.error, 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // SELL MODAL
-        // ═══════════════════════════════════════════════════════════════
-        function openSellModal(mint, symbol, balance) {
-            document.getElementById('sellTokenInfo').value = `${symbol} (${mint.slice(0, 4)}...${mint.slice(-4)})`;
-            document.getElementById('sellBalance').value = balance.toFixed(4);
-            document.getElementById('sellModal').dataset.mint = mint;
-            document.getElementById('sellModal').classList.add('active');
-        }
-
-        function closeSellModal() {
-            document.getElementById('sellModal').classList.remove('active');
-        }
-
-        function setSellPercent(percent) {
-            const balance = parseFloat(document.getElementById('sellBalance').value);
-            const amount = (balance * percent / 100).toFixed(4);
-            document.getElementById('sellAmount').value = amount;
-        }
-
-        async function executeSell() {
-            const mint = document.getElementById('sellModal').dataset.mint;
-            const amount = parseFloat(document.getElementById('sellAmount').value);
-            
-            if (!mint || !amount) {
-                showToast('❌ Veuillez entrer un montant valide', 'error');
-                return;
-            }
-            
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px"></div> En cours...';
-            
-            try {
-                const res = await fetch(`${API}/api/sell`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, amount, reason: 'MANUAL' }),
-                });
-                
-                const result = await res.json();
-                
-                if (result.success) {
-                    showToast(`✅ Vente réussie ! ${result.solOut?.toFixed(6)} SOL reçus`, 'success');
-                    closeSellModal();
-                    setTimeout(() => loadData(), 3000);
-                } else {
-                    showToast('❌ ' + result.error, 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // TOAST NOTIFICATIONS
-        // ═══════════════════════════════════════════════════════════════
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toastContainer') || (() => {
-                const div = document.createElement('div');
-                div.id = 'toastContainer';
-                div.style.cssText = 'position:fixed;top:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:10px;';
-                document.body.appendChild(div);
-                return div;
-            })();
-            
-            const toast = document.createElement('div');
-            toast.style.cssText = `
-                padding: 12px 16px;
-                background: ${type === 'success' ? 'rgba(16, 185, 129, 0.15)' : type === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-card)'};
-                border: 1px solid ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--border)'};
-                border-radius: 8px;
-                color: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--text)'};
-                font-size: 13px;
-                animation: slideIn 0.3s ease;
-                min-width: 280px;
-            `;
-            toast.textContent = message;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'slideIn 0.3s ease reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // TAB SWITCHING
-        // ═══════════════════════════════════════════════════════════════
-        function switchTab(tabName) {
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-            
-            if (tabName === 'analytics') {
-                showToast('📊 Analytics - Bientôt disponible', 'info');
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // SEARCH
-        // ═══════════════════════════════════════════════════════════════
-        document.getElementById('searchInput').addEventListener('input', renderTokens);
-
-        // ═══════════════════════════════════════════════════════════════
-        // CLOSE MODALS ON OUTSIDE CLICK
-        // ═══════════════════════════════════════════════════════════════
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                }
-            });
-        });
-    </script>
+    // Close modals on outside click
+    document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('active'); }));
+    document.getElementById('searchInput').addEventListener('input', renderTokens);
+  </script>
 </body>
 </html>
