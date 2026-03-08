@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════╗
- * ║                     SolBot v4.0 — Production Build                     ║
+ * ║                     SolBot v6.0 — Production Build                     ║
  * ║              Réécriture complète depuis zéro — Mars 2026               ║
  * ╠══════════════════════════════════════════════════════════════════════════╣
  * ║  Architecture modulaire en 14 sections :                                ║
@@ -31,6 +31,16 @@
  * ║   [v3]    DCA prix moyen pondéré                                        ║
  * ║   [v3]    Retry quote refetch (expire ~60s)                            ║
  * ║   [v3]    stopLossHit persisté → pas de double-vente après restart     ║
+ * ╠══════════════════════════════════════════════════════════════════════════╣
+ * ║  Nouveautés v6.0 (sur base v5.0) :                                      ║
+ * ║   SCANNER  TokenScanner — détecte nouveaux tokens PumpFun+Raydium      ║
+ * ║             via Helius WebSocket, score + achat automatique            ║
+ * ║   RISQUE   Daily Loss Limit — pause bot si pertes/jour > seuil         ║
+ * ║             Reset automatique minuit UTC                               ║
+ * ║   STATS    Portfolio Value History — courbe valeur totale              ║
+ * ║             Stats par token : meilleur/pire/durée holding              ║
+ * ║             API /api/portfolio-history, /api/scanner/status            ║
+ * ║             /api/scanner/seen, /api/daily-loss                         ║
  * ╠══════════════════════════════════════════════════════════════════════════╣
  * ║  Nouveautés v5.0 (sur base v4.0) :                                      ║
  * ║   ENTRÉE  Pyramid In  — rachète sur montée (paliers configurables)      ║
@@ -170,6 +180,26 @@ const CFG = {
   // ── §NEW  Sortie USDC (sell → USDC au lieu de SOL) ────────────────────────
   // Mettre SELL_TO_USDC=true dans les env vars Render pour activer
   SELL_TO_USDC: process.env.SELL_TO_USDC === 'true',
+
+  // ── §v6  Token Scanner — détection automatique nouveaux tokens ────────────
+  SCANNER_ENABLED:     process.env.SCANNER_ENABLED === 'true',
+  SCANNER_MIN_SCORE:   parseFloat(process.env.SCANNER_MIN_SCORE   || '60'),
+  SCANNER_MIN_LIQ:     parseFloat(process.env.SCANNER_MIN_LIQ     || '5000'),   // $ liquidité minimum
+  SCANNER_MAX_LIQ:     parseFloat(process.env.SCANNER_MAX_LIQ     || '500000'), // $ liquidité maximum
+  SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.05'),   // SOL par achat scanner
+  SCANNER_COOLDOWN_MS: parseInt(process.env.SCANNER_COOLDOWN_MS   || '300000'), // 5 min cooldown par mint
+  SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '15000'),  // délai avant éval (laisser DexScreener indexer)
+  SCANNER_PROGRAMS: [
+    '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium AMM v4
+    '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',  // PumpFun
+  ],
+
+  // ── §v6  Daily Loss Limit ─────────────────────────────────────────────────
+  DAILY_LOSS_ENABLED: process.env.DAILY_LOSS_ENABLED === 'true',
+  DAILY_LOSS_LIMIT:   parseFloat(process.env.DAILY_LOSS_LIMIT || '-2.0'), // SOL/jour (négatif)
+
+  // ── §v6  Portfolio History ────────────────────────────────────────────────
+  HISTORY_MAX_POINTS: parseInt(process.env.HISTORY_MAX_POINTS || '288'), // 24h à 5min
 };
 
 if (!CFG.PRIVATE_KEY) { console.error('❌ PRIVATE_KEY manquante'); process.exit(1); }
@@ -193,7 +223,7 @@ const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SPL_TOKEN  = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const SPL_2022   = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 const JITO_TIP_WALLET = 'Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY';
-const VERSION    = '5.0.0';
+const VERSION    = '6.0.0';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §3  UTILITAIRES
@@ -1739,6 +1769,20 @@ class BotLoop {
     this.momentum  = new MomentumTracker();
     this.analytics = new Analytics(state);
     this.costBasis = new Map(Object.entries(state.costBasis || {}));
+
+    // §v6 — Daily Loss Limit
+    this.dailyLoss = {
+      date:       this._today(),
+      realizedSol: state.dailyLoss?.date === this._today() ? (state.dailyLoss?.realizedSol || 0) : 0,
+      paused:     false,
+    };
+
+    // §v6 — Portfolio Value History
+    this.valueHistory = state.valueHistory || []; // [{ ts, value }]
+  }
+
+  _today() {
+    return new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD' UTC
   }
 
   // ── Persistance ─────────────────────────────────────────────────────────────
@@ -1752,7 +1796,9 @@ class BotLoop {
       breakEven:   Array.from(this.positions.breakEven),
       analytics:   this.analytics.serialize(),
       costBasis:   Object.fromEntries(this.costBasis),
-      slExits:     this.positions.serializeSlExits(), // §NEW
+      slExits:     this.positions.serializeSlExits(),
+      dailyLoss:   { date: this.dailyLoss.date, realizedSol: this.dailyLoss.realizedSol }, // §v6
+      valueHistory: this.valueHistory.slice(-CFG.HISTORY_MAX_POINTS), // §v6
     });
   }
 
@@ -1781,10 +1827,43 @@ class BotLoop {
       if (cb.tokBought <= 0) this.costBasis.delete(mint);
 
       this.analytics.record({ pnlSol, pnlPct, holdMs, symbol, solOut });
+
+      // §v6 — Daily Loss tracking
+      this._trackDailyLoss(pnlSol);
     } else {
       this.analytics.totalSoldSol = +(this.analytics.totalSoldSol + solOut).toFixed(6);
     }
     return { pnlSol, pnlPct, holdMs };
+  }
+
+  // §v6 — Daily Loss helpers
+  _trackDailyLoss(pnlSol) {
+    const today = this._today();
+    if (this.dailyLoss.date !== today) {
+      // Nouveau jour — reset
+      this.dailyLoss = { date: today, realizedSol: 0, paused: false };
+      log('info', '📅 Daily Loss Limit reset (nouveau jour)');
+    }
+    this.dailyLoss.realizedSol = +(this.dailyLoss.realizedSol + pnlSol).toFixed(6);
+
+    if (CFG.DAILY_LOSS_ENABLED && this.dailyLoss.realizedSol <= CFG.DAILY_LOSS_LIMIT && !this.dailyLoss.paused) {
+      this.dailyLoss.paused = true;
+      log('warn', `🛑 DAILY LOSS LIMIT atteint (${this.dailyLoss.realizedSol.toFixed(4)} SOL) — nouveaux achats suspendus`);
+      webhook(
+        '🛑 Daily Loss Limit atteint',
+        `Pertes du jour : **${this.dailyLoss.realizedSol.toFixed(4)} SOL** (limite : ${CFG.DAILY_LOSS_LIMIT} SOL)\nNouveaux achats automatiques suspendus jusqu'à minuit UTC.`,
+        0xff2d55,
+        [{ name: 'Date', value: today, inline: true }],
+      ).catch(() => {});
+    }
+  }
+
+  isDailyLossPaused() {
+    const today = this._today();
+    if (this.dailyLoss.date !== today) {
+      this.dailyLoss = { date: today, realizedSol: 0, paused: false };
+    }
+    return CFG.DAILY_LOSS_ENABLED && this.dailyLoss.paused;
   }
 
   recordTrade(entry) {
@@ -1836,6 +1915,12 @@ class BotLoop {
       return false;
     }
 
+    // §v6 — Daily Loss guard (sauf pour PYRAMID et DCA sur positions existantes)
+    if (this.isDailyLossPaused() && !reason.startsWith('PYRAMID') && !reason.startsWith('DCAD')) {
+      log('warn', `_autoBuy bloqué par Daily Loss Limit (${reason})`);
+      return false;
+    }
+
     const bps = this.scorer.slippage(priceData?.liquidity, 'normal');
     let result;
     try {
@@ -1851,10 +1936,36 @@ class BotLoop {
     }
 
     const sym = priceData?.symbol || mint.slice(0, 8);
-    this.recordBuy(mint, solAmount, result.outAmount || 0);
+    const tokBought = result.outAmount || 0;
+
+    // §FIX — Prix d'entrée exact = SOL dépensé / tokens reçus (pas le prix marché du tick suivant)
+    const exactEntryPrice = tokBought > 0 ? solAmount / tokBought : (priceData?.price || 0);
+
+    this.recordBuy(mint, solAmount, tokBought);
+
+    // Enregistrer l'entrée IMMÉDIATEMENT avec le prix réel du swap
+    // trackEntry ne fait rien si la position existe déjà (pyramid/DCA → setEntryPrice pondéré)
+    if (!this.positions.entries.has(mint)) {
+      // Nouvelle position — prix exact du swap
+      this.positions.trackEntry(mint, exactEntryPrice, tokBought, exactEntryPrice);
+    } else {
+      // Position existante (pyramid/DCA) — recalculer prix moyen pondéré
+      const e  = this.positions.entries.get(mint);
+      const cb = this.costBasis.get(mint);
+      if (e && cb && cb.tokBought > 0) {
+        const avgPrice = cb.solSpent / cb.tokBought;
+        e.price        = +avgPrice.toPrecision(10);
+        e.bootstrapped = false;
+        log('info', '📌 Prix moyen pondéré mis à jour', {
+          mint: mint.slice(0, 8), avgPrice: avgPrice.toPrecision(6),
+        });
+      }
+    }
+
     this.recordTrade({
       type: 'buy', mint, symbol: sym,
-      solSpent: solAmount, outAmount: result.outAmount,
+      solSpent: solAmount, outAmount: tokBought,
+      entryPrice: exactEntryPrice,
       reason, txId: result.sig, txUrl: result.txUrl,
     });
 
@@ -2234,6 +2345,17 @@ class BotLoop {
 
       log('debug', 'Cycle done', { tokens: tokens.length, total: `$${tv.toFixed(2)}`, cycle: this.cycle });
 
+      // §v6 — Portfolio Value History snapshot (toutes les 10 cycles)
+      if (this.cycle % 10 === 0) {
+        const solPd    = getPrice(SOL_MINT);
+        const solPrice = solPd?.price || 0;
+        this.valueHistory.push({ ts: Date.now(), valueSol: +tv.toFixed(4), solPriceUsd: +solPrice.toFixed(2) });
+        if (this.valueHistory.length > CFG.HISTORY_MAX_POINTS) this.valueHistory.shift();
+      }
+
+      // §v6 — Reset Daily Loss à minuit UTC
+      this._today(); // force le check (remet paused=false si nouveau jour)
+
       if (this.cycle % 10 === 0) this.persist();
     } catch (err) {
       log('error', 'Tick error', { err: err.message });
@@ -2279,6 +2401,292 @@ class BotLoop {
       negCacheSize:       _negCache.size,
       sellCircuitBreaker: this.swap.sellFailures,
       lastUpdate:         new Date().toISOString(),
+      // §v6
+      dailyLoss: {
+        enabled:     CFG.DAILY_LOSS_ENABLED,
+        limit:       CFG.DAILY_LOSS_LIMIT,
+        today:       this.dailyLoss.date,
+        realizedSol: +this.dailyLoss.realizedSol.toFixed(6),
+        paused:      this.dailyLoss.paused,
+        remaining:   +(CFG.DAILY_LOSS_LIMIT - this.dailyLoss.realizedSol).toFixed(6),
+      },
+      scannerEnabled: CFG.SCANNER_ENABLED,
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// §16  TOKEN SCANNER — Détection automatique nouveaux tokens
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const WebSocket = require('ws');
+
+class TokenScanner {
+  constructor(bot) {
+    this.bot        = bot;
+    this.seen       = new Set();        // mints traités/blacklistés
+    this.cooldowns  = new Map();        // mint → lastAttemptTs
+    this.queue      = [];               // mints en attente d'évaluation
+    this.ws         = null;
+    this.wsId       = 0;
+    this.subIds     = [];
+    this.running    = false;
+    this.reconnects = 0;
+    this.stats = {
+      detected: 0,
+      evaluated: 0,
+      bought: 0,
+      rejected: 0,
+      errors: 0,
+    };
+  }
+
+  start() {
+    if (!CFG.HELIUS_KEY) {
+      log('warn', '⚠️  Scanner désactivé — HELIUS_API_KEY manquant');
+      return;
+    }
+    this.running = true;
+    log('info', '🔍 TokenScanner démarré', { programs: CFG.SCANNER_PROGRAMS.length });
+    this._connect();
+    this._processQueue();
+  }
+
+  stop() {
+    this.running = false;
+    if (this.ws) { try { this.ws.close(); } catch {} this.ws = null; }
+  }
+
+  // ── WebSocket Helius ────────────────────────────────────────────────────────
+
+  _connect() {
+    if (!this.running) return;
+    const wsUrl = `wss://atlas-mainnet.helius-rpc.com/?api-key=${CFG.HELIUS_KEY}`;
+    log('info', `🔗 Scanner WebSocket connexion (tentative ${this.reconnects + 1})`);
+
+    try {
+      this.ws = new WebSocket(wsUrl);
+    } catch (e) {
+      log('error', 'Scanner WebSocket init error', { e: e.message });
+      this._scheduleReconnect();
+      return;
+    }
+
+    this.ws.on('open', () => {
+      log('success', '✅ Scanner WebSocket connecté');
+      this.reconnects = 0;
+      this.subIds = [];
+      // Subscribe aux logs de chaque programme cible
+      for (const programId of CFG.SCANNER_PROGRAMS) {
+        const id = ++this.wsId;
+        this.ws.send(JSON.stringify({
+          jsonrpc: '2.0', id,
+          method: 'logsSubscribe',
+          params: [
+            { mentions: [programId] },
+            { commitment: 'confirmed' },
+          ],
+        }));
+      }
+    });
+
+    this.ws.on('message', (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.method === 'logsNotification') {
+          this._handleLogs(msg.params?.result?.value);
+        }
+      } catch {}
+    });
+
+    this.ws.on('error',  (e) => { log('warn', 'Scanner WS error', { e: e.message }); });
+    this.ws.on('close',  ()  => {
+      log('warn', 'Scanner WS fermé — reconnexion...');
+      this._scheduleReconnect();
+    });
+  }
+
+  _scheduleReconnect() {
+    if (!this.running) return;
+    this.reconnects++;
+    const delay = Math.min(5000 * this.reconnects, 60000);
+    setTimeout(() => this._connect(), delay);
+  }
+
+  // ── Parsing des logs ────────────────────────────────────────────────────────
+
+  _handleLogs(value) {
+    if (!value?.logs || !value?.signature) return;
+    const logs = value.logs;
+    const sig  = value.signature;
+
+    // Détecter init pool Raydium AMM
+    const isRaydiumInit = logs.some(l =>
+      l.includes('initialize2') || l.includes('initialize') && l.includes('675kPX9')
+    );
+
+    // Détecter nouvelle graduation PumpFun → Raydium
+    const isPumpGrad = logs.some(l =>
+      l.includes('MigrateFunds') || l.includes('WithdrawFees') || l.includes('Migrate')
+    );
+
+    // Détecter nouveau token PumpFun (create)
+    const isPumpCreate = logs.some(l => l.includes('Create') || l.includes('create'));
+
+    if (!isRaydiumInit && !isPumpGrad && !isPumpCreate) return;
+
+    // Extraire les mints des logs (adresses base58 de 32-44 chars)
+    const mintCandidates = new Set();
+    for (const log of logs) {
+      const matches = log.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g) || [];
+      for (const m of matches) {
+        if (m !== SOL_MINT && m !== USDC_MINT &&
+            !CFG.SCANNER_PROGRAMS.includes(m) && m.length >= 32) {
+          mintCandidates.add(m);
+        }
+      }
+    }
+
+    for (const mint of mintCandidates) {
+      if (this.seen.has(mint)) continue;
+      if (_negCache.has(mint)) continue;
+
+      // Vérifier cooldown
+      const last = this.cooldowns.get(mint) || 0;
+      if (Date.now() - last < CFG.SCANNER_COOLDOWN_MS) continue;
+
+      this.seen.add(mint);
+      this.stats.detected++;
+      const reason = isRaydiumInit ? 'RAYDIUM_NEW' : isPumpGrad ? 'PUMP_GRAD' : 'PUMP_NEW';
+      log('info', `🆕 Scanner détecté: ${mint.slice(0, 8)}… (${reason})`, { sig: sig.slice(0, 16) });
+
+      // Délai avant évaluation (laisser DexScreener indexer)
+      this.queue.push({ mint, reason, ts: Date.now() + CFG.SCANNER_DELAY_MS });
+    }
+  }
+
+  // ── File d'évaluation ───────────────────────────────────────────────────────
+
+  async _processQueue() {
+    while (this.running) {
+      await sleep(3000);
+      const now = Date.now();
+      const ready = this.queue.filter(e => e.ts <= now);
+      this.queue = this.queue.filter(e => e.ts > now);
+
+      for (const entry of ready) {
+        try {
+          await this._evaluate(entry.mint, entry.reason);
+        } catch (err) {
+          this.stats.errors++;
+          log('warn', `Scanner eval error: ${err.message}`, { mint: entry.mint.slice(0, 8) });
+        }
+        await sleep(500); // rate limit
+      }
+    }
+  }
+
+  // ── Évaluation et achat potentiel ──────────────────────────────────────────
+
+  async _evaluate(mint, reason) {
+    this.cooldowns.set(mint, Date.now());
+
+    // Vérif: déjà en portfolio ?
+    const already = this.bot.portfolio.find(t => t.mintFull === mint);
+    if (already) { this.stats.rejected++; return; }
+
+    // Vérif: trop de positions ouvertes ?
+    const openPositions = this.bot.portfolio.filter(t =>
+      !t.isSol && !t.isUsdc && t.balance > 0
+    ).length;
+    if (openPositions >= CFG.MAX_POSITIONS) {
+      log('debug', `Scanner skip — max positions atteint (${openPositions})`);
+      this.stats.rejected++;
+      return;
+    }
+
+    // Vérif: Daily Loss Limit
+    if (this.bot.isDailyLossPaused()) {
+      log('warn', 'Scanner skip — Daily Loss Limit actif');
+      this.stats.rejected++;
+      return;
+    }
+
+    // Récupérer les données de prix
+    await prefetchPrices([mint]);
+    const pd = getPrice(mint);
+
+    if (!pd || !pd.price || pd.price <= 0) {
+      log('debug', `Scanner: pas de données prix pour ${mint.slice(0, 8)}`);
+      this.stats.rejected++;
+      return;
+    }
+
+    // Filtres liquidité
+    const liq = pd.liquidity || 0;
+    if (liq < CFG.SCANNER_MIN_LIQ) {
+      log('debug', `Scanner reject — liq trop faible $${liq.toFixed(0)} < $${CFG.SCANNER_MIN_LIQ}`, { mint: mint.slice(0, 8) });
+      this.stats.rejected++;
+      return;
+    }
+    if (liq > CFG.SCANNER_MAX_LIQ) {
+      log('debug', `Scanner reject — liq trop élevée $${liq.toFixed(0)} > $${CFG.SCANNER_MAX_LIQ}`, { mint: mint.slice(0, 8) });
+      this.stats.rejected++;
+      return;
+    }
+
+    // Score
+    const score = this.bot.scorer.score(pd);
+    this.stats.evaluated++;
+
+    if (score < CFG.SCANNER_MIN_SCORE) {
+      log('debug', `Scanner reject — score ${score} < ${CFG.SCANNER_MIN_SCORE}`, {
+        mint: mint.slice(0, 8), sym: pd.symbol,
+      });
+      this.stats.rejected++;
+      return;
+    }
+
+    // Calculer le montant SOL (Smart Sizing si activé)
+    const solAmount = this.bot.calcSmartSize(score) || CFG.SCANNER_SOL_AMOUNT;
+
+    log('info', `🟢 Scanner BUY — score:${score} liq:$${liq.toFixed(0)} sol:${solAmount}`, {
+      mint: mint.slice(0, 8), sym: pd.symbol, reason,
+    });
+
+    const ok = await this.bot._autoBuy(mint, solAmount, `SCANNER_${reason}`, pd, {
+      webhookTitle:  `Scanner — Nouveau token détecté`,
+      webhookDesc:   `**${pd.symbol || mint.slice(0, 8)}** | Score: **${score}/100** | Liq: $${liq.toFixed(0)}`,
+      webhookColor:  0x00d9ff,
+      webhookFields: [
+        { name: 'Raison',    value: reason,                   inline: true },
+        { name: 'SOL',       value: solAmount.toFixed(4),     inline: true },
+        { name: 'Score',     value: `${score}/100`,           inline: true },
+        { name: 'Liquidité', value: `$${liq.toFixed(0)}`,     inline: true },
+      ],
+    });
+
+    if (ok) {
+      this.stats.bought++;
+      log('success', `✅ Scanner acheté ${pd.symbol || mint.slice(0, 8)} (${score}/100)`);
+    } else {
+      this.stats.errors++;
+    }
+  }
+
+  getStatus() {
+    return {
+      running:      this.running,
+      wsConnected:  this.ws?.readyState === 1,
+      enabled:      CFG.SCANNER_ENABLED,
+      minScore:     CFG.SCANNER_MIN_SCORE,
+      minLiq:       CFG.SCANNER_MIN_LIQ,
+      maxLiq:       CFG.SCANNER_MAX_LIQ,
+      solAmount:    CFG.SCANNER_SOL_AMOUNT,
+      delayMs:      CFG.SCANNER_DELAY_MS,
+      queueLength:  this.queue.length,
+      seenCount:    this.seen.size,
+      stats:        this.stats,
     };
   }
 }
@@ -2287,7 +2695,7 @@ class BotLoop {
 // §14  API EXPRESS — 35 routes organisées par domaine
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function startApi(bot, wallet) {
+function startApi(bot, wallet, scanner) {
   const app = express();
   app.use(express.json({ limit: '256kb' }));
 
@@ -2421,6 +2829,12 @@ function startApi(bot, wallet) {
     smartSizeMult: CFG.SMART_SIZE_MULT, smartSizeMin: CFG.SMART_SIZE_MIN, smartSizeMax: CFG.SMART_SIZE_MAX,
     // §NEW — Sortie USDC
     sellToUsdc: CFG.SELL_TO_USDC,
+    // §v6 — Scanner
+    scannerEnabled: CFG.SCANNER_ENABLED, scannerMinScore: CFG.SCANNER_MIN_SCORE,
+    scannerMinLiq: CFG.SCANNER_MIN_LIQ, scannerMaxLiq: CFG.SCANNER_MAX_LIQ,
+    scannerSolAmount: CFG.SCANNER_SOL_AMOUNT,
+    // §v6 — Daily Loss
+    dailyLossEnabled: CFG.DAILY_LOSS_ENABLED, dailyLossLimit: CFG.DAILY_LOSS_LIMIT,
   }));
 
   app.post('/api/config', (req, res) => {
@@ -2502,6 +2916,17 @@ function startApi(bot, wallet) {
 
     // §NEW — Sortie USDC
     if (b.sellToUsdc !== undefined) CFG.SELL_TO_USDC = !!b.sellToUsdc;
+
+    // §v6 — Scanner
+    if (b.scannerEnabled   !== undefined) CFG.SCANNER_ENABLED   = !!b.scannerEnabled;
+    applyNum('scannerMinScore',  0,    100,    n => CFG.SCANNER_MIN_SCORE  = n);
+    applyNum('scannerMinLiq',    0,    1e7,    n => CFG.SCANNER_MIN_LIQ    = n);
+    applyNum('scannerMaxLiq',    0,    1e8,    n => CFG.SCANNER_MAX_LIQ    = n);
+    applyNum('scannerSolAmount', 0.001, 10,   n => CFG.SCANNER_SOL_AMOUNT  = n);
+
+    // §v6 — Daily Loss
+    if (b.dailyLossEnabled !== undefined) CFG.DAILY_LOSS_ENABLED = !!b.dailyLossEnabled;
+    applyNum('dailyLossLimit', -100, 0, n => CFG.DAILY_LOSS_LIMIT = n);
 
     log('info', 'Config mise à jour');
     res.json({ success: true });
@@ -2881,6 +3306,146 @@ function startApi(bot, wallet) {
       min: CFG.SMART_SIZE_MIN, max: CFG.SMART_SIZE_MAX });
   });
 
+  // ─── §v6 · Scanner ────────────────────────────────────────────────────────
+
+  app.get('/api/scanner/status', (_, res) => {
+    res.json(scanner ? scanner.getStatus() : { enabled: false, running: false, reason: 'no scanner' });
+  });
+
+  app.get('/api/scanner/seen', (_, res) => {
+    res.json({
+      count: scanner?.seen.size || 0,
+      mints: Array.from(scanner?.seen || []).slice(-100),
+    });
+  });
+
+  app.post('/api/scanner/config', (req, res) => {
+    const b = req.body || {};
+    const num = (v, mn, mx) => { const n = parseFloat(v); return (!isNaN(n) && n >= mn && n <= mx) ? n : null; };
+    if (b.enabled !== undefined)    CFG.SCANNER_ENABLED   = !!b.enabled;
+    const s = num(b.minScore, 0, 100); if (s !== null) CFG.SCANNER_MIN_SCORE = s;
+    const l = num(b.minLiq, 0, 1e7);  if (l !== null) CFG.SCANNER_MIN_LIQ   = l;
+    const x = num(b.maxLiq, 0, 1e8);  if (x !== null) CFG.SCANNER_MAX_LIQ   = x;
+    const a = num(b.solAmount, 0.001, 10); if (a !== null) CFG.SCANNER_SOL_AMOUNT = a;
+    if (scanner && b.enabled === true  && !scanner.running) scanner.start();
+    if (scanner && b.enabled === false && scanner.running)  scanner.stop();
+    res.json({ success: true, config: scanner?.getStatus() });
+  });
+
+  app.post('/api/scanner/reset-seen', (_, res) => {
+    if (scanner) scanner.seen.clear();
+    res.json({ success: true, message: 'Seen list effacée' });
+  });
+
+  // ─── §v6 · Daily Loss ─────────────────────────────────────────────────────
+
+  app.get('/api/daily-loss', (_, res) => {
+    res.json({
+      enabled:     CFG.DAILY_LOSS_ENABLED,
+      limit:       CFG.DAILY_LOSS_LIMIT,
+      today:       bot.dailyLoss.date,
+      realizedSol: +bot.dailyLoss.realizedSol.toFixed(6),
+      paused:      bot.dailyLoss.paused,
+      remaining:   +(CFG.DAILY_LOSS_LIMIT - bot.dailyLoss.realizedSol).toFixed(6),
+      pct:         CFG.DAILY_LOSS_LIMIT !== 0
+        ? +((bot.dailyLoss.realizedSol / Math.abs(CFG.DAILY_LOSS_LIMIT)) * 100).toFixed(1)
+        : 0,
+    });
+  });
+
+  app.post('/api/daily-loss/config', (req, res) => {
+    const b = req.body || {};
+    if (b.enabled !== undefined)   CFG.DAILY_LOSS_ENABLED = !!b.enabled;
+    const n = parseFloat(b.limit);
+    if (!isNaN(n) && n <= 0 && n >= -100) CFG.DAILY_LOSS_LIMIT = n;
+    res.json({ success: true });
+  });
+
+  app.post('/api/daily-loss/reset', (_, res) => {
+    bot.dailyLoss.paused = false;
+    bot.dailyLoss.realizedSol = 0;
+    bot.dailyLoss.date = bot._today();
+    log('info', 'Daily Loss reset manuellement');
+    res.json({ success: true, message: 'Daily Loss remis à zéro, achats repris' });
+  });
+
+  // ─── §v6 · Portfolio History ───────────────────────────────────────────────
+
+  app.get('/api/portfolio-history', (_, res) => {
+    const history = bot.valueHistory;
+    // Calculer stats sur la période
+    const values = history.map(h => h.valueSol).filter(v => v > 0);
+    const first  = values[0] || 0;
+    const last   = values[values.length - 1] || 0;
+    const max    = values.length ? Math.max(...values) : 0;
+    const min    = values.length ? Math.min(...values) : 0;
+
+    res.json({
+      history,
+      points: history.length,
+      summary: {
+        first:   +first.toFixed(4),
+        last:    +last.toFixed(4),
+        max:     +max.toFixed(4),
+        min:     +min.toFixed(4),
+        change:  first > 0 ? +(((last - first) / first) * 100).toFixed(2) : 0,
+        spanH:   history.length > 1
+          ? +((history[history.length - 1].ts - history[0].ts) / 3_600_000).toFixed(1)
+          : 0,
+      },
+    });
+  });
+
+  // ─── §v6 · Stats avancées par token ───────────────────────────────────────
+
+  app.get('/api/token-stats', (_, res) => {
+    const trades = bot.history;
+    const byToken = {};
+
+    for (const t of trades) {
+      if (!t.mint) continue;
+      if (!byToken[t.mint]) byToken[t.mint] = {
+        mint: t.mint, symbol: t.symbol || t.mint.slice(0, 8),
+        buys: 0, sells: 0, totalSolIn: 0, totalSolOut: 0,
+        pnlSol: 0, pnlPcts: [], holdTimes: [],
+      };
+      const e = byToken[t.mint];
+      if (t.type === 'buy')  { e.buys++;  e.totalSolIn  += (t.solSpent || 0); }
+      if (t.type === 'sell') {
+        e.sells++;
+        e.totalSolOut += (t.solOut || 0);
+        if (t.pnlSol  != null) e.pnlSol += t.pnlSol;
+        if (t.pnlPct  != null) e.pnlPcts.push(t.pnlPct);
+        if (t.holdMs  != null && t.holdMs > 0) e.holdTimes.push(t.holdMs);
+      }
+    }
+
+    const rows = Object.values(byToken).map(e => ({
+      mint: e.mint, symbol: e.symbol,
+      buys: e.buys, sells: e.sells,
+      totalSolIn:  +e.totalSolIn.toFixed(6),
+      totalSolOut: +e.totalSolOut.toFixed(6),
+      pnlSol:      +e.pnlSol.toFixed(6),
+      avgPnlPct:   e.pnlPcts.length ? +(e.pnlPcts.reduce((a, b) => a + b, 0) / e.pnlPcts.length).toFixed(2) : null,
+      bestPnlPct:  e.pnlPcts.length ? +Math.max(...e.pnlPcts).toFixed(2) : null,
+      worstPnlPct: e.pnlPcts.length ? +Math.min(...e.pnlPcts).toFixed(2) : null,
+      avgHoldMs:   e.holdTimes.length ? Math.round(e.holdTimes.reduce((a, b) => a + b, 0) / e.holdTimes.length) : null,
+    })).sort((a, b) => b.pnlSol - a.pnlSol);
+
+    const best  = rows[0] || null;
+    const worst = rows[rows.length - 1] || null;
+
+    res.json({
+      tokens: rows,
+      summary: {
+        best:  best  ? { symbol: best.symbol,  pnlSol: best.pnlSol,  pnlPct: best.bestPnlPct }  : null,
+        worst: worst ? { symbol: worst.symbol, pnlSol: worst.pnlSol, pnlPct: worst.worstPnlPct } : null,
+        totalRealizedSol: +rows.reduce((s, r) => s + r.pnlSol, 0).toFixed(6),
+        uniqueTokens: rows.length,
+      },
+    });
+  });
+
   app.use((_, res) => res.status(404).json({ error: 'Not found' }));
 
   app.listen(CFG.PORT, '0.0.0.0', () =>
@@ -2909,12 +3474,18 @@ async function main() {
     HYST:      CFG.TP_HYSTERESIS + '%',
     INTERVAL:  CFG.INTERVAL_SEC + 's',
     PRICE_TTL: CFG.PRICE_TTL_MS / 1000 + 's',
+    SCANNER:   CFG.SCANNER_ENABLED ? `✅ [score≥${CFG.SCANNER_MIN_SCORE} liq$${CFG.SCANNER_MIN_LIQ}-$${CFG.SCANNER_MAX_LIQ}]` : '❌ OFF',
+    DAILY_LOSS:CFG.DAILY_LOSS_ENABLED ? `✅ [limit ${CFG.DAILY_LOSS_LIMIT} SOL/j]` : '❌ OFF',
   });
 
   const wallet = loadWallet();
   const rpc    = createRpc();
   const state  = loadState();
   const bot    = new BotLoop(wallet, rpc, state);
+
+  // §v6 — Token Scanner
+  const scanner = new TokenScanner(bot);
+  if (CFG.SCANNER_ENABLED) scanner.start();
 
   log('info', 'Premier tick…');
   await bot.tick();
@@ -2924,7 +3495,7 @@ async function main() {
     CFG.INTERVAL_SEC * 1000,
   );
 
-  startApi(bot, wallet);
+  startApi(bot, wallet, scanner);
 
   log('success', '✅ Bot opérationnel', {
     address:  wallet.publicKey.toString().slice(0, 8) + '…',
@@ -2941,4 +3512,3 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
-
