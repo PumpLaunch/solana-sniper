@@ -2578,6 +2578,7 @@ class TokenScanner {
   constructor(bot) {
     this.bot       = bot;
     this.seen      = new Set();
+    this.pending   = new Set();   // mints dans la queue non encore évalués
     this.cooldowns = new Map();
     this.queue     = [];
     this.ws        = null;
@@ -2665,6 +2666,38 @@ class TokenScanner {
     setTimeout(() => this._connectWs(), delay);
   }
 
+  // ── Validation d'une adresse mint Solana ──────────────────────────────────
+
+  _isValidMint(addr) {
+    // Une adresse Solana valide = 32-44 chars base58
+    if (!addr || addr.length < 32 || addr.length > 44) return false;
+    // Alphabet base58 strict (pas de 0, O, I, l)
+    if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(addr)) return false;
+    // Rejeter les faux positifs : données binaires encodées ont des runs de chars répétés
+    // ex: AAAAAAAA, SQAAAAAA, eAAAAAAA — jamais dans une vraie adresse
+    if (/(.)\1{4,}/.test(addr)) return false;
+    // Rejeter si > 60% du string est un seul caractère (données nulles)
+    const charCounts = {};
+    for (const c of addr) charCounts[c] = (charCounts[c] || 0) + 1;
+    const maxFreq = Math.max(...Object.values(charCounts));
+    if (maxFreq / addr.length > 0.5) return false;
+    // Rejeter les adresses connues non-token
+    if (addr === SOL_MINT || addr === USDC_MINT) return false;
+    if (CFG.SCANNER_PROGRAMS.includes(addr)) return false;
+    // Rejeter les adresses système Solana communes
+    const SYSTEM_ADDRS = new Set([
+      '11111111111111111111111111111111',          // System program
+      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // SPL Token
+      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe8bv',  // ATA
+      'ComputeBudget111111111111111111111111111111',
+      'Sysvar1nstructions1111111111111111111111111',
+      'SysvarRent111111111111111111111111111111111',
+      'SysvarC1ock11111111111111111111111111111111',
+    ]);
+    if (SYSTEM_ADDRS.has(addr)) return false;
+    return true;
+  }
+
   _handleLogs(value) {
     if (!value?.logs || !value?.signature) return;
     const logs = value.logs;
@@ -2676,10 +2709,10 @@ class TokenScanner {
 
     const mintCandidates = new Set();
     for (const l of logs) {
+      // Chercher dans les logs "Program log: ..." des adresses mint explicitement mentionnées
       const matches = l.match(/[1-9A-HJ-NP-Za-km-z]{43,44}/g) || [];
       for (const m of matches) {
-        if (m !== SOL_MINT && m !== USDC_MINT && !CFG.SCANNER_PROGRAMS.includes(m))
-          mintCandidates.add(m);
+        if (this._isValidMint(m)) mintCandidates.add(m);
       }
     }
 
@@ -2703,6 +2736,7 @@ class TokenScanner {
         const mint = item?.tokenAddress;
         const chain = item?.chainId;
         if (!mint || chain !== 'solana') continue;
+        if (!this._isValidMint(mint)) continue;   // filtre adresses invalides
         this._enqueue(mint, 'DEX_LATEST');
       }
     } catch (err) {
@@ -2739,15 +2773,19 @@ class TokenScanner {
     }
   }
 
-  // ── Enfile un mint (dédup + cooldown) ─────────────────────────────────────
+  // ── Enfile un mint (dédup strict : seen + pending + cooldown) ─────────────
 
   _enqueue(mint, reason) {
-    if (this.seen.has(mint)) return;
-    if (_negCache.has(mint)) return;
+    if (!this._isValidMint(mint)) return;          // adresse invalide
+    if (this.seen.has(mint))    return;            // déjà évalué
+    if (this.pending.has(mint)) return;            // déjà dans la queue
+    if (_negCache.has(mint))    return;            // token mort connu
+
     const last = this.cooldowns.get(mint) || 0;
     if (Date.now() - last < CFG.SCANNER_COOLDOWN_MS) return;
 
     this.seen.add(mint);
+    this.pending.add(mint);
     this.stats.detected++;
     log('info', `🆕 Scanner détecté: ${mint.slice(0, 8)}… (${reason})`);
     this.queue.push({ mint, reason, ts: Date.now() + CFG.SCANNER_DELAY_MS });
@@ -2757,6 +2795,7 @@ class TokenScanner {
 
   async _evaluate(mint, reason) {
     this.cooldowns.set(mint, Date.now());
+    this.pending.delete(mint); // libérer même si on rejette
 
     const already = this.bot.portfolio.find(t => t.mintFull === mint);
     if (already) { this.stats.rejected++; return; }
@@ -2826,6 +2865,7 @@ class TokenScanner {
       maxLiq:        CFG.SCANNER_MAX_LIQ,
       solAmount:     CFG.SCANNER_SOL_AMOUNT,
       queueLength:   this.queue.length,
+      pendingCount:  this.pending.size,
       seenCount:     this.seen.size,
       stats:         this.stats,
     };
@@ -3654,3 +3694,4 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
+
