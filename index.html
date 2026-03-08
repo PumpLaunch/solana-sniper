@@ -275,6 +275,8 @@ body {
 .token-row:hover { background: var(--bg-hover); }
 .token-row:active { background: var(--bg-active); }
 .token-row.sl-row { opacity: 0.6; }
+.token-row.sol-row  { background: rgba(153,69,255,0.04); border-left: 2px solid rgba(153,69,255,0.4); }
+.token-row.usdc-row { background: rgba(59,130,246,0.04); border-left: 2px solid rgba(59,130,246,0.35); }
 
 .row-rank { font-family: var(--font-mono); font-size: 11px; color: var(--text-ghost); text-align: left; }
 
@@ -922,6 +924,13 @@ body {
 
     <!-- ─── PORTFOLIO ─── -->
     <section id="portfolio" class="section active">
+      <div id="portfolioFilterBar" style="display:flex;align-items:center;gap:8px;padding:8px 4px 6px;flex-wrap:wrap;">
+        <span id="portfolioCount" style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);"></span>
+        <div style="flex:1;"></div>
+        <button id="btnFilterDead" onclick="toggleDeadFilter()" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;opacity:0.7;" title="Masquer/afficher les tokens sans prix">
+          👁 Morts : <span id="deadFilterLabel">cachés</span>
+        </button>
+      </div>
       <div id="tokenList">
         <div class="loading"><div class="spinner"></div><span>Chargement...</span></div>
       </div>
@@ -1740,12 +1749,47 @@ function updateConfigUI() {
   renderTpTiers(configData.takeProfitTiers);
 }
 
+let _showDeadTokens = false;
+let _lastPortfolioTokens = [];
+
+function toggleDeadFilter() {
+  _showDeadTokens = !_showDeadTokens;
+  const lbl = document.getElementById('deadFilterLabel');
+  if (lbl) lbl.textContent = _showDeadTokens ? 'visibles' : 'cachés';
+  renderPortfolio(_lastPortfolioTokens);
+}
+
+function isDeadToken(tok) {
+  // Token mort = pas de prix ET pas de symbole propre (adresse brute comme nom)
+  if (tok.isSol || tok.isUsdc) return false;
+  const hasPrice  = tok.price != null && tok.price > 0;
+  const hasSymbol = tok.symbol && /[a-zA-Z]{2,}/.test(tok.symbol) && tok.symbol.length <= 24 && tok.symbol !== tok.mintFull?.slice(0, 8);
+  return !hasPrice && !hasSymbol;
+}
+
 function renderPortfolio(tokens) {
+  _lastPortfolioTokens = tokens;
   const list = document.getElementById('tokenList');
 
   tokens.forEach(t => { if (!t.mintFull) t.mintFull = t.mint; });
 
-  if (!tokens.length) {
+  // Split live vs dead
+  const live = tokens.filter(t => !isDeadToken(t));
+  const dead = tokens.filter(t => isDeadToken(t));
+  const display = _showDeadTokens ? tokens : live;
+
+  // Update counter
+  const cnt = document.getElementById('portfolioCount');
+  if (cnt) {
+    cnt.textContent = dead.length > 0
+      ? `${live.length} actifs · ${dead.length} mort${dead.length > 1 ? 's' : ''} cachés`
+      : `${live.length} tokens`;
+    if (!_showDeadTokens) cnt.textContent = dead.length > 0
+      ? `${live.length} actifs · ${dead.length} mort${dead.length > 1 ? 's' : ''} masqués`
+      : `${live.length} tokens`;
+  }
+
+  if (!display.length) {
     list.innerHTML = `
       <div class="empty">
         <div class="empty-icon">◈</div>
@@ -1767,40 +1811,58 @@ function renderPortfolio(tokens) {
       <div class="th">ACTIONS</div>
     </div>`;
 
-  const rows = tokens.map((tok, i) => {
+  const rows = display.map((tok, i) => {
     const pnl    = tok.pnl ?? null;
     const pClass = pnl === null ? 'dim' : pnl >= 0 ? 'pos' : 'neg';
     const pStr   = pnl === null ? '—' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`;
     const peak   = tok.peakPnl ?? 0;
     const liq    = tok.liquidity ?? 0;
     const val    = tok.value ?? 0;
-    const logo   = tok.logo
-      ? `<img src="${tok.logo}" onerror="this.parentElement.innerHTML='🪙'" loading="lazy">`
-      : '🪙';
+    const isDead = isDeadToken(tok);
+
+    // Logo spécial SOL/USDC, sinon img standard
+    let logo;
+    if (tok.logo) {
+      logo = `<img src="${tok.logo}" onerror="this.parentElement.innerHTML='🪙'" loading="lazy">`;
+    } else {
+      logo = '🪙';
+    }
 
     const badges = [];
-    if (tok.bootstrapped) badges.push('<span class="badge-xs badge-gold">BOOT</span>');
-    if (tok.stopLossHit)  badges.push('<span class="badge-xs badge-dn">SL</span>');
-    if (tok.breakEven)    badges.push('<span class="badge-xs badge-info">BE</span>');
+    if (tok.isSol)         badges.push('<span class="badge-xs" style="background:rgba(153,69,255,0.25);color:#9945ff;border:1px solid rgba(153,69,255,0.4);">SOL</span>');
+    else if (tok.isUsdc)   badges.push('<span class="badge-xs" style="background:rgba(39,117,201,0.25);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);">USDC</span>');
+    else if (tok.bootstrapped) badges.push('<span class="badge-xs badge-gold">BOOT</span>');
+    if (tok.stopLossHit)   badges.push('<span class="badge-xs badge-dn">SL</span>');
+    if (tok.breakEven)     badges.push('<span class="badge-xs badge-info">BE</span>');
+
+    // Style spécial pour tokens morts
+    const rowStyle = isDead ? ' style="opacity:0.45;"' : '';
+    // SOL/USDC ont un léger fond distinct
+    const rowClass = tok.isSol ? ' sol-row' : tok.isUsdc ? ' usdc-row' : tok.stopLossHit ? ' sl-row' : '';
+
+    // Valeur affichée : USDC en $, SOL calculé, autres en $
+    const valStr = tok.isUsdc ? `$${val.toFixed(2)}` : val > 0 ? `$${val.toFixed(2)}` : '—';
+    // Balance affichée pour SOL/USDC
+    const balStr = tok.isSol ? `${tok.balance?.toFixed(4)} ◎` : tok.isUsdc ? `${tok.balance?.toFixed(2)} $` : null;
 
     return `
-      <div class="token-row ${tok.stopLossHit ? 'sl-row' : ''}" onclick="openTokenDetail('${tok.mintFull}')">
+      <div class="token-row${rowClass}"${rowStyle} onclick="openTokenDetail('${tok.mintFull}')">
         <div class="row-rank">${i + 1}</div>
         <div class="row-token">
           <div class="row-logo">${logo}</div>
           <div>
-            <div class="row-sym">${tok.symbol || tok.mint.slice(0,8)}</div>
+            <div class="row-sym" style="${tok.isSol ? 'color:#9945ff' : tok.isUsdc ? 'color:#3b82f6' : ''}">${tok.symbol || tok.mint.slice(0,8)}</div>
             <div style="display:flex;gap:3px;align-items:center;margin-top:2px;">
               <span class="row-addr">${tok.mint.slice(0,4)}…${tok.mint.slice(-4)}</span>
               ${badges.join('')}
             </div>
           </div>
         </div>
-        <div class="row-num neu col-value">$${val.toFixed(2)}</div>
-        <div class="row-num ${pClass} pnl-col" data-value="$${val.toFixed(2)}">${pStr}</div>
+        <div class="row-num neu col-value">${valStr}${balStr ? `<div style="font-size:9px;color:var(--text-dim);margin-top:1px;">${balStr}</div>` : ''}</div>
+        <div class="row-num ${pClass} pnl-col" data-value="${valStr}">${pStr}</div>
         <div class="row-num pos col-peak">+${peak.toFixed(1)}%</div>
         <div class="row-num gold col-score">${tok.score ?? '—'}</div>
-        <div class="row-num dim col-liq">$${(liq/1000).toFixed(1)}k</div>
+        <div class="row-num dim col-liq">${liq > 0 ? '$'+(liq/1000).toFixed(1)+'k' : '—'}</div>
         <div class="row-actions">
           <button class="btn-row buy"  onclick="event.stopPropagation(); openBuyModal('${tok.mintFull}')">B</button>
           <button class="btn-row sell" onclick="event.stopPropagation(); openSellModal('${tok.mintFull}','${(tok.symbol||tok.mint.slice(0,8)).replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${tok.balance||0})">S</button>
@@ -1809,7 +1871,29 @@ function renderPortfolio(tokens) {
       </div>`;
   }).join('');
 
-  list.innerHTML = `<div class="panel" style="overflow:hidden;">${header}${rows}</div>`;
+  // Section séparatrice tokens morts si affichés
+  let deadHeader = '';
+  if (_showDeadTokens && dead.length > 0) {
+    const liveCount = live.length;
+    const isInDeadSection = (tok, idx) => idx >= liveCount;
+    if (live.length > 0) {
+      deadHeader = `<div style="padding:6px 12px;background:var(--bg-panel);border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:10px;color:var(--text-dim);letter-spacing:0.05em;">▼ TOKENS SANS PRIX (${dead.length}) — ruggés ou abandonnés</div>`;
+    }
+  }
+
+  list.innerHTML = `<div class="panel" style="overflow:hidden;">${header}${rows}${deadHeader ? '' : ''}</div>`;
+
+  // Si on affiche les morts, injecter le séparateur entre live et dead dans le DOM
+  if (_showDeadTokens && dead.length > 0 && live.length > 0) {
+    const panel = list.querySelector('.panel');
+    const allRows = panel.querySelectorAll('.token-row');
+    if (allRows[live.length]) {
+      const sep = document.createElement('div');
+      sep.style.cssText = 'padding:5px 12px;background:rgba(255,45,85,0.06);border-top:1px solid rgba(255,45,85,0.2);border-bottom:1px solid rgba(255,45,85,0.1);font-size:10px;color:rgba(255,45,85,0.6);letter-spacing:0.05em;';
+      sep.textContent = `▼ TOKENS SANS PRIX (${dead.length}) — ruggés ou abandonnés`;
+      panel.insertBefore(sep, allRows[live.length]);
+    }
+  }
 }
 
 function switchTab(tabName) {
@@ -2465,3 +2549,4 @@ document.querySelectorAll('.modal').forEach(m => {
 </script>
 </body>
 </html>
+
