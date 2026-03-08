@@ -737,12 +737,16 @@ body {
 
   .token-table-header { display: none; }
   .token-row {
-    grid-template-columns: 1fr auto;
-    height: auto; padding: 10px;
-    gap: 4px;
+    grid-template-columns: 28px 1fr auto auto auto !important;
+    height: auto; padding: 9px 10px;
+    gap: 6px;
   }
-  .token-row > :not(.row-token):not(.row-num:nth-child(3)):not(.row-actions) { display: none; }
-  .row-num.pnl-col { display: block; }
+  /* hide value, peak, score, liq columns on mobile — keep rank, token, pnl, actions */
+  .token-row .col-value,
+  .token-row .col-peak,
+  .token-row .col-score,
+  .token-row .col-liq { display: none; }
+  .token-row .row-rank { display: none; }
 
   .detail-grid { grid-template-columns: repeat(2, 1fr); }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
@@ -830,9 +834,23 @@ body {
   </nav>
 
   <div class="sidebar-footer">
-    <div class="sol-chip">
+    <div class="sol-chip" style="margin-bottom:8px;">
       <span class="sol-chip-label">◎ SOL</span>
       <span class="sol-chip-val" id="solBalanceDisplay">—</span>
+    </div>
+    <!-- API URL config -->
+    <div style="margin-top:6px;">
+      <div style="font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;">API URL</div>
+      <div style="display:flex; gap:4px;">
+        <input type="text" id="apiUrlInput" value="" placeholder="https://..." 
+          style="flex:1; padding:5px 7px; background:var(--bg-hover); border:1px solid var(--border-mid);
+                 border-radius:4px; color:var(--text); font-family:var(--font-mono); font-size:9px; min-width:0;">
+        <button onclick="applyApiUrl()" 
+          style="padding:5px 8px; background:var(--gold-dim); border:1px solid rgba(201,162,39,0.4);
+                 border-radius:4px; color:var(--gold); font-size:9px; font-weight:700; cursor:pointer; white-space:nowrap;">
+          SET
+        </button>
+      </div>
     </div>
   </div>
 </aside>
@@ -854,6 +872,7 @@ body {
         <span class="topbar-stat-val gold" id="uptimeDisplay">—</span>
       </div>
       <div class="topbar-divider"></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadData()" title="Refresh">↺</button>
       <button class="btn btn-primary btn-sm" onclick="openBuyModal()" style="margin-left:4px;">+ BUY</button>
     </div>
   </header>
@@ -1299,7 +1318,7 @@ body {
         </select>
       </div>
     </div>
-    <button class="btn btn-buy btn-full" onclick="executeBuy()" style="padding:12px; font-size:13px; letter-spacing:.06em;">
+    <button class="btn btn-buy btn-full" onclick="executeBuy(this)" style="padding:12px; font-size:13px; letter-spacing:.06em;">
       CONFIRMER L'ACHAT
     </button>
   </div>
@@ -1342,7 +1361,7 @@ body {
         <select class="form-input" id="sellJito"><option value="false">OFF</option><option value="true">ON</option></select>
       </div>
     </div>
-    <button class="btn btn-sell btn-full" onclick="executeSell()" style="padding:12px; font-size:13px; letter-spacing:.06em;">
+    <button class="btn btn-sell btn-full" onclick="executeSell(this)" style="padding:12px; font-size:13px; letter-spacing:.06em;">
       CONFIRMER LA VENTE
     </button>
   </div>
@@ -1398,7 +1417,25 @@ body {
 
 <!-- ═══════════════════════════ SCRIPT (UNCHANGED) ════════════════ -->
 <script>
-const API = window.location.origin;
+// ─── CONFIG API ──────────────────────────────────────────
+// Si le dashboard est servi depuis un domaine différent du bot (ex: Netlify vs Render),
+// changer cette URL manuellement ou via le champ de config en haut de page.
+const API_DEFAULT = 'https://solana-sniper-7o8s.onrender.com';
+let API = (() => {
+  try { return localStorage.getItem('solbot_api_url') || API_DEFAULT; } catch { return API_DEFAULT; }
+})();
+
+// Helper fetch avec gestion d'erreur JSON propre
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(`${API}${path}`, opts);
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    const txt = await res.text();
+    throw new Error(`API ${path} → HTTP ${res.status} (non-JSON): ${txt.slice(0, 120)}`);
+  }
+  return res.json();
+}
+
 let portfolio = [];
 let configData = {};
 let currentToken = null;
@@ -1413,21 +1450,33 @@ const TAB_TITLES = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Init API URL input
+  const input = document.getElementById('apiUrlInput');
+  if (input) input.value = API;
   loadData();
   loadConfig();
   setInterval(() => loadData(), 30000);
 });
 
+function applyApiUrl() {
+  const input = document.getElementById('apiUrlInput');
+  const url = input.value.trim().replace(/\/$/, '');
+  if (!url.startsWith('http')) { showToast('URL invalide (doit commencer par http)', 'err'); return; }
+  API = url;
+  try { localStorage.setItem('solbot_api_url', url); } catch {}
+  showToast(`API → ${url}`, 'ok');
+  loadData();
+  loadConfig();
+}
+
 async function loadData() {
   try {
-    const [statsRes, portfolioRes, balanceRes] = await Promise.all([
-      fetch(`${API}/api/stats`),
-      fetch(`${API}/api/portfolio`),
-      fetch(`${API}/api/sol-balance`)
+    const [statsData, portfolioData, balanceData] = await Promise.all([
+      apiFetch('/api/stats'),
+      apiFetch('/api/portfolio'),
+      apiFetch('/api/sol-balance'),
     ]);
-    const statsData = await statsRes.json();
-    portfolio = (await portfolioRes.json()).tokens || [];
-    const balanceData = await balanceRes.json();
+    portfolio = portfolioData.tokens || [];
     solBalance = balanceData.balance || 0;
 
     document.getElementById('totalValue').textContent = `$${(statsData.totalValue||0).toFixed(2)}`;
@@ -1441,17 +1490,26 @@ async function loadData() {
     const h = Math.floor(uptimeSec/3600), m = Math.floor((uptimeSec%3600)/60);
     document.getElementById('uptimeDisplay').textContent = `${h}h ${String(m).padStart(2,'0')}m`;
     document.getElementById('solBalanceDisplay').textContent = `${solBalance.toFixed(4)} ◎`;
-
+    // Update status dot
+    const dot = document.querySelector('.status-dot');
+    const statusTxt = document.getElementById('statusText');
+    if (dot && statusTxt) { dot.style.background = 'var(--up)'; statusTxt.textContent = 'LIVE'; }
     renderPortfolio(portfolio);
-  } catch(err) { console.error('Load error:', err); }
+  } catch(err) {
+    console.error('Load error:', err);
+    const dot = document.querySelector('.status-dot');
+    const statusTxt = document.getElementById('statusText');
+    if (dot) dot.style.background = 'var(--dn)';
+    if (statusTxt) statusTxt.textContent = 'ERR';
+    showToast(`API: ${err.message.slice(0,80)}`, 'err');
+  }
 }
 
 async function loadConfig() {
   try {
-    const res = await fetch(`${API}/api/config`);
-    configData = await res.json();
+    configData = await apiFetch('/api/config');
     updateConfigUI();
-  } catch(err) { console.error('Config error:', err); }
+  } catch(err) { console.error('Config error:', err); showToast(`Config: ${err.message.slice(0,80)}`, 'err'); }
 }
 
 function updateConfigUI() {
@@ -1501,6 +1559,8 @@ function renderPortfolio(tokens) {
       </div>`;
     return;
   }
+  // Normalise: ensure mintFull exists
+  tokens.forEach(t => { if (!t.mintFull) t.mintFull = t.mint; });
 
   const header = `
     <div class="token-table-header">
@@ -1542,14 +1602,14 @@ function renderPortfolio(tokens) {
             </div>
           </div>
         </div>
-        <div class="row-num neu">$${(tok.value||0).toFixed(2)}</div>
+        <div class="row-num neu col-value">$${(tok.value||0).toFixed(2)}</div>
         <div class="row-num ${pClass} pnl-col">${pStr}</div>
-        <div class="row-num pos">+${peak.toFixed(1)}%</div>
-        <div class="row-num gold">${tok.score ?? '—'}</div>
-        <div class="row-num dim">$${(liq/1000).toFixed(1)}k</div>
+        <div class="row-num pos col-peak">+${peak.toFixed(1)}%</div>
+        <div class="row-num gold col-score">${tok.score ?? '—'}</div>
+        <div class="row-num dim col-liq">$${(liq/1000).toFixed(1)}k</div>
         <div class="row-actions">
           <button class="btn-row buy" onclick="event.stopPropagation(); openBuyModal('${tok.mintFull}')">B</button>
-          <button class="btn-row sell" onclick="event.stopPropagation(); openSellModal('${tok.mintFull}','${tok.symbol||tok.mint.slice(0,8)}',${tok.balance})">S</button>
+          <button class="btn-row sell" onclick="event.stopPropagation(); openSellModal('${tok.mintFull}','${(tok.symbol||tok.mint.slice(0,8)).replace(/'/g,'\\\'').replace(/"/g,'&quot;')}',${tok.balance || 0})">S</button>
           <button class="btn-row info" onclick="event.stopPropagation(); openTokenDetail('${tok.mintFull}')">▸</button>
         </div>
       </div>`;
@@ -1633,20 +1693,20 @@ async function saveConfig() {
       maxPositions: parseInt(g('maxPositions').value),
       minScore: parseFloat(g('minScore').value),
     };
-    const res = await fetch(`${API}/api/config`, {
+    const result = await apiFetch('/api/config', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(config),
     });
-    if (res.ok) { showToast('Config sauvegardée', 'ok'); loadConfig(); }
-    else showToast('Erreur sauvegarde', 'err');
+    showToast('Config sauvegardée', 'ok'); loadConfig();
   } catch(err) { showToast(err.message, 'err'); }
 }
 
 async function loadAnalytics() {
   try {
-    const [ar, tr] = await Promise.all([fetch(`${API}/api/analytics`), fetch(`${API}/api/trades`)]);
-    const a = await ar.json();
-    const trades = await tr.json();
+    const [a, trades] = await Promise.all([
+      apiFetch('/api/analytics'),
+      apiFetch('/api/trades'),
+    ]);
 
     const g = id => document.getElementById(id);
     g('realizedPnl').textContent = `${(a.realizedPnlSol||0).toFixed(4)} ◎`;
@@ -1724,8 +1784,7 @@ function updatePnlChart(pnlHistory) {
 
 async function loadAutoBuys() {
   try {
-    const res = await fetch(`${API}/api/auto-buys`);
-    const data = await res.json();
+    const data = await apiFetch('/api/auto-buys');
     const c = document.getElementById('autoBuysContent');
     if (!data.positions?.length) {
       c.innerHTML = `<div class="empty"><div class="empty-icon">📈</div><div class="empty-txt">Aucune position auto-buy</div></div>`;
@@ -1776,8 +1835,7 @@ async function loadAutoBuys() {
 
 async function loadReentry() {
   try {
-    const res = await fetch(`${API}/api/reentry`);
-    const data = await res.json();
+    const data = await apiFetch('/api/reentry');
     const c = document.getElementById('reentryContent');
     if (!data.stoppedTokens?.length) {
       c.innerHTML = `<div class="empty"><div class="empty-icon">🔄</div><div class="empty-txt">Aucun token stoppé</div></div>`;
@@ -1805,8 +1863,7 @@ async function loadReentry() {
 
 async function loadDeadTokens() {
   try {
-    const res = await fetch(`${API}/api/dead-tokens`);
-    const data = await res.json();
+    const data = await apiFetch('/api/dead-tokens');
     const c = document.getElementById('deadTokensContent');
     if (!data.deadTokens?.length) {
       c.innerHTML = `<div class="empty"><div class="empty-icon">✓</div><div class="empty-txt">Aucun token mort</div></div>`;
@@ -1824,13 +1881,13 @@ async function loadDeadTokens() {
     const rows = data.deadTokens.map(t => `
       <div class="dead-row">
         <div>
-          <div class="dead-sym">${t.symbol}</div>
-          <div class="dead-addr">${t.mint.slice(0,8)}…</div>
+          <div class="dead-sym">${t.symbol || t.mint?.slice(0,8) || '—'}</div>
+          <div class="dead-addr">${(t.mint||'').slice(0,8)}…</div>
         </div>
         <div class="dead-meta">
           <div style="color:var(--text);">$${(t.value||0).toFixed(2)}</div>
-          <div style="color:var(--dn);">${t.failures} échecs</div>
-          <div style="color:var(--text-dim);">${t.ageHours}h</div>
+          <div style="color:var(--dn);">${t.failures || 0} échecs</div>
+          ${t.ageHours != null ? `<div style="color:var(--text-dim);">${t.ageHours}h</div>` : ''}
         </div>
         <button class="btn btn-danger btn-sm" onclick="purgeDeadToken('${t.mint}')" style="margin-left:10px;">Purge</button>
       </div>`).join('');
@@ -1841,52 +1898,47 @@ async function loadDeadTokens() {
 async function purgeDeadTokens() {
   if (!confirm('Purger TOUS les tokens morts ?')) return;
   try {
-    const r = await fetch(`${API}/api/dead-tokens/purge`, {
+    const result = await apiFetch('/api/dead-tokens/purge', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({all:true}),
     });
-    const result = await r.json();
     if (result.success) { showToast(`${result.purged} tokens purgés`, 'ok'); loadDeadTokens(); }
   } catch(err) { showToast(err.message, 'err'); }
 }
 
 async function purgeDeadToken(mint) {
   try {
-    const r = await fetch(`${API}/api/dead-tokens/purge`, {
+    const result = await apiFetch('/api/dead-tokens/purge', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({mints:[mint]}),
     });
-    const result = await r.json();
     if (result.success) { showToast('Token purgé', 'ok'); loadDeadTokens(); }
   } catch(err) { showToast(err.message, 'err'); }
 }
 
 async function resetNegCache() {
   try {
-    const r = await fetch(`${API}/api/neg-cache/reset`, {
+    const result = await apiFetch('/api/neg-cache/reset', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({all:true}),
     });
-    const result = await r.json();
     if (result.success) { showToast(`Cache reset (${result.cleared})`, 'ok'); loadDeadTokens(); }
   } catch(err) { showToast(err.message, 'err'); }
 }
 
 async function resetCircuitBreaker() {
   try {
-    const r = await fetch(`${API}/api/reset-circuit-breaker`, {method:'POST'});
-    const result = await r.json();
+    const result = await apiFetch('/api/reset-circuit-breaker', {method:'POST'});
     if (result.success) { showToast('Circuit-breaker reset', 'ok'); loadData(); }
   } catch(err) { showToast(err.message, 'err'); }
 }
 
 async function clearReentry(mint) {
   try {
-    const r = await fetch(`${API}/api/reentry/clear`, {
+    const result = await apiFetch('/api/reentry/clear', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({mint}),
     });
-    const result = await r.json();
     if (result.success) { showToast('Re-entry annulé', 'ok'); loadReentry(); }
   } catch(err) { showToast(err.message, 'err'); }
 }
@@ -1902,27 +1954,26 @@ function setBuyAmount(a) { document.getElementById('buyAmount').value = a; }
 async function setMaxBuy() {
   if (solBalance > 0) document.getElementById('buyAmount').value = Math.max(0, solBalance - 0.05).toFixed(4);
 }
-async function executeBuy() {
+async function executeBuy(btnEl) {
   const mint = document.getElementById('buyTokenAddress').value.trim();
   const amount = parseFloat(document.getElementById('buyAmount').value);
   const slippage = parseInt(document.getElementById('buySlippage').value);
   const useSmartSize = document.getElementById('buySmartSize').value === 'true';
   if (!mint || (!amount && !useSmartSize)) { showToast('Remplir tous les champs', 'err'); return; }
-  const btn = event.currentTarget;
+  const btn = btnEl || document.querySelector('#buyModal .btn-buy');
   const orig = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;display:inline-block;border-width:2px;"></span>';
+  btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;display:inline-block;border-width:2px;margin-right:6px;"></span>En cours...';
   try {
-    const r = await fetch(`${API}/api/buy`, {
+    const result = await apiFetch('/api/buy', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({mint, solAmount: amount, slippageBps: slippage, useSmartSize}),
     });
-    const result = await r.json();
     if (result.success) {
       showToast(`Achat OK · ${result.outAmount?.toFixed(4)} tokens`, 'ok');
       closeBuyModal();
       setTimeout(() => loadData(), 3000);
-    } else showToast(result.error, 'err');
+    } else showToast(result.error || 'Erreur achat', 'err');
   } catch(err) { showToast(err.message, 'err'); }
   finally { btn.disabled = false; btn.innerHTML = orig; }
 }
@@ -1939,27 +1990,26 @@ function setSellPercent(pct) {
   const bal = parseFloat(document.getElementById('sellBalance').value);
   document.getElementById('sellAmount').value = (bal * pct / 100).toFixed(4);
 }
-async function executeSell() {
+async function executeSell(btnEl) {
   const mint = document.getElementById('sellModal').dataset.mint;
   const amount = parseFloat(document.getElementById('sellAmount').value);
   const slippage = parseInt(document.getElementById('sellSlippage').value);
   const useJito = document.getElementById('sellJito').value === 'true';
   if (!mint || !amount) { showToast('Montant invalide', 'err'); return; }
-  const btn = event.currentTarget;
+  const btn = btnEl || document.querySelector('#sellModal .btn-sell');
   const orig = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;display:inline-block;border-width:2px;"></span>';
+  btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;display:inline-block;border-width:2px;margin-right:6px;"></span>En cours...';
   try {
-    const r = await fetch(`${API}/api/sell`, {
+    const result = await apiFetch('/api/sell', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({mint, amount, slippageBps: slippage, useJito, reason:'MANUAL'}),
     });
-    const result = await r.json();
     if (result.success) {
       showToast(`Vente OK · ${result.solOut?.toFixed(6)} SOL`, 'ok');
       closeSellModal();
       setTimeout(() => loadData(), 3000);
-    } else showToast(result.error, 'err');
+    } else showToast(result.error || 'Erreur vente', 'err');
   } catch(err) { showToast(err.message, 'err'); }
   finally { btn.disabled = false; btn.innerHTML = orig; }
 }
@@ -1967,8 +2017,8 @@ async function executeSell() {
 // ─── TOKEN DETAIL
 async function openTokenDetail(mint) {
   currentDetailMint = mint;
-  const tok = portfolio.find(t => t.mintFull === mint);
-  if (!tok) return;
+  const tok = portfolio.find(t => t.mintFull === mint || t.mint === mint);
+  if (!tok) { showToast('Token introuvable dans le portfolio', 'err'); return; }
   document.getElementById('tokenDetailTitle').textContent = tok.symbol || mint.slice(0,8);
   document.getElementById('detailValue').textContent = `$${(tok.value||0).toFixed(2)}`;
   document.getElementById('detailLiq').textContent = `$${((tok.liquidity||0)/1000).toFixed(1)}k`;
@@ -1979,8 +2029,7 @@ async function openTokenDetail(mint) {
   document.getElementById('detailPeak').textContent = `+${(tok.peakPnl||0).toFixed(2)}%`;
   document.getElementById('detailLiqDrop').textContent = `${(tok.liqDrop||0).toFixed(1)}%`;
   try {
-    const res = await fetch(`${API}/api/auto-buys`);
-    const data = await res.json();
+    const data = await apiFetch('/api/auto-buys');
     const pos = data.positions?.find(p => p.mint === mint);
     if (pos) {
       const pc = document.getElementById('pyramidTiers');
@@ -2009,24 +2058,32 @@ async function openTokenDetail(mint) {
   } catch(err) { console.error('Detail auto-buys:', err); }
   document.getElementById('tokenDetailModal').classList.add('active');
 }
-function closeTokenDetailModal() { document.getElementById('tokenDetailModal').classList.remove('active'); currentDetailMint = null; }
-function openDexScreener() { if (currentDetailMint) window.open(`https://dexscreener.com/solana/${currentDetailMint}`, '_blank'); }
+function closeTokenDetailModal() {
+  document.getElementById('tokenDetailModal').classList.remove('active');
+  currentDetailMint = null;
+}
+function openDexScreener() {
+  const mint = currentDetailMint;
+  if (mint) window.open(`https://dexscreener.com/solana/${mint}`, '_blank');
+}
 async function scanHistory() {
   if (!currentDetailMint) return;
   try {
-    const r = await fetch(`${API}/api/positions/scan-history`);
-    const result = await r.json();
+    const result = await apiFetch('/api/positions/scan-history', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({}) });
     showToast(result.fixed > 0 ? `${result.fixed} positions corrigées` : 'Aucune correction', result.fixed > 0 ? 'ok' : '');
     if (result.fixed > 0) loadData();
   } catch(err) { showToast(err.message, 'err'); }
 }
-function openBuyFromDetail() { closeTokenDetailModal(); if (currentDetailMint) openBuyModal(currentDetailMint); }
-function openSellFromDetail() {
+function openBuyFromDetail() {
+  const mint = currentDetailMint; // save BEFORE close nullifies it
   closeTokenDetailModal();
-  if (currentDetailMint) {
-    const t = portfolio.find(t => t.mintFull === currentDetailMint);
-    if (t) openSellModal(t.mintFull, t.symbol || t.mint.slice(0,8), t.balance);
-  }
+  if (mint) openBuyModal(mint);
+}
+function openSellFromDetail() {
+  const mint = currentDetailMint; // save BEFORE close nullifies it
+  const tok = portfolio.find(t => t.mintFull === mint || t.mint === mint);
+  closeTokenDetailModal();
+  if (tok) openSellModal(tok.mintFull || tok.mint, tok.symbol || tok.mint.slice(0,8), tok.balance || 0);
 }
 
 // ─── TOAST
