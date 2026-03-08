@@ -2356,10 +2356,140 @@ class BotLoop {
       // §v6 — Reset Daily Loss à minuit UTC
       this._today(); // force le check (remet paused=false si nouveau jour)
 
+      // §v6 — Auto-correction positions bootstrappées (cycle 1 + toutes les 20 cycles)
+      if (this.cycle === 1 || this.cycle % 20 === 0) {
+        const bootedCount = [...this.positions.entries.values()].filter(e => e.bootstrapped).length;
+        if (bootedCount > 0) {
+          this.autoScanBootstrapped().catch(err =>
+            log('warn', 'autoScanBootstrapped error', { err: err.message })
+          );
+        }
+      }
+
       if (this.cycle % 10 === 0) this.persist();
     } catch (err) {
       log('error', 'Tick error', { err: err.message });
       this.rpc.failover();
+    }
+  }
+
+  // ── §v6  Auto-correction positions bootstrappées ──────────────────────────
+
+  /**
+   * Pour un mint donné, interroge l'historique Helius (SWAP) et retrouve
+   * le dernier achat (SOL → token) pour en déduire le prix d'entrée exact.
+   * Retourne { entryPrice, solSpent, tokReceived, ts } ou null.
+   */
+  async _heliusFindEntryPrice(mint, walletStr) {
+    if (!CFG.HELIUS_KEY) return null;
+    const base = `https://api.helius.xyz/v0/addresses/${walletStr}/transactions?api-key=${CFG.HELIUS_KEY}&limit=100`;
+    let before = null;
+    const MAX_PAGES = 5;
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const url = base + (before ? `&before=${before}` : '');
+      let txs;
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+        if (!r.ok) break;
+        txs = await r.json();
+        if (!Array.isArray(txs) || !txs.length) break;
+      } catch { break; }
+
+      for (const tx of txs) {
+        // Chercher un token transfer ENTRANT pour ce mint
+        const recv = (tx.tokenTransfers || []).find(
+          t => t.mint === mint && t.toUserAccount === walletStr && parseFloat(t.tokenAmount) > 0
+        );
+        if (!recv) continue;
+
+        // SOL sorti du wallet dans cette tx
+        const solOut = (tx.nativeTransfers || [])
+          .filter(n => n.fromUserAccount === walletStr)
+          .reduce((s, n) => s + (n.amount || 0), 0) / 1e9;
+
+        const tokReceived = parseFloat(recv.tokenAmount);
+        if (solOut > 0 && tokReceived > 0) {
+          return {
+            entryPrice: solOut / tokReceived,
+            solSpent:   solOut,
+            tokReceived,
+            ts: (tx.timestamp || 0) * 1000,
+          };
+        }
+      }
+
+      // Pagination : reprendre depuis la dernière signature
+      before = txs[txs.length - 1]?.signature;
+      if (!before) break;
+      await sleep(200);
+    }
+    return null;
+  }
+
+  /**
+   * Scan toutes les positions bootstrappées et tente de corriger leur prix.
+   * Appelé automatiquement au démarrage et toutes les 20 cycles.
+   */
+  async autoScanBootstrapped() {
+    const walletStr = this.wallet.publicKey.toString();
+    const booted = [...this.positions.entries.entries()]
+      .filter(([, e]) => e.bootstrapped)
+      .map(([m]) => m);
+
+    if (!booted.length) return;
+    if (!CFG.HELIUS_KEY) {
+      log('warn', `⚠️  ${booted.length} positions bootstrappées — HELIUS_API_KEY manquant, correction impossible`);
+      return;
+    }
+
+    log('info', `🔍 Auto-scan Helius — ${booted.length} positions bootstrappées à corriger`);
+    let fixed = 0;
+
+    for (const mint of booted) {
+      try {
+        const found = await this._heliusFindEntryPrice(mint, walletStr);
+
+        if (found?.entryPrice > 0) {
+          const old = this.positions.entries.get(mint)?.price;
+          this.positions.setEntryPrice(mint, found.entryPrice);
+          // Mettre à jour costBasis si absent ou incomplet
+          if (!this.costBasis.has(mint) || this.costBasis.get(mint)?.solSpent === 0) {
+            this.costBasis.set(mint, {
+              solSpent:   found.solSpent,
+              tokBought:  found.tokReceived,
+              buyTs:      found.ts || Date.now(),
+            });
+          }
+          log('success', `✅ Bootstrap corrigé ${mint.slice(0, 8)}`, {
+            old: old?.toPrecision(4) || '?',
+            new: found.entryPrice.toPrecision(4),
+            sol: found.solSpent.toFixed(4),
+          });
+          fixed++;
+        } else {
+          // Helius n'a pas trouvé la tx — fallback : costBasis existant
+          const cb = this.costBasis.get(mint);
+          if (cb?.solSpent > 0 && cb?.tokBought > 0) {
+            const fallbackPrice = cb.solSpent / cb.tokBought;
+            this.positions.setEntryPrice(mint, fallbackPrice);
+            log('info', `📌 Bootstrap corrigé (fallback costBasis) ${mint.slice(0, 8)}`, {
+              price: fallbackPrice.toPrecision(4),
+            });
+            fixed++;
+          } else {
+            log('debug', `Bootstrap non résolu ${mint.slice(0, 8)} — tx introuvable`);
+          }
+        }
+        await sleep(300); // rate limit Helius
+      } catch (err) {
+        log('warn', `Bootstrap scan error ${mint.slice(0, 8)}: ${err.message}`);
+      }
+    }
+
+    if (fixed > 0) {
+      this.persist();
+      log('info', `✅ Bootstrap: ${fixed}/${booted.length} positions corrigées`);
     }
   }
 
@@ -3119,33 +3249,33 @@ function startApi(bot, wallet, scanner) {
 
     const walletStr = wallet.publicKey.toString();
     const results   = [];
-    log('info', `Helius scan — ${booted.length} positions bootstrappées`);
+    log('info', `Helius scan (manuel) — ${booted.length} positions bootstrappées`);
 
     for (const mint of booted) {
       try {
-        const url = `https://api.helius.xyz/v0/addresses/${walletStr}/transactions?api-key=${CFG.HELIUS_KEY}&limit=100&type=SWAP`;
-        const r = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-        if (!r.ok) { results.push({ mint: mint.slice(0, 8), status: 'error', error: `HTTP ${r.status}` }); continue; }
-        const txs = await r.json();
-        let found = null;
-        for (const tx of Array.isArray(txs) ? txs : []) {
-          const recv = (tx.tokenTransfers || []).find(t => t.mint === mint && t.toUserAccount === walletStr && t.tokenAmount > 0);
-          if (!recv) continue;
-          const solOut = (tx.nativeTransfers || []).filter(n => n.fromUserAccount === walletStr).reduce((s, n) => s + (n.amount || 0), 0) / 1e9;
-          if (solOut > 0 && recv.tokenAmount > 0) { found = { solSpent: solOut, tokReceived: recv.tokenAmount, entryPrice: solOut / recv.tokenAmount, ts: tx.timestamp }; break; }
-        }
+        const found = await bot._heliusFindEntryPrice(mint, walletStr);
         if (found?.entryPrice > 0) {
           const old = bot.positions.entries.get(mint)?.price;
           bot.positions.setEntryPrice(mint, found.entryPrice);
-          if (!bot.costBasis.has(mint))
-            bot.costBasis.set(mint, { solSpent: found.solSpent, tokBought: found.tokReceived, buyTs: (found.ts || Date.now() / 1000) * 1000 });
+          if (!bot.costBasis.has(mint) || bot.costBasis.get(mint)?.solSpent === 0) {
+            bot.costBasis.set(mint, { solSpent: found.solSpent, tokBought: found.tokReceived, buyTs: found.ts || Date.now() });
+          }
           results.push({ mint: mint.slice(0, 8), status: 'fixed', entryPrice: found.entryPrice, priceBefore: old });
-          log('success', `Entry corrigé ${mint.slice(0, 8)}`, { price: found.entryPrice.toPrecision(4) });
-        } else { results.push({ mint: mint.slice(0, 8), status: 'not_found' }); }
-        await sleep(250);
+        } else {
+          const cb = bot.costBasis.get(mint);
+          if (cb?.solSpent > 0 && cb?.tokBought > 0) {
+            const fp = cb.solSpent / cb.tokBought;
+            bot.positions.setEntryPrice(mint, fp);
+            results.push({ mint: mint.slice(0, 8), status: 'fixed_fallback', entryPrice: fp });
+          } else {
+            results.push({ mint: mint.slice(0, 8), status: 'not_found' });
+          }
+        }
+        await sleep(300);
       } catch (err) { results.push({ mint: mint.slice(0, 8), status: 'error', error: err.message }); }
     }
-    const fixed = results.filter(r => r.status === 'fixed').length;
+
+    const fixed = results.filter(r => r.status === 'fixed' || r.status === 'fixed_fallback').length;
     if (fixed > 0) bot.persist();
     log('info', `Scan terminé: ${fixed}/${booted.length}`);
     res.json({ total: booted.length, fixed, results });
