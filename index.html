@@ -2,471 +2,205 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SolBot Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0e1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>SolBot Pro v5.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         :root {
-            --bg: #0f1419;
-            --card: #1a1f2e;
-            --card-hover: #252b3d;
-            --border: #2d3548;
-            --text: #e7e9ea;
-            --text-muted: #8b949e;
-            --accent: #2f81f7;
-            --success: #3fb950;
-            --danger: #f85149;
-            --warning: #d29922;
+            --bg: #0a0e1a; --bg-card: #151a28; --bg-hover: #1e2538;
+            --border: #2a3550; --text: #ffffff; --text-muted: #6b7a99;
+            --accent: #3b82f6; --success: #10b981; --danger: #ef4444;
+            --warning: #f59e0b; --radius: 12px;
+            --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding-bottom: 80px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; padding-top: var(--safe-top);
+            padding-bottom: calc(80px + var(--safe-bottom));
         }
         .header {
-            background: var(--card);
+            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg) 100%);
             border-bottom: 1px solid var(--border);
-            padding: 16px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            padding: calc(12px + var(--safe-top)) 16px 12px;
+            position: sticky; top: 0; z-index: 100;
         }
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 700;
-            font-size: 18px;
-        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+        .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; }
         .status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            background: rgba(63, 185, 80, 0.15);
-            border: 1px solid var(--success);
-            border-radius: 12px;
-            font-size: 12px;
-            color: var(--success);
+            display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+            background: rgba(16, 185, 129, 0.15); border: 1px solid var(--success);
+            border-radius: 12px; font-size: 11px; font-weight: 600; color: var(--success);
         }
         .status-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--success);
-            border-radius: 50%;
+            width: 6px; height: 6px; background: var(--success); border-radius: 50%;
             animation: pulse 2s infinite;
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-        }
-        .stat-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 10px;
-        }
-        .stat-label {
-            font-size: 10px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-        .stat-value {
-            font-family: 'Courier New', monospace;
-            font-size: 16px;
-            font-weight: 600;
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+        .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; }
         .stat-value.pos { color: var(--success); }
         .stat-value.neg { color: var(--danger); }
-        .tabs {
-            display: flex;
-            gap: 6px;
-            padding: 12px 16px;
-            overflow-x: auto;
-        }
+        .tabs { display: flex; gap: 6px; padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tabs::-webkit-scrollbar { display: none; }
         .tab {
-            flex: 1;
-            min-width: 70px;
-            padding: 10px 12px;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text-muted);
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            text-align: center;
-            white-space: nowrap;
+            flex: 1; min-width: 70px; padding: 10px 12px; background: var(--bg-card);
+            border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted);
+            font-size: 11px; font-weight: 500; cursor: pointer; text-align: center; white-space: nowrap;
         }
-        .tab.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
+        .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
         .section { display: none; padding: 0 16px; }
         .section.active { display: block; }
-        .token-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding-bottom: 20px;
-        }
+        .token-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px; }
         .token-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 12px;
-            cursor: pointer;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 12px; cursor: pointer;
         }
         .token-card:active { transform: scale(0.98); }
-        .token-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .token-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex: 1;
-        }
+        .token-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .token-info { display: flex; align-items: center; gap: 10px; flex: 1; }
         .token-logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            background: var(--card-hover);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
+            width: 40px; height: 40px; border-radius: 10px; background: var(--bg-hover);
+            display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
         }
         .token-details { flex: 1; }
-        .token-symbol {
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 2px;
-        }
-        .token-address {
-            font-size: 10px;
-            color: var(--text-muted);
-            font-family: monospace;
-        }
+        .token-symbol { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+        .token-address { font-size: 10px; color: var(--text-muted); font-family: monospace; }
         .token-price { text-align: right; }
-        .price-value {
-            font-family: monospace;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        .price-change {
-            font-family: monospace;
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-top: 4px;
-        }
-        .price-change.pos { background: rgba(63, 185, 80, 0.15); color: var(--success); }
-        .price-change.neg { background: rgba(248, 81, 73, 0.15); color: var(--danger); }
-        .token-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            padding-top: 10px;
-            border-top: 1px solid var(--border);
-        }
+        .price-value { font-family: monospace; font-weight: 600; font-size: 14px; }
+        .price-change { font-family: monospace; font-size: 11px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; }
+        .price-change.pos { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+        .price-change.neg { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .token-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
         .token-stat { text-align: center; }
-        .token-stat-label {
-            font-size: 9px;
-            color: var(--text-muted);
-            margin-bottom: 3px;
-        }
-        .token-stat-value {
-            font-family: monospace;
-            font-weight: 600;
-            font-size: 12px;
-        }
-        .token-actions {
-            display: flex;
-            gap: 6px;
-            margin-top: 10px;
-        }
-        .btn {
-            flex: 1;
-            padding: 8px;
-            border: none;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-        }
+        .token-stat-label { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
+        .token-stat-value { font-family: monospace; font-weight: 600; font-size: 12px; }
+        .token-actions { display: flex; gap: 6px; margin-top: 10px; }
+        .btn { flex: 1; padding: 8px; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
         .btn:active { transform: scale(0.95); }
         .btn-buy { background: var(--success); color: white; }
         .btn-sell { background: var(--danger); color: white; }
-        .btn-chart { background: var(--card-hover); color: var(--text); border: 1px solid var(--border); }
+        .btn-chart { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
         .btn-primary { background: var(--accent); color: white; }
-        .btn-secondary { background: var(--card-hover); color: var(--text); border: 1px solid var(--border); }
-        .btn-sm { padding: 6px 10px; font-size: 10px; }
+        .btn-secondary { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
         .fab {
-            position: fixed;
-            bottom: 90px;
-            right: 16px;
-            width: 56px;
-            height: 56px;
-            background: var(--accent);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(47, 129, 247, 0.4);
-            z-index: 90;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: fixed; bottom: calc(90px + var(--safe-bottom)); right: 16px;
+            width: 56px; height: 56px; background: var(--accent); border: none;
+            border-radius: 50%; color: white; font-size: 24px; cursor: pointer;
+            box-shadow: 0 4px 20px rgba(47, 129, 247, 0.4); z-index: 90;
+            display: flex; align-items: center; justify-content: center;
         }
         .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 70px;
-            background: var(--card);
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            z-index: 100;
+            position: fixed; bottom: 0; left: 0; right: 0; height: calc(70px + var(--safe-bottom));
+            background: var(--bg-card); border-top: 1px solid var(--border);
+            display: flex; justify-content: space-around; align-items: center; z-index: 100;
         }
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            padding: 8px 12px;
-            color: var(--text-muted);
-            cursor: pointer;
-            flex: 1;
-        }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 12px; color: var(--text-muted); cursor: pointer; flex: 1; }
         .nav-item.active { color: var(--accent); }
         .nav-icon { font-size: 20px; }
         .nav-label { font-size: 10px; font-weight: 500; }
         .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 200;
-            align-items: flex-end;
-            justify-content: center;
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85); z-index: 200;
+            align-items: flex-end; justify-content: center;
         }
         .modal.active { display: flex; }
         .modal-content {
-            background: var(--card);
-            border-radius: 10px 10px 0 0;
-            width: 100%;
-            max-height: 85vh;
-            overflow-y: auto;
-            padding: 20px 16px;
+            background: var(--bg-card); border-radius: 10px 10px 0 0;
+            width: 100%; max-height: 85vh; overflow-y: auto;
+            padding: 20px 16px calc(20px + var(--safe-bottom));
             animation: slideUp 0.3s ease;
         }
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
         .modal-title { font-size: 16px; font-weight: 700; }
-        .modal-close {
-            width: 36px;
-            height: 36px;
-            background: var(--card-hover);
-            border: none;
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 20px;
-            cursor: pointer;
-        }
+        .modal-close { width: 36px; height: 36px; background: var(--bg-hover); border: none; border-radius: 8px; color: var(--text); font-size: 20px; cursor: pointer; }
         .form-group { margin-bottom: 16px; }
-        .form-label {
-            display: block;
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-        }
-        .form-input {
-            width: 100%;
-            padding: 10px;
-            background: var(--card-hover);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 13px;
-        }
+        .form-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+        .form-input { width: 100%; padding: 10px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
         .form-input:focus { outline: none; border-color: var(--accent); }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .quick-amounts {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-            margin-top: 6px;
-        }
-        .quick-btn {
-            padding: 8px;
-            background: var(--card-hover);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-muted);
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: center;
-        }
+        .quick-amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+        .quick-btn { padding: 8px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; }
         .quick-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .config-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .config-section {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 14px;
-        }
-        .config-section-title {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-        .toggle-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border);
-        }
+        .config-grid { display: flex; flex-direction: column; gap: 16px; }
+        .config-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+        .config-section-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
         .toggle-row:last-child { border-bottom: none; }
-        .toggle-label {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            flex: 1;
-        }
+        .toggle-label { display: flex; flex-direction: column; gap: 3px; flex: 1; }
         .toggle-title { font-size: 12px; font-weight: 500; }
         .toggle-desc { font-size: 10px; color: var(--text-muted); }
-        .toggle {
-            width: 48px;
-            height: 26px;
-            background: var(--card-hover);
-            border-radius: 13px;
-            position: relative;
-            cursor: pointer;
-            flex-shrink: 0;
-            margin-left: 10px;
-        }
+        .toggle { width: 48px; height: 26px; background: var(--bg-hover); border-radius: 13px; position: relative; cursor: pointer; flex-shrink: 0; margin-left: 10px; }
         .toggle.active { background: var(--success); }
-        .toggle::after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            top: 3px;
-            left: 3px;
-            transition: transform 0.2s;
-        }
+        .toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s; }
         .toggle.active::after { transform: translateX(22px); }
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            color: var(--text-muted);
-            gap: 10px;
-        }
-        .spinner {
-            width: 24px;
-            height: 24px;
-            border: 3px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
+        .loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--text-muted); gap: 10px; }
+        .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .empty {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-muted);
-        }
+        .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
         .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 16px;
-            z-index: 300;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .toast {
-            padding: 12px 16px;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 13px;
-            animation: slideIn 0.3s ease;
-            min-width: 280px;
-        }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .api-status {
-            background: var(--card-hover);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px;
-            margin-top: 10px;
-            font-size: 11px;
-        }
+        .toast-container { position: fixed; top: calc(20px + var(--safe-top)); right: 16px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+        .toast { padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; animation: slideIn 0.3s ease; min-width: 280px; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .api-status { background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 10px; font-size: 11px; }
+        
+        /* 📊 TOKEN DETAIL MODAL WITH CHART */
+        .token-detail-modal .modal-content { max-width: 800px; }
         .chart-container {
-            background: var(--card);
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 12px;
+            border-radius: var(--radius);
             margin-bottom: 16px;
-            height: 250px;
+            height: 400px;
+            overflow: hidden;
         }
+        .chart-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .chart-timeframes {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .chart-tf {
+            padding: 6px 12px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .chart-tf.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .token-info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .token-detail-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        
         @media (min-width: 768px) {
             .stats-grid { grid-template-columns: repeat(4, 1fr); }
             .token-stats { grid-template-columns: repeat(5, 1fr); }
+            .token-info-grid { grid-template-columns: repeat(4, 1fr); }
         }
     </style>
 </head>
@@ -539,41 +273,6 @@
             <div class="stat-card">
                 <div class="stat-label">ROI</div>
                 <div class="stat-value" id="analyticsRoi">0%</div>
-            </div>
-        </div>
-        <div class="stats-grid" style="margin-bottom: 16px;">
-            <div class="stat-card">
-                <div class="stat-label">Sharpe</div>
-                <div class="stat-value" id="analyticsSharpe">—</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Sortino</div>
-                <div class="stat-value" id="analyticsSortino">—</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Max DD</div>
-                <div class="stat-value neg" id="analyticsDrawdown">—</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Profit Factor</div>
-                <div class="stat-value" id="analyticsProfitFactor">—</div>
-            </div>
-        </div>
-        <div class="config-section" style="margin-bottom: 16px;">
-            <div class="config-section-title">🔥 Win / Loss Streaks</div>
-            <div style="display: flex; gap: 16px; justify-content: center; padding: 12px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 24px;">🔥</div>
-                    <div style="font-size: 11px; color: var(--text-muted);">Win</div>
-                    <div class="stat-value pos" id="winStreak">0</div>
-                    <div style="font-size: 10px; color: var(--text-muted);">(Max: <span id="maxWinStreak">0</span>)</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 24px;">❄️</div>
-                    <div style="font-size: 11px; color: var(--text-muted);">Loss</div>
-                    <div class="stat-value neg" id="lossStreak">0</div>
-                    <div style="font-size: 10px; color: var(--text-muted);">(Max: <span id="maxLossStreak">0</span>)</div>
-                </div>
             </div>
         </div>
         <div class="config-section">
@@ -692,7 +391,7 @@
             </div>
             <div class="config-section">
                 <div class="config-section-title">⚠ Circuit-Breaker</div>
-                <div style="padding: 10px; background: var(--card-hover); border-radius: 8px; text-align: center;">
+                <div style="padding: 10px; background: var(--bg-hover); border-radius: 8px; text-align: center;">
                     <div style="font-size: 12px; color: var(--text-muted);">Échecs sell consécutifs</div>
                     <div style="font-size: 24px; font-weight: 700; color: var(--danger);" id="circuitBreakerCount">—</div>
                     <button class="btn btn-secondary btn-sm" onclick="resetCircuitBreaker()" style="margin-top: 8px; width: 100%;">
@@ -775,11 +474,11 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Token</label>
-                <input type="text" class="form-input" id="sellTokenInfo" readonly style="background: var(--card-hover);">
+                <input type="text" class="form-input" id="sellTokenInfo" readonly style="background: var(--bg-hover);">
             </div>
             <div class="form-group">
                 <label class="form-label">Balance</label>
-                <input type="text" class="form-input" id="sellBalance" readonly style="background: var(--card-hover);">
+                <input type="text" class="form-input" id="sellBalance" readonly style="background: var(--bg-hover);">
             </div>
             <div class="form-group">
                 <label class="form-label">À vendre</label>
@@ -797,6 +496,84 @@
         </div>
     </div>
 
+    <!-- TOKEN DETAIL MODAL WITH CHART -->
+    <div class="modal token-detail-modal" id="tokenDetailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="tokenDetailTitle">Token</div>
+                <button class="modal-close" onclick="closeTokenDetailModal()">×</button>
+            </div>
+            
+            <!-- Chart Timeframes -->
+            <div class="chart-timeframes">
+                <div class="chart-tf" onclick="changeTimeframe('5m')">5m</div>
+                <div class="chart-tf" onclick="changeTimeframe('15m')">15m</div>
+                <div class="chart-tf active" onclick="changeTimeframe('1h')">1h</div>
+                <div class="chart-tf" onclick="changeTimeframe('4h')">4h</div>
+                <div class="chart-tf" onclick="changeTimeframe('1d')">1d</div>
+            </div>
+            
+            <!-- Chart Container -->
+            <div class="chart-container" id="chartContainer">
+                <iframe id="chartFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+            </div>
+            
+            <!-- Token Info Grid -->
+            <div class="token-info-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Valeur</div>
+                    <div class="stat-value" id="detailValue">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">PnL</div>
+                    <div class="stat-value" id="detailPnl">0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Peak</div>
+                    <div class="stat-value pos" id="detailPeak">+0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Entrée</div>
+                    <div class="stat-value" id="detailEntry">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Score</div>
+                    <div class="stat-value" id="detailScore">0/100</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Liq.</div>
+                    <div class="stat-value" id="detailLiq">$0k</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">MCap</div>
+                    <div class="stat-value" id="detailMcap">$0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Vol 24h</div>
+                    <div class="stat-value" id="detailVol24h">$0</div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="token-detail-actions">
+                <button class="btn btn-secondary" onclick="openDexScreener()" style="flex: 1;">
+                    🦎 DexScreener ↗
+                </button>
+                <button class="btn btn-secondary" onclick="scanHistory()" style="flex: 1;">
+                    🔍 Scan History
+                </button>
+            </div>
+            <div class="token-detail-actions">
+                <button class="btn btn-buy" onclick="openBuyFromDetail()" style="flex: 1;">
+                    ▲ BUY
+                </button>
+                <button class="btn btn-sell" onclick="openSellFromDetail()" style="flex: 1;">
+                    ▼ SELL
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
@@ -805,6 +582,8 @@
         let portfolio = [];
         let configData = {};
         let solBalance = 0;
+        let currentDetailMint = null;
+        let currentDetailToken = null;
 
         // INIT
         document.addEventListener('DOMContentLoaded', () => {
@@ -887,7 +666,7 @@
                     ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'" style="width:100%;height:100%;border-radius:10px;object-fit:cover;">`
                     : '🪙';
                 return `
-                    <div class="token-card" onclick="openTokenDetail('${token.mintFull}')">
+                    <div class="token-card" onclick="openTokenDetail('${token.mintFull}', ${JSON.stringify(token).replace(/"/g, '&quot;')})">
                         <div class="token-header">
                             <div class="token-info">
                                 <div class="token-logo">${logo}</div>
@@ -918,6 +697,7 @@
                         <div class="token-actions">
                             <button class="btn btn-buy" onclick="event.stopPropagation(); openBuyModal('${token.mintFull}')">Buy</button>
                             <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">Sell</button>
+                            <button class="btn btn-chart" onclick="event.stopPropagation(); openTokenDetail('${token.mintFull}', ${JSON.stringify(token).replace(/"/g, '&quot;')})">📊</button>
                         </div>
                     </div>
                 `;
@@ -949,35 +729,16 @@
                 const analytics = await analyticsRes.json();
                 const trades = await tradesRes.json();
                 
-                // Update stats
                 document.getElementById('analyticsPnl').textContent = `${analytics.realizedPnlSol || 0} ◎`;
                 document.getElementById('analyticsWinRate').textContent = `${analytics.winRate || 0}%`;
                 document.getElementById('analyticsTrades').textContent = analytics.totalTrades || 0;
                 document.getElementById('analyticsRoi').textContent = `${analytics.roi || 0}%`;
                 
-                // Advanced metrics
-                document.getElementById('analyticsSharpe').textContent = analytics.sharpeRatio || '—';
-                document.getElementById('analyticsSortino').textContent = analytics.sortinoRatio || '—';
-                document.getElementById('analyticsDrawdown').textContent = analytics.maxDrawdownSol ? `-${analytics.maxDrawdownSol}` : '—';
-                document.getElementById('analyticsProfitFactor').textContent = analytics.profitFactor || '—';
-                
-                // Streaks
-                document.getElementById('winStreak').textContent = analytics.winStreak || 0;
-                document.getElementById('maxWinStreak').textContent = analytics.maxWinStreak || 0;
-                document.getElementById('lossStreak').textContent = analytics.lossStreak || 0;
-                document.getElementById('maxLossStreak').textContent = analytics.maxLossStreak || 0;
-                
-                // Recent trades
                 const recentTrades = trades.trades?.slice(0, 10) || [];
                 const container = document.getElementById('recentTrades');
                 
                 if (recentTrades.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty">
-                            <div class="empty-icon">📊</div>
-                            <div>Aucun trade récent</div>
-                        </div>
-                    `;
+                    container.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div>Aucun trade récent</div></div>`;
                     return;
                 }
                 
@@ -985,7 +746,6 @@
                     const pnlClass = trade.pnlPct >= 0 ? 'pos' : 'neg';
                     const pnlSign = trade.pnlPct >= 0 ? '+' : '';
                     const date = new Date(trade.ts).toLocaleString('fr-FR');
-                    
                     return `
                         <div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
                             <div>
@@ -1129,6 +889,81 @@
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
+            }
+        }
+
+        // TOKEN DETAIL MODAL WITH CHART
+        function openTokenDetail(mint, token) {
+            currentDetailMint = mint;
+            currentDetailToken = token;
+            
+            document.getElementById('tokenDetailTitle').textContent = `${token.symbol || mint.slice(0,8)}...`;
+            document.getElementById('detailValue').textContent = `$${(token.value || 0).toFixed(2)}`;
+            document.getElementById('detailPnl').textContent = `${token.pnl >= 0 ? '+' : ''}${(token.pnl || 0).toFixed(2)}%`;
+            document.getElementById('detailPnl').className = `stat-value ${token.pnl >= 0 ? 'pos' : 'neg'}`;
+            document.getElementById('detailPeak').textContent = `+${(token.peakPnl || 0).toFixed(2)}%`;
+            document.getElementById('detailEntry').textContent = `$${(token.entryPrice || 0).toFixed(6)}`;
+            document.getElementById('detailScore').textContent = `${token.score || 0}/100`;
+            document.getElementById('detailLiq').textContent = `$${((token.liquidity || 0) / 1000).toFixed(1)}k`;
+            document.getElementById('detailMcap').textContent = `$${(token.mcap || 0).toLocaleString()}`;
+            document.getElementById('detailVol24h').textContent = `$${(token.volume24h || 0).toLocaleString()}`;
+            
+            // Load DexScreener chart
+            loadDexScreenerChart(mint);
+            
+            document.getElementById('tokenDetailModal').classList.add('active');
+        }
+        
+        function loadDexScreenerChart(mint) {
+            const chartUrl = `https://dexscreener.com/solana/${mint}`;
+            document.getElementById('chartFrame').src = chartUrl;
+        }
+        
+        function changeTimeframe(tf) {
+            document.querySelectorAll('.chart-tf').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            // DexScreener gère les timeframes automatiquement
+            showToast(`⏱ Timeframe: ${tf}`, 'info');
+        }
+        
+        function closeTokenDetailModal() {
+            document.getElementById('tokenDetailModal').classList.remove('active');
+            document.getElementById('chartFrame').src = '';
+            currentDetailMint = null;
+            currentDetailToken = null;
+        }
+        
+        function openDexScreener() {
+            if (currentDetailMint) {
+                window.open(`https://dexscreener.com/solana/${currentDetailMint}`, '_blank');
+            }
+        }
+        
+        async function scanHistory() {
+            if (!currentDetailMint) return;
+            try {
+                const res = await fetch(`${API}/api/positions/scan-history`);
+                const result = await res.json();
+                if (result.fixed > 0) {
+                    showToast(`✅ ${result.fixed} positions corrigées`, 'success');
+                    loadData();
+                } else {
+                    showToast('ℹ️ Aucune position à corriger', 'info');
+                }
+            } catch (err) {
+                showToast('❌ ' + err.message, 'error');
+            }
+        }
+        
+        function openBuyFromDetail() {
+            closeTokenDetailModal();
+            if (currentDetailMint) openBuyModal(currentDetailMint);
+        }
+        
+        function openSellFromDetail() {
+            closeTokenDetailModal();
+            if (currentDetailToken) {
+                openSellModal(currentDetailToken.mintFull, currentDetailToken.symbol || currentDetailToken.mint.slice(0,8), currentDetailToken.balance);
             }
         }
 
