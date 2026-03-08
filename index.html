@@ -1,1680 +1,2048 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0a0e1a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>SolBot Pro v5.0 — Dashboard Complet</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        :root {
-            --bg: #0a0e1a; --bg-card: #151a28; --bg-hover: #1e2538;
-            --border: #2a3550; --text: #ffffff; --text-muted: #6b7a99;
-            --accent: #3b82f6; --success: #10b981; --danger: #ef4444;
-            --warning: #f59e0b; --radius: 12px;
-            --safe-top: env(safe-area-inset-top);
-            --safe-bottom: env(safe-area-inset-bottom);
-        }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg); color: var(--text);
-            min-height: 100vh; padding-top: var(--safe-top);
-            padding-bottom: calc(80px + var(--safe-bottom));
-        }
-        .header {
-            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg) 100%);
-            border-bottom: 1px solid var(--border);
-            padding: calc(12px + var(--safe-top)) 16px 12px;
-            position: sticky; top: 0; z-index: 100;
-        }
-        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-        .logo { display: flex; align-items: center; gap: 8px; }
-        .logo-icon {
-            width: 36px; height: 36px; background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
-        }
-        .logo-text { font-size: 16px; font-weight: 700; }
-        .logo-version {
-            font-size: 10px; color: var(--text-muted); background: var(--bg-hover);
-            padding: 2px 6px; border-radius: 4px; margin-left: 4px;
-        }
-        .status {
-            display: flex; align-items: center; gap: 6px; padding: 4px 10px;
-            background: rgba(16, 185, 129, 0.15); border: 1px solid var(--success);
-            border-radius: 12px; font-size: 11px; font-weight: 600; color: var(--success);
-        }
-        .status-dot {
-            width: 6px; height: 6px; background: var(--success); border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .stat-card {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 10px;
-        }
-        .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
-        .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; }
-        .stat-value.pos { color: var(--success); }
-        .stat-value.neg { color: var(--danger); }
-        .tabs {
-            display: flex; gap: 6px; padding: 12px 16px; overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .tabs::-webkit-scrollbar { display: none; }
-        .tab {
-            flex: 1; min-width: 80px; padding: 10px 16px; background: var(--bg-card);
-            border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted);
-            font-size: 12px; font-weight: 500; cursor: pointer; text-align: center;
-            white-space: nowrap;
-        }
-        .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .section { display: none; padding: 0 16px; }
-        .section.active { display: block; }
-        .token-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px; }
-        .token-card {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 12px; cursor: pointer;
-            transition: all 0.2s;
-        }
-        .token-card:active { transform: scale(0.98); border-color: var(--accent); }
-        .token-card.active { border-color: var(--accent); box-shadow: 0 0 15px rgba(59,130,246,0.3); }
-        .token-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .token-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-        .token-logo {
-            width: 40px; height: 40px; border-radius: 10px; background: var(--bg-hover);
-            display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; overflow: hidden;
-        }
-        .token-logo img { width: 100%; height: 100%; object-fit: cover; }
-        .token-details { flex: 1; min-width: 0; }
-        .token-symbol { font-weight: 600; font-size: 14px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .token-address { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-        .token-price { text-align: right; flex-shrink: 0; }
-        .price-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 14px; }
-        .price-change { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; }
-        .price-change.pos { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-        .price-change.neg { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
-        .token-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
-        .token-stat { text-align: center; }
-        .token-stat-label { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
-        .token-stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; }
-        .token-actions { display: flex; gap: 6px; margin-top: 10px; }
-        .btn {
-            flex: 1; padding: 8px; border: none; border-radius: 8px;
-            font-size: 11px; font-weight: 600; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 4px;
-            min-height: 36px;
-        }
-        .btn:active { transform: scale(0.95); }
-        .btn-buy { background: var(--success); color: white; }
-        .btn-sell { background: var(--danger); color: white; }
-        .btn-chart { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
-        .btn-primary { background: linear-gradient(135deg, var(--accent), #8b5cf6); color: white; }
-        .btn-secondary { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
-        .btn-sm { padding: 6px 10px; font-size: 10px; }
-        .fab {
-            position: fixed; bottom: calc(90px + var(--safe-bottom)); right: 16px;
-            width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            border: none; border-radius: 50%; color: white; font-size: 24px;
-            cursor: pointer; box-shadow: 0 4px 20px rgba(59,130,246,0.4);
-            z-index: 90; display: flex; align-items: center; justify-content: center;
-        }
-        .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            height: calc(70px + var(--safe-bottom)); background: var(--bg-card);
-            border-top: 1px solid var(--border); display: flex; justify-content: space-around;
-            align-items: flex-start; padding-top: 8px; z-index: 100;
-        }
-        .nav-item {
-            display: flex; flex-direction: column; align-items: center;
-            gap: 4px; padding: 8px 12px; color: var(--text-muted);
-            cursor: pointer; flex: 1;
-        }
-        .nav-item.active { color: var(--accent); }
-        .nav-icon { font-size: 20px; }
-        .nav-label { font-size: 10px; font-weight: 500; }
-        .modal {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.85); z-index: 200;
-            align-items: flex-end; justify-content: center;
-        }
-        .modal.active { display: flex; }
-        .modal-content {
-            background: var(--bg-card); border-radius: var(--radius) var(--radius) 0 0;
-            width: 100%; max-height: 85vh; overflow-y: auto;
-            padding: 20px 16px calc(20px + var(--safe-bottom));
-            animation: slideUp 0.3s ease;
-        }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .modal-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
-        }
-        .modal-title { font-size: 16px; font-weight: 700; }
-        .modal-close {
-            width: 36px; height: 36px; background: var(--bg-hover); border: none;
-            border-radius: 8px; color: var(--text); font-size: 20px; cursor: pointer;
-        }
-        .form-group { margin-bottom: 16px; }
-        .form-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
-        .form-input {
-            width: 100%; padding: 10px; background: var(--bg-hover);
-            border: 1px solid var(--border); border-radius: 8px;
-            color: var(--text); font-size: 13px;
-        }
-        .form-input:focus { outline: none; border-color: var(--accent); }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .quick-amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
-        .quick-btn {
-            padding: 8px; background: var(--bg-hover); border: 1px solid var(--border);
-            border-radius: 6px; color: var(--text-muted); font-size: 11px;
-            font-weight: 600; cursor: pointer; text-align: center; min-height: 36px;
-        }
-        .quick-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .config-grid { display: flex; flex-direction: column; gap: 16px; }
-        .config-section {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 14px;
-        }
-        .config-section-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-        .toggle-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 0; border-bottom: 1px solid var(--border);
-        }
-        .toggle-row:last-child { border-bottom: none; }
-        .toggle-label { display: flex; flex-direction: column; gap: 3px; flex: 1; }
-        .toggle-title { font-size: 12px; font-weight: 500; }
-        .toggle-desc { font-size: 10px; color: var(--text-muted); }
-        .toggle {
-            width: 48px; height: 26px; background: var(--bg-hover); border-radius: 13px;
-            position: relative; cursor: pointer; flex-shrink: 0; margin-left: 10px;
-        }
-        .toggle.active { background: var(--success); }
-        .toggle::after {
-            content: ''; position: absolute; width: 20px; height: 20px;
-            background: white; border-radius: 50%; top: 3px; left: 3px;
-            transition: transform 0.2s;
-        }
-        .toggle.active::after { transform: translateX(22px); }
-        .badge {
-            display: inline-flex; align-items: center; padding: 2px 6px;
-            border-radius: 4px; font-size: 9px; font-weight: 600;
-        }
-        .badge-success { background: rgba(16,185,129,0.15); color: var(--success); }
-        .badge-danger { background: rgba(239,68,68,0.15); color: var(--danger); }
-        .badge-warning { background: rgba(245,158,11,0.15); color: var(--warning); }
-        .badge-info { background: rgba(59,130,246,0.15); color: var(--accent); }
-        .chart-container {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 12px; margin-bottom: 16px;
-            height: 250px;
-        }
-        .loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--text-muted); gap: 10px; }
-        .spinner {
-            width: 24px; height: 24px; border: 3px solid var(--border);
-            border-top-color: var(--accent); border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
-        .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
-        .toast-container {
-            position: fixed; top: calc(20px + var(--safe-top)); right: 16px;
-            z-index: 300; display: flex; flex-direction: column; gap: 8px;
-        }
-        .toast {
-            padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: 8px; color: var(--text); font-size: 13px;
-            animation: slideIn 0.3s ease; min-width: 280px;
-        }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .progress-bar {
-            width: 100%; height: 6px; background: var(--bg-hover);
-            border-radius: 3px; overflow: hidden; margin-top: 6px;
-        }
-        .progress-fill {
-            height: 100%; background: linear-gradient(90deg, var(--accent), #8b5cf6);
-            border-radius: 3px; transition: width 0.3s;
-        }
-        .auto-buy-status {
-            background: var(--bg-hover); border: 1px solid var(--border);
-            border-radius: 8px; padding: 10px; margin-top: 10px;
-        }
-        .auto-buy-tier {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 6px 0; border-bottom: 1px solid var(--border);
-        }
-        .auto-buy-tier:last-child { border-bottom: none; }
-        .tier-triggered { color: var(--success); }
-        .tier-pending { color: var(--text-muted); }
-        .tier-will-trigger { color: var(--warning); }
-        @media (min-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(4, 1fr); }
-            .token-stats { grid-template-columns: repeat(5, 1fr); }
-            .modal { align-items: center; }
-            .modal-content { border-radius: var(--radius); max-width: 600px; max-height: 80vh; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0c0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SolBot Pro v5.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  /* Core palette */
+  --bg:          #0c0d10;
+  --bg-panel:    #111318;
+  --bg-row:      #13151b;
+  --bg-hover:    #1a1d26;
+  --bg-active:   #1e2230;
+  --border:      #22252f;
+  --border-mid:  #2d3245;
+  /* Text */
+  --text:        #dddbd6;
+  --text-dim:    #7a7e8e;
+  --text-ghost:  #3a3e4e;
+  /* Gold accent */
+  --gold:        #c9a227;
+  --gold-dim:    rgba(201,162,39,0.12);
+  --gold-glow:   rgba(201,162,39,0.25);
+  /* Semantic */
+  --up:          #26a69a;
+  --up-dim:      rgba(38,166,154,0.12);
+  --dn:          #ef5350;
+  --dn-dim:      rgba(239,83,80,0.12);
+  --warn:        #e89d37;
+  --info:        #5b8af5;
+  --info-dim:    rgba(91,138,245,0.12);
+  /* Layout */
+  --sidebar-w:   212px;
+  --topbar-h:    52px;
+  --row-h:       40px;
+  --radius:      6px;
+  --safe-top:    env(safe-area-inset-top);
+  --safe-bot:    env(safe-area-inset-bottom);
+  --font-ui:     'Barlow', sans-serif;
+  --font-hd:     'Barlow Condensed', sans-serif;
+  --font-mono:   'DM Mono', monospace;
+}
+
+/* ─── SCROLLBARS ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+
+/* ─── BASE ──────────────────────────────────────────────── */
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  overflow: hidden;
+}
+
+/* ─── SIDEBAR ───────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  height: 100vh;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: fixed;
+  left: 0; top: 0;
+  z-index: 200;
+  padding-top: var(--safe-top);
+}
+
+.sidebar-logo {
+  padding: 20px 16px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+
+.logo-mark {
+  width: 30px; height: 30px;
+  border: 1.5px solid var(--gold);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+
+.logo-wordmark { line-height: 1.1; }
+.logo-name {
+  font-family: var(--font-hd);
+  font-size: 15px; font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+.logo-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--gold);
+  letter-spacing: 0.08em;
+}
+
+/* Status pill */
+.sidebar-status {
+  margin: 12px 16px;
+  padding: 7px 10px;
+  background: rgba(38,166,154,0.08);
+  border: 1px solid rgba(38,166,154,0.25);
+  border-radius: var(--radius);
+  display: flex; align-items: center; gap: 7px;
+}
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--up);
+  box-shadow: 0 0 6px var(--up);
+  animation: pulse 2.4s ease infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+.status-label { font-family: var(--font-mono); font-size: 10px; color: var(--up); letter-spacing: 0.06em; }
+#statusText { font-family: var(--font-mono); font-size: 10px; color: var(--up); }
+
+/* KPI strip */
+.sidebar-kpi { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.kpi-row { display: flex; justify-content: space-between; align-items: baseline; }
+.kpi-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.kpi-val {
+  font-family: var(--font-mono);
+  font-size: 13px; font-weight: 500;
+  color: var(--text);
+}
+.kpi-val.pos { color: var(--up); }
+.kpi-val.neg { color: var(--dn); }
+.kpi-val.gold { color: var(--gold); }
+
+/* Nav */
+.sidebar-nav { flex: 1; padding: 10px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background 0.15s, color 0.15s;
+  position: relative;
+  border: 1px solid transparent;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.nav-item.active {
+  background: var(--gold-dim);
+  color: var(--gold);
+  border-color: rgba(201,162,39,0.2);
+}
+.nav-item.active .nav-icon { color: var(--gold); }
+.nav-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+.nav-label { font-family: var(--font-hd); font-size: 13px; font-weight: 500; letter-spacing: 0.02em; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--dn);
+  color: white;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 10px;
+}
+
+/* Sidebar footer */
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.sol-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+}
+.sol-chip-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.sol-chip-val { font-family: var(--font-mono); font-size: 12px; color: var(--gold); margin-left: auto; }
+
+/* ─── MAIN CONTENT ──────────────────────────────────────── */
+.main {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Topbar */
+.topbar {
+  height: var(--topbar-h);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  flex-shrink: 0;
+  padding-top: var(--safe-top);
+}
+
+.topbar-title {
+  font-family: var(--font-hd);
+  font-size: 18px; font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  flex: 1;
+}
+
+.topbar-stats { display: flex; gap: 24px; align-items: center; }
+.topbar-stat { display: flex; flex-direction: column; align-items: flex-end; }
+.topbar-stat-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.topbar-stat-val { font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+.topbar-stat-val.pos { color: var(--up); }
+.topbar-stat-val.neg { color: var(--dn); }
+.topbar-stat-val.gold { color: var(--gold); }
+
+.topbar-divider { width: 1px; height: 24px; background: var(--border); }
+
+/* Content area */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  padding-bottom: calc(16px + var(--safe-bot));
+}
+
+/* ─── SECTIONS ──────────────────────────────────────────── */
+.section { display: none; }
+.section.active { display: block; }
+
+/* ─── COMPACT TOKEN TABLE ───────────────────────────────── */
+.token-table { width: 100%; border-collapse: collapse; }
+
+.token-table-header {
+  display: grid;
+  grid-template-columns: 28px 1fr 90px 80px 80px 70px 70px 90px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+.th {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: right;
+}
+.th:first-child { text-align: left; }
+.th.l { text-align: left; }
+
+.token-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 90px 80px 80px 70px 70px 90px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: var(--row-h);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.token-row:hover { background: var(--bg-hover); }
+.token-row:active { background: var(--bg-active); }
+.token-row.sl-row { opacity: 0.6; }
+
+.row-rank { font-family: var(--font-mono); font-size: 10px; color: var(--text-ghost); text-align: left; }
+
+.row-token { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+.row-logo {
+  width: 22px; height: 22px; border-radius: 4px;
+  background: var(--bg-hover); flex-shrink: 0;
+  overflow: hidden; display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+}
+.row-logo img { width: 100%; height: 100%; object-fit: cover; }
+.row-sym {
+  font-family: var(--font-hd);
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--text);
+}
+.row-addr { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+
+.row-badges { display: flex; gap: 3px; margin-top: 1px; }
+.badge-xs {
+  font-family: var(--font-mono);
+  font-size: 8px; font-weight: 500;
+  padding: 1px 4px; border-radius: 2px;
+  letter-spacing: 0.04em;
+}
+.badge-gold { background: var(--gold-dim); color: var(--gold); border: 1px solid rgba(201,162,39,0.3); }
+.badge-dn   { background: var(--dn-dim);   color: var(--dn);   border: 1px solid rgba(239,83,80,0.3); }
+.badge-info { background: var(--info-dim); color: var(--info); border: 1px solid rgba(91,138,245,0.3); }
+
+.row-num { font-family: var(--font-mono); font-size: 12px; text-align: right; }
+.row-num.pos { color: var(--up); }
+.row-num.neg { color: var(--dn); }
+.row-num.neu { color: var(--text); }
+.row-num.dim { color: var(--text-dim); font-size: 11px; }
+
+.row-actions {
+  display: flex; gap: 4px;
+  align-items: center; justify-content: flex-end;
+}
+.btn-row {
+  padding: 4px 8px;
+  border: 1px solid var(--border-mid);
+  border-radius: 3px;
+  font-family: var(--font-hd);
+  font-size: 10px; font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.1s;
+  min-height: 22px;
+  background: transparent;
+  color: var(--text-dim);
+}
+.btn-row:active { transform: scale(0.94); }
+.btn-row.buy  { color: var(--up); border-color: rgba(38,166,154,0.35); }
+.btn-row.buy:hover { background: var(--up-dim); color: var(--up); }
+.btn-row.sell { color: var(--dn); border-color: rgba(239,83,80,0.35); }
+.btn-row.sell:hover { background: var(--dn-dim); color: var(--dn); }
+.btn-row.info:hover { background: var(--bg-active); color: var(--text); }
+
+/* ─── PANELS / CARDS ────────────────────────────────────── */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-title {
+  font-family: var(--font-hd);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-dim);
+  display: flex; align-items: center; gap: 7px;
+}
+.panel-title-icon { color: var(--gold); font-size: 12px; }
+.panel-body { padding: 14px; }
+
+/* Stats row */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; }
+.stat-cell {
+  background: var(--bg-panel);
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.stat-cell:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.stat-cell:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.stat-lbl { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; }
+.stat-val { font-family: var(--font-mono); font-size: 16px; font-weight: 500; color: var(--text); }
+.stat-val.pos { color: var(--up); }
+.stat-val.neg { color: var(--dn); }
+.stat-val.gold { color: var(--gold); }
+
+/* Grid 2col */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }
+
+/* Mini stat (inside panels) */
+.mini-stat {
+  background: var(--bg-row);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.mini-stat-lbl { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.mini-stat-val { font-family: var(--font-mono); font-size: 15px; font-weight: 500; }
+.mini-stat-val.pos { color: var(--up); }
+.mini-stat-val.neg { color: var(--dn); }
+.mini-stat-val.gold { color: var(--gold); }
+
+/* ─── CHART ─────────────────────────────────────────────── */
+.chart-wrap { height: 200px; position: relative; }
+
+/* ─── FORM CONTROLS ─────────────────────────────────────── */
+.form-group { margin-bottom: 12px; }
+.form-label {
+  display: block;
+  font-size: 10px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 5px;
+}
+.form-input {
+  width: 100%; padding: 8px 10px;
+  background: var(--bg-row);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  transition: border-color 0.15s;
+}
+.form-input:focus { outline: none; border-color: var(--gold); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+.quick-amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 5px; }
+.quick-btn {
+  padding: 6px; background: var(--bg-row);
+  border: 1px solid var(--border-mid); border-radius: 3px;
+  color: var(--text-dim); font-family: var(--font-hd);
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; text-align: center; min-height: 32px;
+  transition: all 0.1s;
+}
+.quick-btn:hover { border-color: var(--gold); color: var(--gold); }
+.quick-btn.active { background: var(--gold-dim); color: var(--gold); border-color: var(--gold); }
+
+/* Toggle */
+.toggle-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-label { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.toggle-title { font-size: 12px; font-weight: 500; color: var(--text); }
+.toggle-desc { font-size: 10px; color: var(--text-dim); }
+.toggle {
+  width: 42px; height: 22px;
+  background: var(--bg-row); border: 1px solid var(--border-mid);
+  border-radius: 11px; position: relative;
+  cursor: pointer; flex-shrink: 0; margin-left: 10px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.toggle.active { background: rgba(201,162,39,0.2); border-color: var(--gold); }
+.toggle::after {
+  content: ''; position: absolute;
+  width: 16px; height: 16px;
+  background: var(--text-dim); border-radius: 50%;
+  top: 2px; left: 2px;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle.active::after { transform: translateX(20px); background: var(--gold); }
+
+/* ─── CONFIG SECTIONS ───────────────────────────────────── */
+.config-grid { display: flex; flex-direction: column; gap: 10px; }
+.config-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.config-section-title {
+  font-family: var(--font-hd);
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.config-section-title::before {
+  content: ''; width: 3px; height: 12px;
+  background: var(--gold); border-radius: 2px; display: inline-block;
+}
+
+/* ─── BTN PRIMARY / SECONDARY ───────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 16px; border: none; border-radius: var(--radius);
+  font-family: var(--font-hd);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+  cursor: pointer; transition: all 0.15s; min-height: 36px;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary {
+  background: var(--gold);
+  color: #0c0d10;
+  border: 1px solid var(--gold);
+}
+.btn-primary:hover { background: #ddb633; }
+.btn-secondary {
+  background: var(--bg-row);
+  color: var(--text);
+  border: 1px solid var(--border-mid);
+}
+.btn-secondary:hover { border-color: var(--text-dim); }
+.btn-buy  { background: rgba(38,166,154,0.15); color: var(--up); border: 1px solid rgba(38,166,154,0.4); }
+.btn-buy:hover { background: rgba(38,166,154,0.25); }
+.btn-sell { background: rgba(239,83,80,0.15); color: var(--dn); border: 1px solid rgba(239,83,80,0.4); }
+.btn-sell:hover { background: rgba(239,83,80,0.25); }
+.btn-danger { background: var(--dn-dim); color: var(--dn); border: 1px solid rgba(239,83,80,0.4); }
+.btn-sm { padding: 5px 10px; font-size: 10px; min-height: 28px; }
+.btn-full { width: 100%; }
+
+/* ─── FAB ───────────────────────────────────────────────── */
+.fab {
+  position: fixed;
+  bottom: calc(16px + var(--safe-bot));
+  right: 20px;
+  width: 44px; height: 44px;
+  background: var(--gold);
+  border: none; border-radius: 50%;
+  color: #0c0d10; font-size: 22px; font-weight: 300;
+  cursor: pointer;
+  box-shadow: 0 4px 18px var(--gold-glow);
+  z-index: 90;
+  display: none; /* hidden desktop */
+  align-items: center; justify-content: center;
+  transition: transform 0.15s;
+}
+.fab:active { transform: scale(0.92); }
+
+/* ─── BOTTOM NAV (mobile only) ──────────────────────────── */
+.bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: calc(58px + var(--safe-bot));
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  justify-content: space-around; align-items: flex-start;
+  padding-top: 8px;
+  z-index: 200;
+}
+.bnav-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 3px; padding: 4px 12px;
+  color: var(--text-dim); cursor: pointer; flex: 1;
+}
+.bnav-item.active { color: var(--gold); }
+.bnav-icon { font-size: 18px; }
+.bnav-label { font-family: var(--font-hd); font-size: 9px; font-weight: 600; letter-spacing: 0.05em; }
+
+/* ─── MODAL ─────────────────────────────────────────────── */
+.modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 400;
+  align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.modal.active { display: flex; }
+.modal-content {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%; max-width: 560px;
+  max-height: 88vh; overflow-y: auto;
+  padding: 20px 18px calc(18px + var(--safe-bot));
+  animation: slideUp 0.22s cubic-bezier(.22,.68,0,1.2);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 18px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title {
+  font-family: var(--font-hd);
+  font-size: 16px; font-weight: 700;
+  letter-spacing: 0.06em; color: var(--text);
+}
+.modal-close {
+  width: 30px; height: 30px;
+  background: var(--bg-hover); border: 1px solid var(--border-mid);
+  border-radius: 4px; color: var(--text-dim);
+  font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { color: var(--text); }
+
+/* ─── TRADE ROW ─────────────────────────────────────────── */
+.trade-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.trade-row:last-child { border-bottom: none; }
+.trade-sym { font-family: var(--font-hd); font-size: 13px; font-weight: 600; }
+.trade-meta { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+.trade-pnl { font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+.trade-pnl.pos { color: var(--up); }
+.trade-pnl.neg { color: var(--dn); }
+
+/* ─── AUTO-BUY ROW ──────────────────────────────────────── */
+.auto-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+}
+.auto-row:last-child { border-bottom: none; }
+.tier-done  { color: var(--up); font-family: var(--font-mono); font-size: 11px; }
+.tier-next  { color: var(--warn); font-family: var(--font-mono); font-size: 11px; }
+.tier-idle  { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; }
+
+/* ─── REENTRY CARD ──────────────────────────────────────── */
+.reentry-card {
+  background: var(--bg-row);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.reentry-card.eligible { border-color: rgba(38,166,154,0.35); }
+.reentry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.reentry-sym { font-family: var(--font-hd); font-size: 14px; font-weight: 700; }
+.reentry-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+.reentry-item { font-size: 10px; color: var(--text-dim); }
+.reentry-item .val { font-family: var(--font-mono); }
+.reentry-item .val.ok  { color: var(--up); }
+.reentry-item .val.bad { color: var(--dn); }
+.reentry-item .val.wrn { color: var(--warn); }
+
+/* ─── DEAD TOKEN ROW ────────────────────────────────────── */
+.dead-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 14px; border-bottom: 1px solid var(--border);
+}
+.dead-row:last-child { border-bottom: none; }
+.dead-sym { font-family: var(--font-hd); font-size: 13px; font-weight: 600; color: var(--dn); }
+.dead-addr { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); }
+.dead-meta { text-align: right; font-family: var(--font-mono); font-size: 11px; }
+
+/* ─── MISC ──────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 20px; color: var(--text-dim); gap: 10px;
+}
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border-mid);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty {
+  text-align: center; padding: 48px 20px; color: var(--text-dim);
+}
+.empty-icon { font-size: 36px; margin-bottom: 10px; opacity: 0.4; }
+.empty-txt { font-size: 12px; }
+
+/* ─── TOAST ─────────────────────────────────────────────── */
+.toast-container {
+  position: fixed; top: calc(14px + var(--safe-top));
+  right: 16px; z-index: 999;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.toast {
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+  color: var(--text); font-size: 12px;
+  font-family: var(--font-ui);
+  animation: fadeIn 0.2s ease;
+  min-width: 260px;
+  border-left: 3px solid var(--gold);
+}
+@keyframes fadeIn { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: none; } }
+.toast.ok  { border-left-color: var(--up); }
+.toast.err { border-left-color: var(--dn); }
+
+/* ─── PROGRESS ──────────────────────────────────────────── */
+.progress-bar { width: 100%; height: 3px; background: var(--bg-hover); border-radius: 2px; overflow: hidden; margin-top: 5px; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--gold), #e8b830); border-radius: 2px; transition: width 0.3s; }
+
+/* ─── DETAIL GRID ───────────────────────────────────────── */
+.detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.detail-cell { background: var(--bg-row); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }
+.detail-lbl { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
+.detail-val { font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+.detail-val.pos { color: var(--up); }
+.detail-val.neg { color: var(--dn); }
+.detail-val.gold { color: var(--gold); }
+
+/* ─── HORIZONTAL RULE ───────────────────────────────────── */
+.section-sep {
+  font-family: var(--font-hd);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-ghost);
+  display: flex; align-items: center; gap: 8px;
+  margin: 14px 0 8px;
+}
+.section-sep::after { content:''; flex:1; height:1px; background: var(--border); }
+
+/* ─── CIRCUIT BREAKER ───────────────────────────────────── */
+.cb-display {
+  text-align: center; padding: 14px;
+  background: var(--bg-row); border-radius: var(--radius);
+}
+.cb-count { font-family: var(--font-mono); font-size: 32px; font-weight: 500; color: var(--dn); }
+.cb-label { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; }
+
+/* ─── RESPONSIVE — MOBILE ───────────────────────────────── */
+@media (max-width: 768px) {
+  body { overflow: auto; }
+  html, body { height: auto; overflow: auto; }
+
+  .sidebar { display: none; }
+  .main {
+    margin-left: 0;
+    height: auto;
+    min-height: 100vh;
+    padding-top: var(--safe-top);
+    padding-bottom: calc(60px + var(--safe-bot));
+    overflow: auto;
+  }
+  .main > .content { overflow: visible; height: auto; }
+  .fab { display: flex; }
+  .bottom-nav { display: flex; }
+
+  .topbar {
+    padding: 0 14px;
+    padding-top: var(--safe-top);
+    height: auto;
+    min-height: 48px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+  .topbar-stats { flex-wrap: wrap; gap: 12px; }
+  .topbar-divider { display: none; }
+
+  .token-table-header { display: none; }
+  .token-row {
+    grid-template-columns: 1fr auto;
+    height: auto; padding: 10px;
+    gap: 4px;
+  }
+  .token-row > :not(.row-token):not(.row-num:nth-child(3)):not(.row-actions) { display: none; }
+  .row-num.pnl-col { display: block; }
+
+  .detail-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .topbar-title { font-size: 15px; }
+}
+
+@media (min-width: 769px) {
+  .modal { align-items: center; }
+  .modal-content {
+    border-radius: var(--radius);
+    max-height: 82vh;
+  }
+  /* Desktop tweaks */
+  .content { padding: 18px 24px; }
+  .topbar { padding: 0 24px; padding-top: var(--safe-top); }
+}
+
+@media (min-width: 1280px) {
+  :root { --sidebar-w: 228px; }
+}
+</style>
 </head>
 <body>
-    <!-- HEADER -->
-    <header class="header">
-        <div class="header-top">
-            <div class="logo">
-                <div class="logo-icon">🤖</div>
-                <div>
-                    <div class="logo-text">SolBot Pro</div>
-                    <div class="logo-version">v5.0</div>
-                </div>
-            </div>
-            <div class="status">
-                <div class="status-dot"></div>
-                <span id="statusText">LIVE</span>
-            </div>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Portfolio</div>
-                <div class="stat-value" id="totalValue">$0.00</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">PnL Net</div>
-                <div class="stat-value" id="pnlNet">0 ◎</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Win Rate</div>
-                <div class="stat-value" id="winRate">0%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Actifs</div>
-                <div class="stat-value" id="tokenCount">0</div>
-            </div>
-        </div>
-    </header>
 
-    <!-- TABS -->
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('portfolio')">◈ Portfolio</div>
-        <div class="tab" onclick="switchTab('analytics')">⌇ Analytics</div>
-        <div class="tab" onclick="switchTab('config')">⚙ Config</div>
-        <div class="tab" onclick="switchTab('autobuys')">📈 Auto-Buys</div>
-        <div class="tab" onclick="switchTab('reentry')">🔄 Re-Entry</div>
-        <div class="tab" onclick="switchTab('dead')">🔴 Dead</div>
+<!-- ═══════════════════════════ SIDEBAR ════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">⚡</div>
+    <div class="logo-wordmark">
+      <div class="logo-name">SOLBOT PRO</div>
+      <div class="logo-sub">v5.0 · PRODUCTION</div>
     </div>
+  </div>
 
-    <!-- PORTFOLIO SECTION -->
+  <div class="sidebar-status">
+    <div class="status-dot"></div>
+    <span id="statusText" class="status-label">LIVE</span>
+  </div>
+
+  <div class="sidebar-kpi">
+    <div class="kpi-row">
+      <span class="kpi-label">Portfolio</span>
+      <span class="kpi-val gold" id="totalValue">$0.00</span>
+    </div>
+    <div class="kpi-row">
+      <span class="kpi-label">PnL Net</span>
+      <span class="kpi-val" id="pnlNet">0 ◎</span>
+    </div>
+    <div class="kpi-row">
+      <span class="kpi-label">Win Rate</span>
+      <span class="kpi-val" id="winRate">—</span>
+    </div>
+    <div class="kpi-row">
+      <span class="kpi-label">Actifs</span>
+      <span class="kpi-val" id="tokenCount">0</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-item active" id="nav-portfolio" onclick="switchTab('portfolio')">
+      <span class="nav-icon">◈</span>
+      <span class="nav-label">Portfolio</span>
+    </div>
+    <div class="nav-item" id="nav-analytics" onclick="switchTab('analytics')">
+      <span class="nav-icon">⌇</span>
+      <span class="nav-label">Analytics</span>
+    </div>
+    <div class="nav-item" id="nav-autobuys" onclick="switchTab('autobuys')">
+      <span class="nav-icon">📈</span>
+      <span class="nav-label">Auto-Buys</span>
+    </div>
+    <div class="nav-item" id="nav-reentry" onclick="switchTab('reentry')">
+      <span class="nav-icon">🔄</span>
+      <span class="nav-label">Re-Entry</span>
+    </div>
+    <div class="nav-item" id="nav-dead" onclick="switchTab('dead')">
+      <span class="nav-icon">💀</span>
+      <span class="nav-label">Dead Tokens</span>
+    </div>
+    <div class="nav-item" id="nav-config" onclick="switchTab('config')">
+      <span class="nav-icon">⚙</span>
+      <span class="nav-label">Config</span>
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sol-chip">
+      <span class="sol-chip-label">◎ SOL</span>
+      <span class="sol-chip-val" id="solBalanceDisplay">—</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════ MAIN ═══════════════════════════════ -->
+<div class="main">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-title" id="topbarTitle">PORTFOLIO</div>
+    <div class="topbar-stats">
+      <div class="topbar-stat">
+        <span class="topbar-stat-label">Circuit Breaker</span>
+        <span class="topbar-stat-val" id="circuitBreakerCount">—</span>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-stat">
+        <span class="topbar-stat-label">Uptime</span>
+        <span class="topbar-stat-val gold" id="uptimeDisplay">—</span>
+      </div>
+      <div class="topbar-divider"></div>
+      <button class="btn btn-primary btn-sm" onclick="openBuyModal()" style="margin-left:4px;">+ BUY</button>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ─── PORTFOLIO ─── -->
     <section id="portfolio" class="section active">
-        <div class="token-list" id="tokenList">
-            <div class="loading">
-                <div class="spinner"></div>
-                <span>Chargement...</span>
-            </div>
-        </div>
+      <div id="tokenList">
+        <div class="loading"><div class="spinner"></div><span>Chargement...</span></div>
+      </div>
     </section>
 
-    <!-- ANALYTICS SECTION -->
+    <!-- ─── ANALYTICS ─── -->
     <section id="analytics" class="section">
-        <div class="chart-container">
-            <canvas id="pnlChart"></canvas>
+      <div class="grid-4">
+        <div class="mini-stat">
+          <div class="mini-stat-lbl">PnL Réalisé</div>
+          <div class="mini-stat-val gold" id="realizedPnl">0 ◎</div>
         </div>
-        <div class="stats-grid" style="margin-bottom: 16px;">
-            <div class="stat-card">
-                <div class="stat-label">PnL Réalisé</div>
-                <div class="stat-value" id="realizedPnl">0 ◎</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Win Rate</div>
-                <div class="stat-value" id="analyticsWinRate">0%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Trades</div>
-                <div class="stat-value" id="totalTrades">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">ROI</div>
-                <div class="stat-value" id="roi">0%</div>
-            </div>
+        <div class="mini-stat">
+          <div class="mini-stat-lbl">Win Rate</div>
+          <div class="mini-stat-val" id="analyticsWinRate">—</div>
         </div>
-        <div class="form-row">
-            <div class="stat-card">
-                <div class="stat-label">Sharpe</div>
-                <div class="stat-value" id="sharpe">—</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Sortino</div>
-                <div class="stat-value" id="sortino">—</div>
-            </div>
+        <div class="mini-stat">
+          <div class="mini-stat-lbl">Trades</div>
+          <div class="mini-stat-val" id="totalTrades">0</div>
         </div>
-        <div class="form-row" style="margin-top: 10px;">
-            <div class="stat-card">
-                <div class="stat-label">Max Drawdown</div>
-                <div class="stat-value neg" id="maxDrawdown">—</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Profit Factor</div>
-                <div class="stat-value" id="profitFactor">—</div>
-            </div>
+        <div class="mini-stat">
+          <div class="mini-stat-lbl">ROI</div>
+          <div class="mini-stat-val" id="roi">—</div>
         </div>
-        <div class="config-section" style="margin-top: 16px;">
-            <div class="config-section-title">🔥 Win / Loss Streaks</div>
-            <div style="display: flex; gap: 16px; justify-content: center; padding: 12px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 24px;">🔥</div>
-                    <div style="font-size: 11px; color: var(--text-muted);">Win</div>
-                    <div class="stat-value pos" id="winStreak">0</div>
-                    <div style="font-size: 10px; color: var(--text-muted);">(Max: <span id="maxWinStreak">0</span>)</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 24px;">❄️</div>
-                    <div style="font-size: 11px; color: var(--text-muted);">Loss</div>
-                    <div class="stat-value neg" id="lossStreak">0</div>
-                    <div style="font-size: 10px; color: var(--text-muted);">(Max: <span id="maxLossStreak">0</span>)</div>
-                </div>
-            </div>
+      </div>
+
+      <div class="grid-4">
+        <div class="mini-stat">
+          <div class="mini-stat-lbl">Sharpe</div>
+          <div class="mini-stat-val" id="sharpe">—</div>
         </div>
-        <div class="config-section" style="margin-top: 16px;">
-            <div class="config-section-title">📊 Derniers trades</div>
-            <div id="recentTrades">
-                <div class="empty">
-                    <div class="empty-icon">📊</div>
-                    <div>Aucun trade récent</div>
-                </div>
-            </div>
+        <div class="mini-stat">
+          <div class="mini-stat-lbl">Sortino</div>
+          <div class="mini-stat-val" id="sortino">—</div>
         </div>
+        <div class="mini-stat">
+          <div class="mini-stat-lbl">Max Drawdown</div>
+          <div class="mini-stat-val neg" id="maxDrawdown">—</div>
+        </div>
+        <div class="mini-stat">
+          <div class="mini-stat-lbl">Profit Factor</div>
+          <div class="mini-stat-val" id="profitFactor">—</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="panel-title-icon">◈</span> PnL Cumulé</div>
+        </div>
+        <div class="panel-body">
+          <div class="chart-wrap"><canvas id="pnlChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="panel-title-icon">🔥</span> Streaks</div>
+        </div>
+        <div class="panel-body">
+          <div class="grid-2">
+            <div style="text-align:center; padding: 10px 0;">
+              <div style="font-size:28px; margin-bottom:4px;">🔥</div>
+              <div style="font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em;">WIN</div>
+              <div class="stat-val pos" id="winStreak">0</div>
+              <div style="font-size:10px; color:var(--text-dim); margin-top:3px;">max <span id="maxWinStreak" style="color:var(--up);">0</span></div>
+            </div>
+            <div style="text-align:center; padding: 10px 0;">
+              <div style="font-size:28px; margin-bottom:4px;">❄️</div>
+              <div style="font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em;">LOSS</div>
+              <div class="stat-val neg" id="lossStreak">0</div>
+              <div style="font-size:10px; color:var(--text-dim); margin-top:3px;">max <span id="maxLossStreak" style="color:var(--dn);">0</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="panel-title-icon">◇</span> Derniers trades</div>
+        </div>
+        <div id="recentTrades">
+          <div class="empty"><div class="empty-icon">◇</div><div class="empty-txt">Aucun trade</div></div>
+        </div>
+      </div>
     </section>
 
-    <!-- CONFIG SECTION -->
+    <!-- ─── CONFIG ─── -->
     <section id="config" class="section">
-        <div class="config-grid">
-            <div class="config-section">
-                <div class="config-section-title">🎯 Take-Profit</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Vente auto à chaque palier</div>
-                    </div>
-                    <div class="toggle" id="toggle-tp" onclick="toggleConfig('takeProfitEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Hysteresis (%)</label>
-                    <input type="number" class="form-input" id="tpHysteresis" value="5" min="0" max="50">
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">🔒 Break-Even Stop</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">SL → entry+buffer après TP1</div>
-                    </div>
-                    <div class="toggle" id="toggle-be" onclick="toggleConfig('breakEvenEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Buffer (%)</label>
-                    <select class="form-input" id="beBuffer">
-                        <option value="1">+1%</option>
-                        <option value="2" selected>+2%</option>
-                        <option value="5">+5%</option>
-                    </select>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">🛡 Stop-Loss</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Vente forcée sous le seuil</div>
-                    </div>
-                    <div class="toggle" id="toggle-sl" onclick="toggleConfig('stopLossEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Seuil (%)</label>
-                    <select class="form-input" id="slPct">
-                        <option value="-25">-25%</option>
-                        <option value="-40">-40%</option>
-                        <option value="-50" selected>-50%</option>
-                        <option value="-70">-70%</option>
-                    </select>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">📉 Trailing Stop</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Suit le peak, vend si recul</div>
-                    </div>
-                    <div class="toggle" id="toggle-ts" onclick="toggleConfig('trailingEnabled')"></div>
-                </div>
-                <div class="form-row" style="margin-top: 12px;">
-                    <div class="form-group">
-                        <label class="form-label">Recul max (%)</label>
-                        <select class="form-input" id="tsPct">
-                            <option value="10">10%</option>
-                            <option value="20" selected>20%</option>
-                            <option value="30">30%</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Adaptatif σ</label>
-                        <select class="form-input" id="tsVol">
-                            <option value="false">OFF</option>
-                            <option value="true" selected>ON</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">🚨 Anti-Rug</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Urgence si chute brutale</div>
-                    </div>
-                    <div class="toggle" id="toggle-ar" onclick="toggleConfig('antiRugEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Chute (% / cycle)</label>
-                    <select class="form-input" id="arPct">
-                        <option value="40">40%</option>
-                        <option value="60" selected>60%</option>
-                        <option value="80">80%</option>
-                    </select>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">💧 Liquidity Exit</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Exit si liquidité chute de X%</div>
-                    </div>
-                    <div class="toggle" id="toggle-le" onclick="toggleConfig('liqExitEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Chute liq. (%)</label>
-                    <select class="form-input" id="lePct">
-                        <option value="50">50%</option>
-                        <option value="70" selected>70%</option>
-                        <option value="90">90%</option>
-                    </select>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">⏱ Time-Based Stop</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Exit si stagnant trop longtemps</div>
-                    </div>
-                    <div class="toggle" id="toggle-tt" onclick="toggleConfig('timeStopEnabled')"></div>
-                </div>
-                <div class="form-row" style="margin-top: 12px;">
-                    <div class="form-group">
-                        <label class="form-label">Après (heures)</label>
-                        <select class="form-input" id="ttHours">
-                            <option value="12">12h</option>
-                            <option value="24" selected>24h</option>
-                            <option value="48">48h</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">PnL min</label>
-                        <input type="number" class="form-input" id="ttMinPnl" value="0" step="1">
-                    </div>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">🔄 Momentum Exit</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Exit si retournement confirmé</div>
-                    </div>
-                    <div class="toggle" id="toggle-me" onclick="toggleConfig('momentumEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Seuil (%/cycle)</label>
-                    <input type="number" class="form-input" id="meThreshold" value="-3" step="0.5">
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">⚡ Jito Bundles</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Sells urgents via Jito (anti-MEV)</div>
-                    </div>
-                    <div class="toggle" id="toggle-jito" onclick="toggleConfig('jitoEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Tip (SOL)</label>
-                    <input type="number" class="form-input" id="jitoTip" value="0.0001" step="0.0001">
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">📈 Pyramid In (NEW)</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Rachète sur montée (paliers)</div>
-                    </div>
-                    <div class="toggle" id="toggle-pyramid" onclick="toggleConfig('pyramidEnabled')"></div>
-                </div>
-                <div class="form-row" style="margin-top: 12px;">
-                    <div class="form-group">
-                        <label class="form-label">Max SOL</label>
-                        <input type="number" class="form-input" id="pyramidMaxSol" value="0.5" step="0.05">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Hysteresis</label>
-                        <input type="number" class="form-input" id="pyramidHysteresis" value="5" min="0" max="50">
-                    </div>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">📉 DCA-Down (NEW)</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Moyenne à la baisse</div>
-                    </div>
-                    <div class="toggle" id="toggle-dcad" onclick="toggleConfig('dcadEnabled')"></div>
-                </div>
-                <div class="form-row" style="margin-top: 12px;">
-                    <div class="form-group">
-                        <label class="form-label">Max Adds</label>
-                        <input type="number" class="form-input" id="dcadMaxAdds" value="2" min="1" max="10">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Require Momentum</label>
-                        <select class="form-input" id="dcadRequireMomentum">
-                            <option value="true" selected>OUI</option>
-                            <option value="false">NON</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">🔄 Re-Entry (NEW)</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Rachat auto après SL</div>
-                    </div>
-                    <div class="toggle" id="toggle-reentry" onclick="toggleConfig('reentryEnabled')"></div>
-                </div>
-                <div class="form-row" style="margin-top: 12px;">
-                    <div class="form-group">
-                        <label class="form-label">Délai (min)</label>
-                        <input type="number" class="form-input" id="reentryDelayMin" value="30" min="1" max="1440">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Rebond min (%)</label>
-                        <input type="number" class="form-input" id="reentryMinGain" value="15" min="1" max="200">
-                    </div>
-                </div>
-                <div class="form-group" style="margin-top: 10px;">
-                    <label class="form-label">Score min</label>
-                    <input type="number" class="form-input" id="reentryMinScore" value="60" min="0" max="100">
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">🎯 Smart Sizing (NEW)</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">SOL auto par score 0-100</div>
-                    </div>
-                    <div class="toggle" id="toggle-smartsize" onclick="toggleConfig('smartSizeEnabled')"></div>
-                </div>
-                <div class="form-row" style="margin-top: 12px;">
-                    <div class="form-group">
-                        <label class="form-label">Base SOL</label>
-                        <input type="number" class="form-input" id="smartSizeBase" value="0.05" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Multiplier</label>
-                        <input type="number" class="form-input" id="smartSizeMult" value="2.0" step="0.1">
-                    </div>
-                </div>
-                <div class="form-row" style="margin-top: 10px;">
-                    <div class="form-group">
-                        <label class="form-label">Min SOL</label>
-                        <input type="number" class="form-input" id="smartSizeMin" value="0.02" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Max SOL</label>
-                        <input type="number" class="form-input" id="smartSizeMax" value="0.5" step="0.05">
-                    </div>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">⚙ Général</div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Slippage défaut (bps)</label>
-                        <input type="number" class="form-input" id="defaultSlippage" value="500" min="10" max="5000">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Réserve SOL min</label>
-                        <input type="number" class="form-input" id="minSolReserve" value="0.05" step="0.01" min="0" max="10">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Intervalle (sec)</label>
-                        <select class="form-input" id="intervalSec">
-                            <option value="15">15s</option>
-                            <option value="30" selected>30s</option>
-                            <option value="60">60s</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Max positions</label>
-                        <input type="number" class="form-input" id="maxPositions" value="10" min="1" max="50">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Score min. achat (0 = désactivé)</label>
-                    <input type="number" class="form-input" id="minScore" value="0" min="0" max="100">
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">⚠ Circuit-Breaker</div>
-                <div style="padding: 10px; background: var(--bg-hover); border-radius: 8px; text-align: center;">
-                    <div style="font-size: 12px; color: var(--text-muted);">Échecs sell consécutifs</div>
-                    <div style="font-size: 24px; font-weight: 700; color: var(--danger);" id="circuitBreakerCount">—</div>
-                    <button class="btn btn-secondary btn-sm" onclick="resetCircuitBreaker()" style="margin-top: 8px; width: 100%;">
-                        🔄 RESET
-                    </button>
-                </div>
-            </div>
+      <div class="config-grid">
+
+        <div class="config-section">
+          <div class="config-section-title">Take-Profit</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Vente auto à chaque palier</div></div>
+            <div class="toggle" id="toggle-tp" onclick="toggleConfig('takeProfitEnabled')"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">Hysteresis (%)</label>
+            <input type="number" class="form-input" id="tpHysteresis" value="5" min="0" max="50">
+          </div>
         </div>
-        <button class="btn btn-primary" onclick="saveConfig()" style="width: 100%; padding: 14px; margin-top: 16px; min-height: 48px;">
-            ▸ SAUVEGARDER LA CONFIG ◂
-        </button>
+
+        <div class="config-section">
+          <div class="config-section-title">Break-Even Stop</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">SL → entry+buffer après TP1</div></div>
+            <div class="toggle" id="toggle-be" onclick="toggleConfig('breakEvenEnabled')"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">Buffer (%)</label>
+            <select class="form-input" id="beBuffer">
+              <option value="1">+1%</option><option value="2" selected>+2%</option><option value="5">+5%</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Stop-Loss</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Vente forcée sous le seuil</div></div>
+            <div class="toggle" id="toggle-sl" onclick="toggleConfig('stopLossEnabled')"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">Seuil (%)</label>
+            <select class="form-input" id="slPct">
+              <option value="-25">-25%</option><option value="-40">-40%</option>
+              <option value="-50" selected>-50%</option><option value="-70">-70%</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Trailing Stop</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Suit le peak, vend si recul</div></div>
+            <div class="toggle" id="toggle-ts" onclick="toggleConfig('trailingEnabled')"></div>
+          </div>
+          <div class="form-row" style="margin-top:10px;">
+            <div class="form-group">
+              <label class="form-label">Recul max (%)</label>
+              <select class="form-input" id="tsPct"><option value="10">10%</option><option value="20" selected>20%</option><option value="30">30%</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Adaptatif σ</label>
+              <select class="form-input" id="tsVol"><option value="false">OFF</option><option value="true" selected>ON</option></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Anti-Rug</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Urgence si chute brutale</div></div>
+            <div class="toggle" id="toggle-ar" onclick="toggleConfig('antiRugEnabled')"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">Chute (% / cycle)</label>
+            <select class="form-input" id="arPct"><option value="40">40%</option><option value="60" selected>60%</option><option value="80">80%</option></select>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Liquidity Exit</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Exit si liquidité chute de X%</div></div>
+            <div class="toggle" id="toggle-le" onclick="toggleConfig('liqExitEnabled')"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">Chute liq. (%)</label>
+            <select class="form-input" id="lePct"><option value="50">50%</option><option value="70" selected>70%</option><option value="90">90%</option></select>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Time-Based Stop</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Exit si stagnant trop longtemps</div></div>
+            <div class="toggle" id="toggle-tt" onclick="toggleConfig('timeStopEnabled')"></div>
+          </div>
+          <div class="form-row" style="margin-top:10px;">
+            <div class="form-group">
+              <label class="form-label">Après (h)</label>
+              <select class="form-input" id="ttHours"><option value="12">12h</option><option value="24" selected>24h</option><option value="48">48h</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">PnL min</label>
+              <input type="number" class="form-input" id="ttMinPnl" value="0" step="1">
+            </div>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Momentum Exit</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Exit si retournement confirmé</div></div>
+            <div class="toggle" id="toggle-me" onclick="toggleConfig('momentumEnabled')"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">Seuil (%/cycle)</label>
+            <input type="number" class="form-input" id="meThreshold" value="-3" step="0.5">
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Jito Bundles</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Sells urgents via Jito (anti-MEV)</div></div>
+            <div class="toggle" id="toggle-jito" onclick="toggleConfig('jitoEnabled')"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">Tip (SOL)</label>
+            <input type="number" class="form-input" id="jitoTip" value="0.0001" step="0.0001">
+          </div>
+        </div>
+
+        <!-- NEW STRATEGIES -->
+        <div class="config-section" style="border-color: rgba(201,162,39,0.25);">
+          <div class="config-section-title" style="color:var(--gold);">Pyramid In · NEW</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Rachète sur montée (paliers)</div></div>
+            <div class="toggle" id="toggle-pyramid" onclick="toggleConfig('pyramidEnabled')"></div>
+          </div>
+          <div class="form-row" style="margin-top:10px;">
+            <div class="form-group">
+              <label class="form-label">Max SOL</label>
+              <input type="number" class="form-input" id="pyramidMaxSol" value="0.5" step="0.05">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Hysteresis</label>
+              <input type="number" class="form-input" id="pyramidHysteresis" value="5" min="0" max="50">
+            </div>
+          </div>
+        </div>
+
+        <div class="config-section" style="border-color: rgba(201,162,39,0.25);">
+          <div class="config-section-title" style="color:var(--gold);">DCA-Down · NEW</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Moyenne à la baisse</div></div>
+            <div class="toggle" id="toggle-dcad" onclick="toggleConfig('dcadEnabled')"></div>
+          </div>
+          <div class="form-row" style="margin-top:10px;">
+            <div class="form-group">
+              <label class="form-label">Max Adds</label>
+              <input type="number" class="form-input" id="dcadMaxAdds" value="2" min="1" max="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Req. Momentum</label>
+              <select class="form-input" id="dcadRequireMomentum"><option value="true" selected>OUI</option><option value="false">NON</option></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="config-section" style="border-color: rgba(201,162,39,0.25);">
+          <div class="config-section-title" style="color:var(--gold);">Re-Entry · NEW</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">Rachat auto après SL</div></div>
+            <div class="toggle" id="toggle-reentry" onclick="toggleConfig('reentryEnabled')"></div>
+          </div>
+          <div class="form-row" style="margin-top:10px;">
+            <div class="form-group">
+              <label class="form-label">Délai (min)</label>
+              <input type="number" class="form-input" id="reentryDelayMin" value="30" min="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rebond min (%)</label>
+              <input type="number" class="form-input" id="reentryMinGain" value="15" min="1">
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:8px;">
+            <label class="form-label">Score min</label>
+            <input type="number" class="form-input" id="reentryMinScore" value="60" min="0" max="100">
+          </div>
+        </div>
+
+        <div class="config-section" style="border-color: rgba(201,162,39,0.25);">
+          <div class="config-section-title" style="color:var(--gold);">Smart Sizing · NEW</div>
+          <div class="toggle-row">
+            <div class="toggle-label"><div class="toggle-title">Actif</div><div class="toggle-desc">SOL auto par score 0-100</div></div>
+            <div class="toggle" id="toggle-smartsize" onclick="toggleConfig('smartSizeEnabled')"></div>
+          </div>
+          <div class="form-row" style="margin-top:10px;">
+            <div class="form-group">
+              <label class="form-label">Base SOL</label>
+              <input type="number" class="form-input" id="smartSizeBase" value="0.05" step="0.01">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Multiplier</label>
+              <input type="number" class="form-input" id="smartSizeMult" value="2.0" step="0.1">
+            </div>
+          </div>
+          <div class="form-row" style="margin-top:8px;">
+            <div class="form-group">
+              <label class="form-label">Min SOL</label>
+              <input type="number" class="form-input" id="smartSizeMin" value="0.02" step="0.01">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max SOL</label>
+              <input type="number" class="form-input" id="smartSizeMax" value="0.5" step="0.05">
+            </div>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Général</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Slippage (bps)</label>
+              <input type="number" class="form-input" id="defaultSlippage" value="500" min="10" max="5000">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Réserve SOL min</label>
+              <input type="number" class="form-input" id="minSolReserve" value="0.05" step="0.01">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Intervalle (sec)</label>
+              <select class="form-input" id="intervalSec">
+                <option value="15">15s</option><option value="30" selected>30s</option><option value="60">60s</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max positions</label>
+              <input type="number" class="form-input" id="maxPositions" value="10" min="1" max="50">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Score min. achat (0 = off)</label>
+            <input type="number" class="form-input" id="minScore" value="0" min="0" max="100">
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-title">Circuit-Breaker</div>
+          <div class="cb-display">
+            <div class="cb-label">Échecs sell consécutifs</div>
+            <div class="cb-count" id="circuitBreakerCountCfg">—</div>
+            <button class="btn btn-secondary btn-sm btn-full" onclick="resetCircuitBreaker()" style="margin-top:10px;">
+              ↺ RESET
+            </button>
+          </div>
+        </div>
+
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveConfig()" style="padding:13px; margin-top:14px; font-size:13px; letter-spacing:.08em;">
+        ▸ SAUVEGARDER LA CONFIG ◂
+      </button>
     </section>
 
-    <!-- AUTO-BUYS SECTION -->
+    <!-- ─── AUTO-BUYS ─── -->
     <section id="autobuys" class="section">
-        <div id="autoBuysContent">
-            <div class="loading">
-                <div class="spinner"></div>
-                <span>Chargement...</span>
-            </div>
-        </div>
+      <div id="autoBuysContent">
+        <div class="loading"><div class="spinner"></div><span>Chargement...</span></div>
+      </div>
     </section>
 
-    <!-- RE-ENTRY SECTION -->
+    <!-- ─── RE-ENTRY ─── -->
     <section id="reentry" class="section">
-        <div id="reentryContent">
-            <div class="loading">
-                <div class="spinner"></div>
-                <span>Chargement...</span>
-            </div>
-        </div>
+      <div id="reentryContent">
+        <div class="loading"><div class="spinner"></div><span>Chargement...</span></div>
+      </div>
     </section>
 
-    <!-- DEAD TOKENS SECTION -->
+    <!-- ─── DEAD TOKENS ─── -->
     <section id="dead" class="section">
-        <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-            <button class="btn btn-secondary" onclick="loadDeadTokens()" style="flex: 1;">
-                ↺ Refresh
-            </button>
-            <button class="btn btn-danger" onclick="purgeDeadTokens()" style="flex: 1;">
-                🗑 Purge ALL
-            </button>
-            <button class="btn btn-secondary" onclick="resetNegCache()" style="flex: 1;">
-                🔍 Reset Cache
-            </button>
-        </div>
-        <div id="deadTokensContent">
-            <div class="loading">
-                <div class="spinner"></div>
-                <span>Chargement...</span>
-            </div>
-        </div>
+      <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="loadDeadTokens()" style="flex:1; min-width:100px;">↺ Refresh</button>
+        <button class="btn btn-danger btn-sm" onclick="purgeDeadTokens()" style="flex:1; min-width:100px;">🗑 Purge ALL</button>
+        <button class="btn btn-secondary btn-sm" onclick="resetNegCache()" style="flex:1; min-width:100px;">🔍 Reset Cache</button>
+      </div>
+      <div id="deadTokensContent">
+        <div class="loading"><div class="spinner"></div><span>Chargement...</span></div>
+      </div>
     </section>
 
-    <!-- FLOATING ACTION BUTTON -->
-    <button class="fab" onclick="openBuyModal()">+</button>
+  </div><!-- .content -->
+</div><!-- .main -->
 
-    <!-- BOTTOM NAV -->
-    <nav class="bottom-nav">
-        <div class="nav-item active" onclick="switchTab('portfolio')">
-            <div class="nav-icon">◈</div>
-            <div class="nav-label">Portfolio</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('analytics')">
-            <div class="nav-icon">⌇</div>
-            <div class="nav-label">Analytics</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('config')">
-            <div class="nav-icon">⚙</div>
-            <div class="nav-label">Config</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('autobuys')">
-            <div class="nav-icon">📈</div>
-            <div class="nav-label">Auto</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('reentry')">
-            <div class="nav-icon">🔄</div>
-            <div class="nav-label">Re-Entry</div>
-        </div>
-    </nav>
+<!-- ═══════════════════════════ MOBILE NAV ═════════════════════════ -->
+<button class="fab" onclick="openBuyModal()">+</button>
 
-    <!-- BUY MODAL -->
-    <div class="modal" id="buyModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">▲ ACHETER</div>
-                <button class="modal-close" onclick="closeBuyModal()">×</button>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Token Address</label>
-                <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse complète">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Montant (SOL)</label>
-                <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01">
-                <div class="quick-amounts">
-                    <div class="quick-btn" onclick="setBuyAmount(0.1)">0.1</div>
-                    <div class="quick-btn" onclick="setBuyAmount(0.25)">0.25</div>
-                    <div class="quick-btn" onclick="setBuyAmount(0.5)">0.5</div>
-                    <div class="quick-btn" onclick="setMaxBuy()">MAX</div>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Slippage</label>
-                    <select class="form-input" id="buySlippage">
-                        <option value="100">1%</option>
-                        <option value="300" selected>3%</option>
-                        <option value="500">5%</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Smart Size</label>
-                    <select class="form-input" id="buySmartSize">
-                        <option value="false">OFF</option>
-                        <option value="true">ON</option>
-                    </select>
-                </div>
-            </div>
-            <button class="btn btn-buy" onclick="executeBuy()" style="width: 100%; padding: 14px; min-height: 48px;">
-                CONFIRMER L'ACHAT
-            </button>
-        </div>
+<nav class="bottom-nav">
+  <div class="bnav-item active" id="bnav-portfolio" onclick="switchTab('portfolio')">
+    <div class="bnav-icon">◈</div><div class="bnav-label">Portfolio</div>
+  </div>
+  <div class="bnav-item" id="bnav-analytics" onclick="switchTab('analytics')">
+    <div class="bnav-icon">⌇</div><div class="bnav-label">Analytics</div>
+  </div>
+  <div class="bnav-item" id="bnav-autobuys" onclick="switchTab('autobuys')">
+    <div class="bnav-icon">📈</div><div class="bnav-label">Auto</div>
+  </div>
+  <div class="bnav-item" id="bnav-reentry" onclick="switchTab('reentry')">
+    <div class="bnav-icon">🔄</div><div class="bnav-label">Re-Entry</div>
+  </div>
+  <div class="bnav-item" id="bnav-config" onclick="switchTab('config')">
+    <div class="bnav-icon">⚙</div><div class="bnav-label">Config</div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════ MODALS ════════════════════════════ -->
+
+<!-- BUY -->
+<div class="modal" id="buyModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--up);">▲ ACHETER</div>
+      <button class="modal-close" onclick="closeBuyModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Token Address</label>
+      <input type="text" class="form-input" id="buyTokenAddress" placeholder="Adresse complète">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Montant (SOL)</label>
+      <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01">
+      <div class="quick-amounts">
+        <div class="quick-btn" onclick="setBuyAmount(0.1)">0.1</div>
+        <div class="quick-btn" onclick="setBuyAmount(0.25)">0.25</div>
+        <div class="quick-btn" onclick="setBuyAmount(0.5)">0.5</div>
+        <div class="quick-btn" onclick="setMaxBuy()">MAX</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Slippage</label>
+        <select class="form-input" id="buySlippage">
+          <option value="100">1%</option><option value="300" selected>3%</option><option value="500">5%</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Smart Size</label>
+        <select class="form-input" id="buySmartSize">
+          <option value="false">OFF</option><option value="true">ON</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-buy btn-full" onclick="executeBuy()" style="padding:12px; font-size:13px; letter-spacing:.06em;">
+      CONFIRMER L'ACHAT
+    </button>
+  </div>
+</div>
+
+<!-- SELL -->
+<div class="modal" id="sellModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--dn);">▼ VENDRE</div>
+      <button class="modal-close" onclick="closeSellModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Token</label>
+      <input type="text" class="form-input" id="sellTokenInfo" readonly style="opacity:.7;">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Balance</label>
+      <input type="text" class="form-input" id="sellBalance" readonly style="opacity:.7;">
+    </div>
+    <div class="form-group">
+      <label class="form-label">À vendre</label>
+      <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001">
+      <div class="quick-amounts">
+        <div class="quick-btn" onclick="setSellPercent(25)">25%</div>
+        <div class="quick-btn" onclick="setSellPercent(50)">50%</div>
+        <div class="quick-btn" onclick="setSellPercent(75)">75%</div>
+        <div class="quick-btn" onclick="setSellPercent(100)">100%</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Slippage</label>
+        <select class="form-input" id="sellSlippage">
+          <option value="100">1%</option><option value="300" selected>3%</option><option value="500">5%</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Jito</label>
+        <select class="form-input" id="sellJito"><option value="false">OFF</option><option value="true">ON</option></select>
+      </div>
+    </div>
+    <button class="btn btn-sell btn-full" onclick="executeSell()" style="padding:12px; font-size:13px; letter-spacing:.06em;">
+      CONFIRMER LA VENTE
+    </button>
+  </div>
+</div>
+
+<!-- TOKEN DETAIL -->
+<div class="modal" id="tokenDetailModal">
+  <div class="modal-content" style="max-width:700px;">
+    <div class="modal-header">
+      <div class="modal-title" id="tokenDetailTitle">Token</div>
+      <button class="modal-close" onclick="closeTokenDetailModal()">×</button>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-cell"><div class="detail-lbl">Valeur</div><div class="detail-val gold" id="detailValue">$0</div></div>
+      <div class="detail-cell"><div class="detail-lbl">Liq.</div><div class="detail-val" id="detailLiq">—</div></div>
+      <div class="detail-cell"><div class="detail-lbl">MCap</div><div class="detail-val" id="detailMcap">—</div></div>
+      <div class="detail-cell"><div class="detail-lbl">Vol 24h</div><div class="detail-val" id="detailVol24h">—</div></div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-cell"><div class="detail-lbl">Score</div><div class="detail-val gold" id="detailScore">0/100</div></div>
+      <div class="detail-cell"><div class="detail-lbl">Entrée</div><div class="detail-val" id="detailEntry">—</div></div>
+      <div class="detail-cell"><div class="detail-lbl">Peak PnL</div><div class="detail-val pos" id="detailPeak">+0%</div></div>
+      <div class="detail-cell"><div class="detail-lbl">Liq Drop</div><div class="detail-val neg" id="detailLiqDrop">0%</div></div>
     </div>
 
-    <!-- SELL MODAL -->
-    <div class="modal" id="sellModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">▼ VENDRE</div>
-                <button class="modal-close" onclick="closeSellModal()">×</button>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Token</label>
-                <input type="text" class="form-input" id="sellTokenInfo" readonly style="background: var(--bg-hover);">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Balance</label>
-                <input type="text" class="form-input" id="sellBalance" readonly style="background: var(--bg-hover);">
-            </div>
-            <div class="form-group">
-                <label class="form-label">À vendre</label>
-                <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001">
-                <div class="quick-amounts">
-                    <div class="quick-btn" onclick="setSellPercent(25)">25%</div>
-                    <div class="quick-btn" onclick="setSellPercent(50)">50%</div>
-                    <div class="quick-btn" onclick="setSellPercent(75)">75%</div>
-                    <div class="quick-btn" onclick="setSellPercent(100)">100%</div>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Slippage</label>
-                    <select class="form-input" id="sellSlippage">
-                        <option value="100">1%</option>
-                        <option value="300" selected>3%</option>
-                        <option value="500">5%</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Jito</label>
-                    <select class="form-input" id="sellJito">
-                        <option value="false">OFF</option>
-                        <option value="true">ON</option>
-                    </select>
-                </div>
-            </div>
-            <button class="btn btn-sell" onclick="executeSell()" style="width: 100%; padding: 14px; min-height: 48px;">
-                CONFIRMER LA VENTE
-            </button>
-        </div>
+    <div class="section-sep">Pyramid In</div>
+    <div class="panel" style="margin-bottom:10px;">
+      <div id="pyramidTiers" style="padding:10px 14px;"></div>
+      <div style="padding: 6px 14px; border-top: 1px solid var(--border); font-size:10px; color:var(--text-dim);">
+        Budget restant: <span id="pyramidBudget" style="color:var(--gold);">0 SOL</span>
+      </div>
     </div>
 
-    <!-- TOKEN DETAIL MODAL -->
-    <div class="modal" id="tokenDetailModal">
-        <div class="modal-content" style="max-width: 800px;">
-            <div class="modal-header">
-                <div class="modal-title" id="tokenDetailTitle">Token</div>
-                <button class="modal-close" onclick="closeTokenDetailModal()">×</button>
-            </div>
-            <div class="form-row" style="margin-bottom: 16px;">
-                <div class="stat-card">
-                    <div class="stat-label">Valeur</div>
-                    <div class="stat-value" id="detailValue">$0.00</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Liq.</div>
-                    <div class="stat-value" id="detailLiq">$0k</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">MCap</div>
-                    <div class="stat-value" id="detailMcap">$0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Vol 24h</div>
-                    <div class="stat-value" id="detailVol24h">$0</div>
-                </div>
-            </div>
-            <div class="form-row" style="margin-bottom: 16px;">
-                <div class="stat-card">
-                    <div class="stat-label">Score</div>
-                    <div class="stat-value" id="detailScore">0/100</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Entrée</div>
-                    <div class="stat-value" id="detailEntry">$0.00</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Peak PnL</div>
-                    <div class="stat-value pos" id="detailPeak">+0%</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Liq Drop</div>
-                    <div class="stat-value neg" id="detailLiqDrop">0%</div>
-                </div>
-            </div>
-            <div class="auto-buy-status" id="autoBuyStatus">
-                <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">📈 Pyramid In Status</div>
-                <div id="pyramidTiers"></div>
-                <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">
-                    Budget restant: <span id="pyramidBudget" style="color: var(--accent);">0 SOL</span>
-                </div>
-            </div>
-            <div class="auto-buy-status" style="margin-top: 10px;">
-                <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">📉 DCA-Down Status</div>
-                <div id="dcadTiers"></div>
-                <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">
-                    Adds restants: <span id="dcadAddsLeft" style="color: var(--accent);">0</span>
-                </div>
-            </div>
-            <div style="display: flex; gap: 10px; margin-top: 16px;">
-                <button class="btn btn-secondary" onclick="openDexScreener()" style="flex: 1;">
-                    🦎 DexScreener
-                </button>
-                <button class="btn btn-secondary" onclick="scanHistory()" style="flex: 1;">
-                    🔍 Scan History
-                </button>
-            </div>
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button class="btn btn-buy" onclick="openBuyFromDetail()" style="flex: 1;">
-                    ▲ BUY
-                </button>
-                <button class="btn btn-sell" onclick="openSellFromDetail()" style="flex: 1;">
-                    ▼ SELL
-                </button>
-            </div>
-        </div>
+    <div class="section-sep">DCA-Down</div>
+    <div class="panel" style="margin-bottom:14px;">
+      <div id="dcadTiers" style="padding:10px 14px;"></div>
+      <div style="padding: 6px 14px; border-top: 1px solid var(--border); font-size:10px; color:var(--text-dim);">
+        Adds restants: <span id="dcadAddsLeft" style="color:var(--gold);">0</span>
+      </div>
     </div>
 
-    <!-- TOAST CONTAINER -->
-    <div class="toast-container" id="toastContainer"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="openDexScreener()" style="flex:1; min-width:120px;">🦎 DexScreener</button>
+      <button class="btn btn-secondary" onclick="scanHistory()" style="flex:1; min-width:120px;">🔍 Scan History</button>
+      <button class="btn btn-buy" onclick="openBuyFromDetail()" style="flex:1; min-width:90px;">▲ BUY</button>
+      <button class="btn btn-sell" onclick="openSellFromDetail()" style="flex:1; min-width:90px;">▼ SELL</button>
+    </div>
+  </div>
+</div>
 
-    <script>
-        const API = window.location.origin;
-        let portfolio = [];
-        let configData = {};
-        let currentToken = null;
-        let solBalance = 0;
-        let pnlChart = null;
-        let currentDetailMint = null;
+<!-- ─── TOAST ─── -->
+<div class="toast-container" id="toastContainer"></div>
 
-        // INIT
-        document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-            loadConfig();
-            setInterval(() => loadData(), 30000);
-        });
+<!-- ═══════════════════════════ SCRIPT (UNCHANGED) ════════════════ -->
+<script>
+const API = window.location.origin;
+let portfolio = [];
+let configData = {};
+let currentToken = null;
+let solBalance = 0;
+let pnlChart = null;
+let currentDetailMint = null;
 
-        // LOAD DATA
-        async function loadData() {
-            try {
-                const [statsRes, portfolioRes, balanceRes] = await Promise.all([
-                    fetch(`${API}/api/stats`),
-                    fetch(`${API}/api/portfolio`),
-                    fetch(`${API}/api/sol-balance`)
-                ]);
-                const statsData = await statsRes.json();
-                portfolio = (await portfolioRes.json()).tokens || [];
-                const balanceData = await balanceRes.json();
-                solBalance = balanceData.balance || 0;
-                document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
-                document.getElementById('tokenCount').textContent = statsData.tokens || 0;
-                document.getElementById('circuitBreakerCount').textContent = statsData.sellCircuitBreaker || 0;
-                renderPortfolio(portfolio);
-            } catch (err) {
-                console.error('Load error:', err);
-            }
-        }
+const TABS = ['portfolio','analytics','config','autobuys','reentry','dead'];
+const TAB_TITLES = {
+  portfolio:'PORTFOLIO', analytics:'ANALYTICS', config:'CONFIGURATION',
+  autobuys:'AUTO-BUYS', reentry:'RE-ENTRY', dead:'DEAD TOKENS'
+};
 
-        // LOAD CONFIG
-        async function loadConfig() {
-            try {
-                const res = await fetch(`${API}/api/config`);
-                configData = await res.json();
-                updateConfigUI();
-            } catch (err) {
-                console.error('Config load error:', err);
-            }
-        }
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  loadConfig();
+  setInterval(() => loadData(), 30000);
+});
 
-        // UPDATE CONFIG UI
-        function updateConfigUI() {
-            document.getElementById('toggle-tp').classList.toggle('active', configData.takeProfitEnabled);
-            document.getElementById('toggle-be').classList.toggle('active', configData.breakEvenEnabled);
-            document.getElementById('toggle-sl').classList.toggle('active', configData.stopLossEnabled);
-            document.getElementById('toggle-ts').classList.toggle('active', configData.trailingEnabled);
-            document.getElementById('toggle-ar').classList.toggle('active', configData.antiRugEnabled);
-            document.getElementById('toggle-le').classList.toggle('active', configData.liqExitEnabled);
-            document.getElementById('toggle-tt').classList.toggle('active', configData.timeStopEnabled);
-            document.getElementById('toggle-me').classList.toggle('active', configData.momentumEnabled);
-            document.getElementById('toggle-jito').classList.toggle('active', configData.jitoEnabled);
-            document.getElementById('toggle-pyramid').classList.toggle('active', configData.pyramidEnabled);
-            document.getElementById('toggle-dcad').classList.toggle('active', configData.dcadEnabled);
-            document.getElementById('toggle-reentry').classList.toggle('active', configData.reentryEnabled);
-            document.getElementById('toggle-smartsize').classList.toggle('active', configData.smartSizeEnabled);
-            document.getElementById('tpHysteresis').value = configData.hysteresis || 5;
-            document.getElementById('beBuffer').value = configData.breakEvenBuffer || 2;
-            document.getElementById('slPct').value = configData.stopLossPct || -50;
-            document.getElementById('tsPct').value = configData.trailingPct || 20;
-            document.getElementById('tsVol').value = configData.trailingVol ? 'true' : 'false';
-            document.getElementById('arPct').value = configData.antiRugPct || 60;
-            document.getElementById('lePct').value = configData.liqExitPct || 70;
-            document.getElementById('ttHours').value = configData.timeStopHours || 24;
-            document.getElementById('ttMinPnl').value = configData.timeStopMinPnl || 0;
-            document.getElementById('meThreshold').value = configData.momentumThreshold || -3;
-            document.getElementById('jitoTip').value = configData.jitoTipSol || 0.0001;
-            document.getElementById('pyramidMaxSol').value = configData.pyramidMaxSol || 0.5;
-            document.getElementById('pyramidHysteresis').value = configData.pyramidHysteresis || 5;
-            document.getElementById('dcadMaxAdds').value = configData.dcadMaxAdds || 2;
-            document.getElementById('dcadRequireMomentum').value = configData.dcadRequireMomentum ? 'true' : 'false';
-            document.getElementById('reentryDelayMin').value = configData.reentryDelayMin || 30;
-            document.getElementById('reentryMinGain').value = configData.reentryMinGain || 15;
-            document.getElementById('reentryMinScore').value = configData.reentryMinScore || 60;
-            document.getElementById('smartSizeBase').value = configData.smartSizeBase || 0.05;
-            document.getElementById('smartSizeMult').value = configData.smartSizeMult || 2.0;
-            document.getElementById('smartSizeMin').value = configData.smartSizeMin || 0.02;
-            document.getElementById('smartSizeMax').value = configData.smartSizeMax || 0.5;
-            document.getElementById('defaultSlippage').value = configData.defaultSlippage || 500;
-            document.getElementById('minSolReserve').value = configData.minSolReserve || 0.05;
-            document.getElementById('intervalSec').value = configData.intervalSec || 30;
-            document.getElementById('maxPositions').value = configData.maxPositions || 10;
-            document.getElementById('minScore').value = configData.minScore || 0;
-        }
+async function loadData() {
+  try {
+    const [statsRes, portfolioRes, balanceRes] = await Promise.all([
+      fetch(`${API}/api/stats`),
+      fetch(`${API}/api/portfolio`),
+      fetch(`${API}/api/sol-balance`)
+    ]);
+    const statsData = await statsRes.json();
+    portfolio = (await portfolioRes.json()).tokens || [];
+    const balanceData = await balanceRes.json();
+    solBalance = balanceData.balance || 0;
 
-        // RENDER PORTFOLIO
-        function renderPortfolio(tokens) {
-            const list = document.getElementById('tokenList');
-            if (tokens.length === 0) {
-                list.innerHTML = `
-                    <div class="empty">
-                        <div class="empty-icon">💎</div>
-                        <div>Aucun token dans le portfolio</div>
-                        <button class="btn btn-primary" onclick="openBuyModal()" style="margin-top: 16px; min-height: 44px;">
-                            + Acheter un token
-                        </button>
-                    </div>
-                `;
-                return;
-            }
-            list.innerHTML = tokens.map(token => {
-                const pnlClass = token.pnl >= 0 ? 'pos' : 'neg';
-                const pnlSign = token.pnl >= 0 ? '+' : '';
-                const logo = token.logo 
-                    ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'" style="width:100%;height:100%;border-radius:10px;object-fit:cover;">`
-                    : '🪙';
-                const badges = [];
-                if (token.bootstrapped) badges.push('<span class="badge badge-warning">BOOT</span>');
-                if (token.stopLossHit) badges.push('<span class="badge badge-danger">SL</span>');
-                if (token.breakEven) badges.push('<span class="badge badge-info">BE</span>');
-                return `
-                    <div class="token-card" onclick="openTokenDetail('${token.mintFull}')">
-                        <div class="token-header">
-                            <div class="token-info">
-                                <div class="token-logo">${logo}</div>
-                                <div class="token-details">
-                                    <div class="token-symbol">${token.symbol || token.mint.slice(0, 8)}... ${badges.join(' ')}</div>
-                                    <div class="token-address">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
-                                </div>
-                            </div>
-                            <div class="token-price">
-                                <div class="price-value">$${(token.price || 0).toFixed(6)}</div>
-                                <div class="price-change ${pnlClass}">${pnlSign}${(token.pnl || 0).toFixed(2)}%</div>
-                            </div>
-                        </div>
-                        <div class="token-stats">
-                            <div class="token-stat">
-                                <div class="token-stat-label">Valeur</div>
-                                <div class="token-stat-value">$${(token.value || 0).toFixed(2)}</div>
-                            </div>
-                            <div class="token-stat">
-                                <div class="token-stat-label">Balance</div>
-                                <div class="token-stat-value">${(token.balance || 0).toFixed(4)}</div>
-                            </div>
-                            <div class="token-stat">
-                                <div class="token-stat-label">Liq.</div>
-                                <div class="token-stat-value">$${((token.liquidity || 0) / 1000).toFixed(1)}k</div>
-                            </div>
-                        </div>
-                        <div class="token-actions">
-                            <button class="btn btn-buy" onclick="event.stopPropagation(); openBuyModal('${token.mintFull}')">Buy</button>
-                            <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">Sell</button>
-                            <button class="btn btn-chart" onclick="event.stopPropagation(); openTokenDetail('${token.mintFull}')">📊</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
+    document.getElementById('totalValue').textContent = `$${(statsData.totalValue||0).toFixed(2)}`;
+    document.getElementById('tokenCount').textContent = statsData.tokens || 0;
+    const cb = statsData.sellCircuitBreaker || 0;
+    document.getElementById('circuitBreakerCount').textContent = cb;
+    document.getElementById('circuitBreakerCount').className = 'topbar-stat-val' + (cb > 0 ? ' neg' : '');
+    const cbCfg = document.getElementById('circuitBreakerCountCfg');
+    if (cbCfg) cbCfg.textContent = cb;
+    const uptimeSec = statsData.uptime || 0;
+    const h = Math.floor(uptimeSec/3600), m = Math.floor((uptimeSec%3600)/60);
+    document.getElementById('uptimeDisplay').textContent = `${h}h ${String(m).padStart(2,'0')}m`;
+    document.getElementById('solBalanceDisplay').textContent = `${solBalance.toFixed(4)} ◎`;
 
-        // TAB SWITCHING
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
-            if (tabName === 'analytics') { loadAnalytics(); }
-            if (tabName === 'autobuys') { loadAutoBuys(); }
-            if (tabName === 'reentry') { loadReentry(); }
-            if (tabName === 'dead') { loadDeadTokens(); }
-        }
+    renderPortfolio(portfolio);
+  } catch(err) { console.error('Load error:', err); }
+}
 
-        // CONFIG TOGGLES
-        function toggleConfig(key) {
-            const toggle = document.getElementById(`toggle-${key}`);
-            if (toggle) toggle.classList.toggle('active');
-        }
+async function loadConfig() {
+  try {
+    const res = await fetch(`${API}/api/config`);
+    configData = await res.json();
+    updateConfigUI();
+  } catch(err) { console.error('Config error:', err); }
+}
 
-        async function saveConfig() {
-            try {
-                const config = {
-                    takeProfitEnabled: document.getElementById('toggle-tp').classList.contains('active'),
-                    breakEvenEnabled: document.getElementById('toggle-be').classList.contains('active'),
-                    stopLossEnabled: document.getElementById('toggle-sl').classList.contains('active'),
-                    trailingEnabled: document.getElementById('toggle-ts').classList.contains('active'),
-                    trailingVol: document.getElementById('tsVol').value === 'true',
-                    antiRugEnabled: document.getElementById('toggle-ar').classList.contains('active'),
-                    liqExitEnabled: document.getElementById('toggle-le').classList.contains('active'),
-                    timeStopEnabled: document.getElementById('toggle-tt').classList.contains('active'),
-                    momentumEnabled: document.getElementById('toggle-me').classList.contains('active'),
-                    jitoEnabled: document.getElementById('toggle-jito').classList.contains('active'),
-                    pyramidEnabled: document.getElementById('toggle-pyramid').classList.contains('active'),
-                    dcadEnabled: document.getElementById('toggle-dcad').classList.contains('active'),
-                    reentryEnabled: document.getElementById('toggle-reentry').classList.contains('active'),
-                    smartSizeEnabled: document.getElementById('toggle-smartsize').classList.contains('active'),
-                    hysteresis: parseFloat(document.getElementById('tpHysteresis').value),
-                    breakEvenBuffer: parseFloat(document.getElementById('beBuffer').value),
-                    stopLossPct: parseFloat(document.getElementById('slPct').value),
-                    trailingPct: parseFloat(document.getElementById('tsPct').value),
-                    antiRugPct: parseFloat(document.getElementById('arPct').value),
-                    liqExitPct: parseFloat(document.getElementById('lePct').value),
-                    timeStopHours: parseFloat(document.getElementById('ttHours').value),
-                    timeStopMinPnl: parseFloat(document.getElementById('ttMinPnl').value),
-                    momentumThreshold: parseFloat(document.getElementById('meThreshold').value),
-                    jitoTipSol: parseFloat(document.getElementById('jitoTip').value),
-                    pyramidMaxSol: parseFloat(document.getElementById('pyramidMaxSol').value),
-                    pyramidHysteresis: parseFloat(document.getElementById('pyramidHysteresis').value),
-                    dcadMaxAdds: parseInt(document.getElementById('dcadMaxAdds').value),
-                    dcadRequireMomentum: document.getElementById('dcadRequireMomentum').value === 'true',
-                    reentryDelayMin: parseFloat(document.getElementById('reentryDelayMin').value),
-                    reentryMinGain: parseFloat(document.getElementById('reentryMinGain').value),
-                    reentryMinScore: parseFloat(document.getElementById('reentryMinScore').value),
-                    smartSizeBase: parseFloat(document.getElementById('smartSizeBase').value),
-                    smartSizeMult: parseFloat(document.getElementById('smartSizeMult').value),
-                    smartSizeMin: parseFloat(document.getElementById('smartSizeMin').value),
-                    smartSizeMax: parseFloat(document.getElementById('smartSizeMax').value),
-                    defaultSlippage: parseInt(document.getElementById('defaultSlippage').value),
-                    minSolReserve: parseFloat(document.getElementById('minSolReserve').value),
-                    intervalSec: parseInt(document.getElementById('intervalSec').value),
-                    maxPositions: parseInt(document.getElementById('maxPositions').value),
-                    minScore: parseFloat(document.getElementById('minScore').value),
-                };
-                const res = await fetch(`${API}/api/config`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config),
-                });
-                if (res.ok) {
-                    showToast('✅ Configuration sauvegardée', 'success');
-                    loadConfig();
-                } else {
-                    showToast('❌ Erreur lors de la sauvegarde', 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
+function updateConfigUI() {
+  const bools = {
+    'toggle-tp': 'takeProfitEnabled', 'toggle-be': 'breakEvenEnabled',
+    'toggle-sl': 'stopLossEnabled', 'toggle-ts': 'trailingEnabled',
+    'toggle-ar': 'antiRugEnabled', 'toggle-le': 'liqExitEnabled',
+    'toggle-tt': 'timeStopEnabled', 'toggle-me': 'momentumEnabled',
+    'toggle-jito': 'jitoEnabled', 'toggle-pyramid': 'pyramidEnabled',
+    'toggle-dcad': 'dcadEnabled', 'toggle-reentry': 'reentryEnabled',
+    'toggle-smartsize': 'smartSizeEnabled',
+  };
+  for (const [id, key] of Object.entries(bools)) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', !!configData[key]);
+  }
+  const vals = {
+    tpHysteresis: configData.hysteresis||5, beBuffer: configData.breakEvenBuffer||2,
+    slPct: configData.stopLossPct||-50, tsPct: configData.trailingPct||20,
+    tsVol: configData.trailingVol ? 'true':'false', arPct: configData.antiRugPct||60,
+    lePct: configData.liqExitPct||70, ttHours: configData.timeStopHours||24,
+    ttMinPnl: configData.timeStopMinPnl||0, meThreshold: configData.momentumThreshold||-3,
+    jitoTip: configData.jitoTipSol||0.0001, pyramidMaxSol: configData.pyramidMaxSol||0.5,
+    pyramidHysteresis: configData.pyramidHysteresis||5, dcadMaxAdds: configData.dcadMaxAdds||2,
+    dcadRequireMomentum: configData.dcadRequireMomentum ? 'true':'false',
+    reentryDelayMin: configData.reentryDelayMin||30, reentryMinGain: configData.reentryMinGain||15,
+    reentryMinScore: configData.reentryMinScore||60, smartSizeBase: configData.smartSizeBase||0.05,
+    smartSizeMult: configData.smartSizeMult||2.0, smartSizeMin: configData.smartSizeMin||0.02,
+    smartSizeMax: configData.smartSizeMax||0.5, defaultSlippage: configData.defaultSlippage||500,
+    minSolReserve: configData.minSolReserve||0.05, intervalSec: configData.intervalSec||30,
+    maxPositions: configData.maxPositions||10, minScore: configData.minScore||0,
+  };
+  for (const [id, val] of Object.entries(vals)) {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  }
+}
 
-        // LOAD ANALYTICS
-        async function loadAnalytics() {
-            try {
-                const [analyticsRes, tradesRes] = await Promise.all([
-                    fetch(`${API}/api/analytics`),
-                    fetch(`${API}/api/trades`)
-                ]);
-                const analytics = await analyticsRes.json();
-                const trades = await tradesRes.json();
-                document.getElementById('realizedPnl').textContent = `${analytics.realizedPnlSol || 0} ◎`;
-                document.getElementById('analyticsWinRate').textContent = `${analytics.winRate || 0}%`;
-                document.getElementById('totalTrades').textContent = analytics.totalTrades || 0;
-                document.getElementById('roi').textContent = `${analytics.roi || 0}%`;
-                document.getElementById('sharpe').textContent = analytics.sharpeRatio || '—';
-                document.getElementById('sortino').textContent = analytics.sortinoRatio || '—';
-                document.getElementById('maxDrawdown').textContent = analytics.maxDrawdownSol ? `-${analytics.maxDrawdownSol}` : '—';
-                document.getElementById('profitFactor').textContent = analytics.profitFactor || '—';
-                document.getElementById('winStreak').textContent = analytics.winStreak || 0;
-                document.getElementById('maxWinStreak').textContent = analytics.maxWinStreak || 0;
-                document.getElementById('lossStreak').textContent = analytics.lossStreak || 0;
-                document.getElementById('maxLossStreak').textContent = analytics.maxLossStreak || 0;
-                const recentTrades = trades.trades?.slice(0, 10) || [];
-                const container = document.getElementById('recentTrades');
-                if (recentTrades.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty">
-                            <div class="empty-icon">📊</div>
-                            <div>Aucun trade récent</div>
-                        </div>
-                    `;
-                    return;
-                }
-                container.innerHTML = recentTrades.map(trade => {
-                    const pnlClass = trade.pnlPct >= 0 ? 'pos' : 'neg';
-                    const pnlSign = trade.pnlPct >= 0 ? '+' : '';
-                    const date = new Date(trade.ts).toLocaleString('fr-FR');
-                    return `
-                        <div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-weight: 600; font-size: 13px;">${trade.symbol || trade.mint?.slice(0,8)}</div>
-                                <div style="font-size: 10px; color: var(--text-muted);">${trade.type.toUpperCase()} • ${date}</div>
-                            </div>
-                            <div class="${pnlClass}" style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">
-                                ${pnlSign}${(trade.pnlPct || 0).toFixed(2)}%
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                updatePnlChart(analytics.pnlHistory || []);
-            } catch (err) {
-                console.error('Analytics load error:', err);
-            }
-        }
+function renderPortfolio(tokens) {
+  const list = document.getElementById('tokenList');
+  if (!tokens.length) {
+    list.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">◈</div>
+        <div class="empty-txt">Portfolio vide</div>
+        <button class="btn btn-primary" onclick="openBuyModal()" style="margin-top:16px;">+ Acheter</button>
+      </div>`;
+    return;
+  }
 
-        // UPDATE PNL CHART
-        function updatePnlChart(pnlHistory) {
-            const ctx = document.getElementById('pnlChart').getContext('2d');
-            if (pnlChart) { pnlChart.destroy(); }
-            const labels = pnlHistory.slice(-30).map((_, i) => i + 1);
-            const data = pnlHistory.slice(-30).map(p => p.cumul);
-            pnlChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'PnL Cumulé (SOL)',
-                        data: data,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { display: false },
-                        y: {
-                            grid: { color: 'rgba(42, 53, 80, 0.5)' },
-                            ticks: { color: '#6b7a99', font: { family: 'JetBrains Mono', size: 10 } }
-                        }
-                    },
-                    interaction: { intersect: false, mode: 'index' }
-                }
-            });
-        }
+  const header = `
+    <div class="token-table-header">
+      <div class="th l">#</div>
+      <div class="th l">TOKEN</div>
+      <div class="th">VALEUR</div>
+      <div class="th">PNL</div>
+      <div class="th">PEAK</div>
+      <div class="th">SCORE</div>
+      <div class="th">LIQ.</div>
+      <div class="th">ACTIONS</div>
+    </div>`;
 
-        // LOAD AUTO-BUYS
-        async function loadAutoBuys() {
-            try {
-                const res = await fetch(`${API}/api/auto-buys`);
-                const data = await res.json();
-                const container = document.getElementById('autoBuysContent');
-                if (!data.positions || data.positions.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty">
-                            <div class="empty-icon">📈</div>
-                            <div>Aucune position avec auto-buy</div>
-                        </div>
-                    `;
-                    return;
-                }
-                container.innerHTML = data.positions.map(pos => {
-                    const pnlClass = pos.pnl >= 0 ? 'pos' : 'neg';
-                    const pnlSign = pos.pnl >= 0 ? '+' : '';
-                    let pyramidHtml = '';
-                    if (data.pyramidEnabled && pos.pyramidTiers) {
-                        pyramidHtml = `<div style="margin-top: 8px; font-size: 11px;"><strong>Pyramid:</strong> ${pos.pyramidTiers.map(t => 
-                            `<span class="${t.triggered ? 'tier-triggered' : t.willTrigger ? 'tier-will-trigger' : 'tier-pending'}">T${t.idx+1}: ${t.pnl}% (${t.addSol} SOL)</span>`
-                        ).join(' | ')}</div>`;
-                    }
-                    let dcadHtml = '';
-                    if (data.dcadEnabled && pos.dcadTiers) {
-                        dcadHtml = `<div style="margin-top: 4px; font-size: 11px;"><strong>DCA-Down:</strong> ${pos.dcadTiers.map(t => 
-                            `<span class="${t.triggered ? 'tier-triggered' : t.willTrigger ? 'tier-will-trigger' : 'tier-pending'}">T${t.idx+1}: ${t.pnl}% (${t.addSol} SOL)</span>`
-                        ).join(' | ')}</div>`;
-                    }
-                    return `
-                        <div class="config-section" style="margin-bottom: 10px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div style="font-weight: 600;">${pos.symbol} (${pos.mint.slice(0,8)}...)</div>
-                                <div class="${pnlClass}" style="font-family: 'JetBrains Mono', monospace;">${pnlSign}${pos.pnl}%</div>
-                            </div>
-                            ${pyramidHtml}
-                            ${dcadHtml}
-                            <div style="margin-top: 8px; font-size: 10px; color: var(--text-muted);">
-                                Pyramid: ${pos.addedSol?.toFixed(4) || 0}/${data.pyramidMaxSol} SOL | DCA: ${pos.dcadDone || 0}/${data.dcadMaxAdds} adds
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (err) {
-                console.error('Auto-buys load error:', err);
-            }
-        }
+  const rows = tokens.map((tok, i) => {
+    const pnl    = tok.pnl ?? null;
+    const pClass = pnl === null ? 'dim' : pnl >= 0 ? 'pos' : 'neg';
+    const pStr   = pnl === null ? '—' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`;
+    const peak   = tok.peakPnl ?? 0;
+    const liq    = tok.liquidity ?? 0;
+    const logo   = tok.logo
+      ? `<img src="${tok.logo}" onerror="this.parentElement.innerHTML='🪙'" loading="lazy">`
+      : '🪙';
 
-        // LOAD RE-ENTRY
-        async function loadReentry() {
-            try {
-                const res = await fetch(`${API}/api/reentry`);
-                const data = await res.json();
-                const container = document.getElementById('reentryContent');
-                if (!data.stoppedTokens || data.stoppedTokens.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty">
-                            <div class="empty-icon">🔄</div>
-                            <div>Aucun token éligible au re-entry</div>
-                        </div>
-                    `;
-                    return;
-                }
-                container.innerHTML = data.stoppedTokens.map(token => {
-                    const eligibleClass = token.eligible ? 'pos' : 'neg';
-                    const delayClass = token.delayDone ? 'pos' : 'warning';
-                    return `
-                        <div class="config-section" style="margin-bottom: 10px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                <div style="font-weight: 600;">${token.symbol}</div>
-                                <span class="badge ${token.eligible ? 'badge-success' : 'badge-danger'}">${token.eligible ? 'ÉLIGIBLE' : 'NON'}</span>
-                            </div>
-                            <div style="font-size: 11px; color: var(--text-muted);">
-                                <div>Exit: ${token.exitPrice?.toFixed(6) || '—'} → Current: ${token.currentPrice?.toFixed(6) || '—'}</div>
-                                <div>Rebond: <span class="${token.reboundPct >= data.reentryMinGain ? 'pos' : 'neg'}">+${token.reboundPct || 0}%</span> (min: +${data.reentryMinGain}%)</div>
-                                <div>Délai: <span class="${token.delayDone ? 'pos' : 'warning'}">${token.delayDone ? 'OK' : token.delayRemainMin + 'min'}</span></div>
-                                <div>Score: <span class="${token.scoreOk ? 'pos' : 'neg'}">${token.score || 0}/100</span> (min: ${data.reentryMinScore})</div>
-                            </div>
-                            ${token.eligible ? `<button class="btn btn-secondary btn-sm" onclick="clearReentry('${token.mint}')" style="margin-top: 8px; width: 100%;">Annuler Re-Entry</button>` : ''}
-                        </div>
-                    `;
-                }).join('');
-            } catch (err) {
-                console.error('Re-entry load error:', err);
-            }
-        }
+    const badges = [];
+    if (tok.bootstrapped) badges.push('<span class="badge-xs badge-gold">BOOT</span>');
+    if (tok.stopLossHit)  badges.push('<span class="badge-xs badge-dn">SL</span>');
+    if (tok.breakEven)    badges.push('<span class="badge-xs badge-info">BE</span>');
 
-        // LOAD DEAD TOKENS
-        async function loadDeadTokens() {
-            try {
-                const res = await fetch(`${API}/api/dead-tokens`);
-                const data = await res.json();
-                const container = document.getElementById('deadTokensContent');
-                if (!data.deadTokens || data.deadTokens.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty">
-                            <div class="empty-icon">✅</div>
-                            <div>Aucun token mort</div>
-                        </div>
-                    `;
-                    return;
-                }
-                container.innerHTML = `
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
-                        ${data.alive} alive | ${data.dead} dead | Neg-cache: ${data.negCacheSize}
-                    </div>
-                ` + data.deadTokens.map(token => `
-                    <div class="config-section" style="margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-weight: 600;">${token.symbol}</div>
-                                <div style="font-size: 10px; color: var(--text-muted);">${token.mint.slice(0,8)}...</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-size: 12px;">$${token.value?.toFixed(2) || '0.00'}</div>
-                                <div style="font-size: 10px; color: var(--danger);">${token.failures || 0} échecs</div>
-                            </div>
-                        </div>
-                        <button class="btn btn-danger btn-sm" onclick="purgeDeadToken('${token.mint}')" style="margin-top: 8px; width: 100%;">
-                            🗑 Purge
-                        </button>
-                    </div>
-                `).join('');
-            } catch (err) {
-                console.error('Dead tokens load error:', err);
-            }
-        }
+    return `
+      <div class="token-row ${tok.stopLossHit ? 'sl-row' : ''}" onclick="openTokenDetail('${tok.mintFull}')">
+        <div class="row-rank">${i + 1}</div>
+        <div class="row-token">
+          <div class="row-logo">${logo}</div>
+          <div>
+            <div class="row-sym">${tok.symbol || tok.mint.slice(0,8)}</div>
+            <div style="display:flex;gap:3px;align-items:center;margin-top:2px;">
+              <span class="row-addr">${tok.mint.slice(0,4)}…${tok.mint.slice(-4)}</span>
+              ${badges.join('')}
+            </div>
+          </div>
+        </div>
+        <div class="row-num neu">$${(tok.value||0).toFixed(2)}</div>
+        <div class="row-num ${pClass} pnl-col">${pStr}</div>
+        <div class="row-num pos">+${peak.toFixed(1)}%</div>
+        <div class="row-num gold">${tok.score ?? '—'}</div>
+        <div class="row-num dim">$${(liq/1000).toFixed(1)}k</div>
+        <div class="row-actions">
+          <button class="btn-row buy" onclick="event.stopPropagation(); openBuyModal('${tok.mintFull}')">B</button>
+          <button class="btn-row sell" onclick="event.stopPropagation(); openSellModal('${tok.mintFull}','${tok.symbol||tok.mint.slice(0,8)}',${tok.balance})">S</button>
+          <button class="btn-row info" onclick="event.stopPropagation(); openTokenDetail('${tok.mintFull}')">▸</button>
+        </div>
+      </div>`;
+  }).join('');
 
-        // PURGE DEAD TOKENS
-        async function purgeDeadTokens() {
-            if (!confirm('Purger TOUS les tokens morts ?')) return;
-            try {
-                const res = await fetch(`${API}/api/dead-tokens/purge`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ all: true }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast(`✅ ${result.purged} tokens purgés`, 'success');
-                    loadDeadTokens();
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
+  list.innerHTML = `<div class="panel" style="overflow:hidden;">${header}${rows}</div>`;
+}
 
-        async function purgeDeadToken(mint) {
-            try {
-                const res = await fetch(`${API}/api/dead-tokens/purge`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mints: [mint] }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast(`✅ Token purgé`, 'success');
-                    loadDeadTokens();
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
+function switchTab(tabName) {
+  TABS.forEach(t => {
+    const s = document.getElementById(t);
+    if (s) s.classList.toggle('active', t === tabName);
+    const n = document.getElementById(`nav-${t}`);
+    if (n) n.classList.toggle('active', t === tabName);
+    const b = document.getElementById(`bnav-${t}`);
+    if (b) b.classList.toggle('active', t === tabName);
+  });
+  const title = document.getElementById('topbarTitle');
+  if (title) title.textContent = TAB_TITLES[tabName] || tabName.toUpperCase();
 
-        async function resetNegCache() {
-            try {
-                const res = await fetch(`${API}/api/neg-cache/reset`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ all: true }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast(`✅ Cache reset (${result.cleared} tokens)`, 'success');
-                    loadDeadTokens();
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
+  if (tabName === 'analytics') loadAnalytics();
+  if (tabName === 'autobuys')  loadAutoBuys();
+  if (tabName === 'reentry')   loadReentry();
+  if (tabName === 'dead')      loadDeadTokens();
+}
 
-        async function resetCircuitBreaker() {
-            try {
-                const res = await fetch(`${API}/api/reset-circuit-breaker`, { method: 'POST' });
-                const result = await res.json();
-                if (result.success) {
-                    showToast('✅ Circuit-breaker reset', 'success');
-                    loadData();
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
+function toggleConfig(key) {
+  const map = {
+    takeProfitEnabled:'toggle-tp', breakEvenEnabled:'toggle-be', stopLossEnabled:'toggle-sl',
+    trailingEnabled:'toggle-ts', antiRugEnabled:'toggle-ar', liqExitEnabled:'toggle-le',
+    timeStopEnabled:'toggle-tt', momentumEnabled:'toggle-me', jitoEnabled:'toggle-jito',
+    pyramidEnabled:'toggle-pyramid', dcadEnabled:'toggle-dcad',
+    reentryEnabled:'toggle-reentry', smartSizeEnabled:'toggle-smartsize',
+  };
+  const id = map[key];
+  if (id) document.getElementById(id)?.classList.toggle('active');
+}
 
-        async function clearReentry(mint) {
-            try {
-                const res = await fetch(`${API}/api/reentry/clear`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast('✅ Re-entry annulé', 'success');
-                    loadReentry();
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
+async function saveConfig() {
+  try {
+    const g = id => document.getElementById(id);
+    const config = {
+      takeProfitEnabled: g('toggle-tp').classList.contains('active'),
+      breakEvenEnabled: g('toggle-be').classList.contains('active'),
+      stopLossEnabled: g('toggle-sl').classList.contains('active'),
+      trailingEnabled: g('toggle-ts').classList.contains('active'),
+      trailingVol: g('tsVol').value === 'true',
+      antiRugEnabled: g('toggle-ar').classList.contains('active'),
+      liqExitEnabled: g('toggle-le').classList.contains('active'),
+      timeStopEnabled: g('toggle-tt').classList.contains('active'),
+      momentumEnabled: g('toggle-me').classList.contains('active'),
+      jitoEnabled: g('toggle-jito').classList.contains('active'),
+      pyramidEnabled: g('toggle-pyramid').classList.contains('active'),
+      dcadEnabled: g('toggle-dcad').classList.contains('active'),
+      reentryEnabled: g('toggle-reentry').classList.contains('active'),
+      smartSizeEnabled: g('toggle-smartsize').classList.contains('active'),
+      hysteresis: parseFloat(g('tpHysteresis').value),
+      breakEvenBuffer: parseFloat(g('beBuffer').value),
+      stopLossPct: parseFloat(g('slPct').value),
+      trailingPct: parseFloat(g('tsPct').value),
+      antiRugPct: parseFloat(g('arPct').value),
+      liqExitPct: parseFloat(g('lePct').value),
+      timeStopHours: parseFloat(g('ttHours').value),
+      timeStopMinPnl: parseFloat(g('ttMinPnl').value),
+      momentumThreshold: parseFloat(g('meThreshold').value),
+      jitoTipSol: parseFloat(g('jitoTip').value),
+      pyramidMaxSol: parseFloat(g('pyramidMaxSol').value),
+      pyramidHysteresis: parseFloat(g('pyramidHysteresis').value),
+      dcadMaxAdds: parseInt(g('dcadMaxAdds').value),
+      dcadRequireMomentum: g('dcadRequireMomentum').value === 'true',
+      reentryDelayMin: parseFloat(g('reentryDelayMin').value),
+      reentryMinGain: parseFloat(g('reentryMinGain').value),
+      reentryMinScore: parseFloat(g('reentryMinScore').value),
+      smartSizeBase: parseFloat(g('smartSizeBase').value),
+      smartSizeMult: parseFloat(g('smartSizeMult').value),
+      smartSizeMin: parseFloat(g('smartSizeMin').value),
+      smartSizeMax: parseFloat(g('smartSizeMax').value),
+      defaultSlippage: parseInt(g('defaultSlippage').value),
+      minSolReserve: parseFloat(g('minSolReserve').value),
+      intervalSec: parseInt(g('intervalSec').value),
+      maxPositions: parseInt(g('maxPositions').value),
+      minScore: parseFloat(g('minScore').value),
+    };
+    const res = await fetch(`${API}/api/config`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(config),
+    });
+    if (res.ok) { showToast('Config sauvegardée', 'ok'); loadConfig(); }
+    else showToast('Erreur sauvegarde', 'err');
+  } catch(err) { showToast(err.message, 'err'); }
+}
 
-        // BUY MODAL
-        function openBuyModal(mint = '') {
-            document.getElementById('buyTokenAddress').value = mint;
-            document.getElementById('buyAmount').value = '';
-            document.getElementById('buyModal').classList.add('active');
-        }
-        function closeBuyModal() { document.getElementById('buyModal').classList.remove('active'); }
-        function setBuyAmount(amount) { document.getElementById('buyAmount').value = amount; }
-        async function setMaxBuy() {
-            if (solBalance > 0) {
-                const max = Math.max(0, solBalance - 0.05);
-                document.getElementById('buyAmount').value = max.toFixed(4);
-            }
-        }
-        async function executeBuy() {
-            const mint = document.getElementById('buyTokenAddress').value.trim();
-            const amount = parseFloat(document.getElementById('buyAmount').value);
-            const slippage = parseInt(document.getElementById('buySlippage').value);
-            const useSmartSize = document.getElementById('buySmartSize').value === 'true';
-            if (!mint || (!amount && !useSmartSize)) { showToast('❌ Veuillez remplir tous les champs', 'error'); return; }
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px;display:inline-block"></div> En cours...';
-            try {
-                const res = await fetch(`${API}/api/buy`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, solAmount: amount, slippageBps: slippage, useSmartSize }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast(`✅ Achat réussi ! ${result.outAmount?.toFixed(4)} tokens`, 'success');
-                    closeBuyModal();
-                    setTimeout(() => loadData(), 3000);
-                } else {
-                    showToast('❌ ' + result.error, 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }
+async function loadAnalytics() {
+  try {
+    const [ar, tr] = await Promise.all([fetch(`${API}/api/analytics`), fetch(`${API}/api/trades`)]);
+    const a = await ar.json();
+    const trades = await tr.json();
 
-        // SELL MODAL
-        function openSellModal(mint, symbol, balance) {
-            document.getElementById('sellTokenInfo').value = `${symbol} (${mint.slice(0, 4)}...${mint.slice(-4)})`;
-            document.getElementById('sellBalance').value = balance.toFixed(4);
-            document.getElementById('sellModal').dataset.mint = mint;
-            document.getElementById('sellModal').classList.add('active');
-        }
-        function closeSellModal() { document.getElementById('sellModal').classList.remove('active'); }
-        function setSellPercent(percent) {
-            const balance = parseFloat(document.getElementById('sellBalance').value);
-            document.getElementById('sellAmount').value = (balance * percent / 100).toFixed(4);
-        }
-        async function executeSell() {
-            const mint = document.getElementById('sellModal').dataset.mint;
-            const amount = parseFloat(document.getElementById('sellAmount').value);
-            const slippage = parseInt(document.getElementById('sellSlippage').value);
-            const useJito = document.getElementById('sellJito').value === 'true';
-            if (!mint || !amount) { showToast('❌ Veuillez entrer un montant valide', 'error'); return; }
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px;display:inline-block"></div> En cours...';
-            try {
-                const res = await fetch(`${API}/api/sell`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, amount, slippageBps: slippage, useJito, reason: 'MANUAL' }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast(`✅ Vente réussie ! ${result.solOut?.toFixed(6)} SOL reçus`, 'success');
-                    closeSellModal();
-                    setTimeout(() => loadData(), 3000);
-                } else {
-                    showToast('❌ ' + result.error, 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }
+    const g = id => document.getElementById(id);
+    g('realizedPnl').textContent = `${(a.realizedPnlSol||0).toFixed(4)} ◎`;
+    g('realizedPnl').className = `mini-stat-val ${(a.realizedPnlSol||0) >= 0 ? 'pos' : 'neg'}`;
+    g('analyticsWinRate').textContent = `${a.winRate||0}%`;
+    g('totalTrades').textContent = a.totalTrades || 0;
+    g('roi').textContent = a.roi != null ? `${a.roi}%` : '—';
+    g('roi').className = `mini-stat-val ${(a.roi||0) >= 0 ? 'pos' : 'neg'}`;
+    g('sharpe').textContent = a.sharpeRatio ?? '—';
+    g('sortino').textContent = a.sortinoRatio ?? '—';
+    g('maxDrawdown').textContent = a.maxDrawdownSol ? `-${a.maxDrawdownSol} ◎` : '—';
+    g('profitFactor').textContent = a.profitFactor ?? '—';
+    g('winStreak').textContent = a.winStreak || 0;
+    g('maxWinStreak').textContent = a.maxWinStreak || 0;
+    g('lossStreak').textContent = a.lossStreak || 0;
+    g('maxLossStreak').textContent = a.maxLossStreak || 0;
+    g('pnlNet').textContent = `${(a.realizedPnlSol||0) >= 0 ? '+' : ''}${(a.realizedPnlSol||0).toFixed(4)} ◎`;
+    g('pnlNet').className = `kpi-val ${(a.realizedPnlSol||0) >= 0 ? 'pos' : 'neg'}`;
+    g('winRate').textContent = a.winRate ? `${a.winRate}%` : '—';
+    g('winRate').className = `kpi-val ${(a.winRate||0) >= 50 ? 'pos' : 'neg'}`;
 
-        // TOKEN DETAIL MODAL
-        async function openTokenDetail(mint) {
-            currentDetailMint = mint;
-            const token = portfolio.find(t => t.mintFull === mint);
-            if (!token) return;
-            document.getElementById('tokenDetailTitle').textContent = `${token.symbol || mint.slice(0,8)}...`;
-            document.getElementById('detailValue').textContent = `$${(token.value || 0).toFixed(2)}`;
-            document.getElementById('detailLiq').textContent = `$${((token.liquidity || 0) / 1000).toFixed(1)}k`;
-            document.getElementById('detailMcap').textContent = `$${(token.mcap || 0).toLocaleString()}`;
-            document.getElementById('detailVol24h').textContent = `$${(token.volume24h || 0).toLocaleString()}`;
-            document.getElementById('detailScore').textContent = `${token.score || 0}/100`;
-            document.getElementById('detailEntry').textContent = `$${(token.entryPrice || 0).toFixed(6)}`;
-            document.getElementById('detailPeak').textContent = `+${(token.peakPnl || 0).toFixed(2)}%`;
-            document.getElementById('detailLiqDrop').textContent = `${(token.liqDrop || 0).toFixed(1)}%`;
-            // Load auto-buy status
-            try {
-                const res = await fetch(`${API}/api/auto-buys`);
-                const data = await res.json();
-                const pos = data.positions.find(p => p.mint === mint);
-                if (pos) {
-                    // Pyramid
-                    const pyramidContainer = document.getElementById('pyramidTiers');
-                    if (data.pyramidEnabled && pos.pyramidTiers) {
-                        pyramidContainer.innerHTML = pos.pyramidTiers.map(t => `
-                            <div class="auto-buy-tier">
-                                <span class="${t.triggered ? 'tier-triggered' : t.willTrigger ? 'tier-will-trigger' : 'tier-pending'}">
-                                    T${t.idx+1}: ${t.pnl}%
-                                </span>
-                                <span>${t.addSol} SOL ${t.triggered ? '✅' : t.willTrigger ? '⏳' : '⏸'}</span>
-                            </div>
-                        `).join('');
-                        document.getElementById('pyramidBudget').textContent = `${pos.pyramidBudgetLeft?.toFixed(4) || 0} SOL`;
-                    } else {
-                        pyramidContainer.innerHTML = '<div style="font-size: 11px; color: var(--text-muted);">Pyramid OFF</div>';
-                    }
-                    // DCA-Down
-                    const dcadContainer = document.getElementById('dcadTiers');
-                    if (data.dcadEnabled && pos.dcadTiers) {
-                        dcadContainer.innerHTML = pos.dcadTiers.map(t => `
-                            <div class="auto-buy-tier">
-                                <span class="${t.triggered ? 'tier-triggered' : t.willTrigger ? 'tier-will-trigger' : 'tier-pending'}">
-                                    T${t.idx+1}: ${t.pnl}%
-                                </span>
-                                <span>${t.addSol} SOL ${t.triggered ? '✅' : t.willTrigger ? '⏳' : '⏸'}</span>
-                            </div>
-                        `).join('');
-                        document.getElementById('dcadAddsLeft').textContent = pos.dcadAddsLeft || 0;
-                    } else {
-                        dcadContainer.innerHTML = '<div style="font-size: 11px; color: var(--text-muted);">DCA-Down OFF</div>';
-                    }
-                }
-            } catch (err) { console.error('Auto-buy status error:', err); }
-            document.getElementById('tokenDetailModal').classList.add('active');
-        }
-        function closeTokenDetailModal() { document.getElementById('tokenDetailModal').classList.remove('active'); currentDetailMint = null; }
-        function openDexScreener() {
-            if (currentDetailMint) window.open(`https://dexscreener.com/solana/${currentDetailMint}`, '_blank');
-        }
-        async function scanHistory() {
-            if (!currentDetailMint) return;
-            try {
-                const res = await fetch(`${API}/api/positions/scan-history`);
-                const result = await res.json();
-                if (result.fixed > 0) {
-                    showToast(`✅ ${result.fixed} positions corrigées`, 'success');
-                    loadData();
-                } else {
-                    showToast('ℹ️ Aucune position à corriger', 'info');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
-        function openBuyFromDetail() {
-            closeTokenDetailModal();
-            if (currentDetailMint) openBuyModal(currentDetailMint);
-        }
-        function openSellFromDetail() {
-            closeTokenDetailModal();
-            if (currentDetailMint) {
-                const token = portfolio.find(t => t.mintFull === currentDetailMint);
-                if (token) openSellModal(token.mintFull, token.symbol || token.mint.slice(0,8), token.balance);
-            }
-        }
+    const recent = (trades.trades||[]).slice(0, 12);
+    const rt = g('recentTrades');
+    rt.innerHTML = recent.length ? recent.map(t => {
+      const pc = (t.pnlPct||0) >= 0 ? 'pos' : 'neg';
+      const ps = (t.pnlPct||0) >= 0 ? '+' : '';
+      const d  = new Date(t.ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      return `<div class="trade-row">
+        <div>
+          <div class="trade-sym">${t.symbol||t.mint?.slice(0,8)}</div>
+          <div class="trade-meta">${t.type?.toUpperCase()} · ${t.reason||''} · ${d}</div>
+        </div>
+        <div class="trade-pnl ${pc}">${ps}${(t.pnlPct||0).toFixed(2)}%</div>
+      </div>`;
+    }).join('') : `<div class="empty"><div class="empty-icon">◇</div><div class="empty-txt">Aucun trade</div></div>`;
 
-        // TOAST
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.style.borderColor = type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--border)';
-            toast.textContent = message;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.animation = 'slideIn 0.3s ease reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
+    updatePnlChart(a.pnlHistory||[]);
+  } catch(err) { console.error('Analytics error:', err); }
+}
 
-        // CLOSE MODALS ON OUTSIDE CLICK
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                }
-            });
-        });
-    </script>
+function updatePnlChart(pnlHistory) {
+  const ctx = document.getElementById('pnlChart').getContext('2d');
+  if (pnlChart) { pnlChart.destroy(); pnlChart = null; }
+  const pts = pnlHistory.slice(-50);
+  const labels = pts.map((_, i) => i+1);
+  const data = pts.map(p => p.cumul);
+  const last = data[data.length-1] || 0;
+  const color = last >= 0 ? '#26a69a' : '#ef5350';
+  pnlChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label: 'PnL ◎', data, borderColor: color,
+        backgroundColor: last >= 0 ? 'rgba(38,166,154,0.08)' : 'rgba(239,83,80,0.08)',
+        borderWidth: 1.5, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#111318', borderColor: '#22252f', borderWidth: 1,
+        titleColor: '#7a7e8e', bodyColor: '#dddbd6',
+        titleFont: { family: 'DM Mono', size: 10 }, bodyFont: { family: 'DM Mono', size: 11 },
+      }},
+      scales: {
+        x: { display: false },
+        y: {
+          grid: { color: 'rgba(34,37,47,0.8)', drawBorder: false },
+          ticks: { color: '#3a3e4e', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 4 }
+        }
+      },
+      interaction: { intersect: false, mode: 'index' }
+    }
+  });
+}
+
+async function loadAutoBuys() {
+  try {
+    const res = await fetch(`${API}/api/auto-buys`);
+    const data = await res.json();
+    const c = document.getElementById('autoBuysContent');
+    if (!data.positions?.length) {
+      c.innerHTML = `<div class="empty"><div class="empty-icon">📈</div><div class="empty-txt">Aucune position auto-buy</div></div>`;
+      return;
+    }
+    c.innerHTML = data.positions.map(pos => {
+      const pc = (pos.pnl||0) >= 0 ? 'pos' : 'neg';
+      const ps = (pos.pnl||0) >= 0 ? '+' : '';
+      let pyramidRows = '';
+      if (data.pyramidEnabled && pos.pyramidTiers) {
+        pyramidRows = pos.pyramidTiers.map(t => `
+          <div class="auto-row">
+            <span class="${t.triggered ? 'tier-done' : t.willTrigger ? 'tier-next' : 'tier-idle'}">
+              T${t.idx+1} · ${t.pnl}% → ${t.addSol} SOL
+            </span>
+            <span class="${t.triggered ? 'tier-done' : t.willTrigger ? 'tier-next' : 'tier-idle'}">
+              ${t.triggered ? '✓ DONE' : t.willTrigger ? '⏳ SOON' : '○ WAIT'}
+            </span>
+          </div>`).join('');
+      }
+      let dcadRows = '';
+      if (data.dcadEnabled && pos.dcadTiers) {
+        dcadRows = pos.dcadTiers.map(t => `
+          <div class="auto-row">
+            <span class="${t.triggered ? 'tier-done' : t.willTrigger ? 'tier-next' : 'tier-idle'}">
+              T${t.idx+1} · ${t.pnl}% → ${t.addSol} SOL
+            </span>
+            <span class="${t.triggered ? 'tier-done' : t.willTrigger ? 'tier-next' : 'tier-idle'}">
+              ${t.triggered ? '✓ DONE' : t.willTrigger ? '⏳ SOON' : '○ WAIT'}
+            </span>
+          </div>`).join('');
+      }
+      return `
+        <div class="panel" style="margin-bottom:10px;">
+          <div class="panel-header">
+            <div class="panel-title">${pos.symbol} <span style="color:var(--text-dim);font-size:10px;font-weight:400;">${pos.mint.slice(0,8)}…</span></div>
+            <span class="kpi-val ${pc}">${ps}${pos.pnl||0}%</span>
+          </div>
+          ${pyramidRows || dcadRows ? `
+            <div style="padding: 8px 0;">
+              ${pyramidRows ? `<div style="padding: 4px 14px; font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.08em;">PYRAMID · ${(pos.addedSol||0).toFixed(4)}/${data.pyramidMaxSol} SOL</div>${pyramidRows}` : ''}
+              ${dcadRows ? `<div style="padding: 4px 14px; font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.08em;">DCA-DOWN · ${pos.dcadDone||0}/${data.dcadMaxAdds} adds</div>${dcadRows}` : ''}
+            </div>` : '<div style="padding:12px 14px; font-size:11px; color:var(--text-dim);">Stratégies désactivées</div>'}
+        </div>`;
+    }).join('');
+  } catch(err) { console.error('Auto-buys error:', err); }
+}
+
+async function loadReentry() {
+  try {
+    const res = await fetch(`${API}/api/reentry`);
+    const data = await res.json();
+    const c = document.getElementById('reentryContent');
+    if (!data.stoppedTokens?.length) {
+      c.innerHTML = `<div class="empty"><div class="empty-icon">🔄</div><div class="empty-txt">Aucun token stoppé</div></div>`;
+      return;
+    }
+    c.innerHTML = data.stoppedTokens.map(t => `
+      <div class="reentry-card ${t.eligible ? 'eligible' : ''}">
+        <div class="reentry-header">
+          <div class="reentry-sym">${t.symbol}</div>
+          <span style="font-family:var(--font-mono); font-size:11px; color:${t.eligible ? 'var(--up)' : 'var(--text-dim)'};">
+            ${t.eligible ? '✓ ÉLIGIBLE' : '✗ NON'}
+          </span>
+        </div>
+        <div class="reentry-meta">
+          <div class="reentry-item">Exit price <span class="val">${t.exitPrice?.toFixed(6)||'—'}</span></div>
+          <div class="reentry-item">Prix actuel <span class="val">${t.currentPrice?.toFixed(6)||'—'}</span></div>
+          <div class="reentry-item">Rebond <span class="val ${(t.reboundPct||0) >= data.reentryMinGain ? 'ok' : 'bad'}">+${t.reboundPct||0}%</span> / min ${data.reentryMinGain}%</div>
+          <div class="reentry-item">Délai <span class="val ${t.delayDone ? 'ok' : 'wrn'}">${t.delayDone ? 'OK' : t.delayRemainMin+'min'}</span></div>
+          <div class="reentry-item">Score <span class="val ${t.scoreOk ? 'ok' : 'bad'}">${t.score||0}</span> / min ${data.reentryMinScore}</div>
+        </div>
+        ${t.eligible ? `<button class="btn btn-secondary btn-sm btn-full" onclick="clearReentry('${t.mint}')" style="margin-top:10px;">Annuler Re-Entry</button>` : ''}
+      </div>`).join('');
+  } catch(err) { console.error('Re-entry error:', err); }
+}
+
+async function loadDeadTokens() {
+  try {
+    const res = await fetch(`${API}/api/dead-tokens`);
+    const data = await res.json();
+    const c = document.getElementById('deadTokensContent');
+    if (!data.deadTokens?.length) {
+      c.innerHTML = `<div class="empty"><div class="empty-icon">✓</div><div class="empty-txt">Aucun token mort</div></div>`;
+      return;
+    }
+    const summary = `
+      <div class="panel" style="margin-bottom:10px;">
+        <div class="panel-body" style="display:flex; gap:20px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:var(--text-dim);">Total: <b style="color:var(--text);">${data.total}</b></span>
+          <span style="font-size:11px; color:var(--up);">Alive: ${data.alive}</span>
+          <span style="font-size:11px; color:var(--dn);">Dead: ${data.dead}</span>
+          <span style="font-size:11px; color:var(--text-dim);">Neg-cache: ${data.negCacheSize}</span>
+        </div>
+      </div>`;
+    const rows = data.deadTokens.map(t => `
+      <div class="dead-row">
+        <div>
+          <div class="dead-sym">${t.symbol}</div>
+          <div class="dead-addr">${t.mint.slice(0,8)}…</div>
+        </div>
+        <div class="dead-meta">
+          <div style="color:var(--text);">$${(t.value||0).toFixed(2)}</div>
+          <div style="color:var(--dn);">${t.failures} échecs</div>
+          <div style="color:var(--text-dim);">${t.ageHours}h</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="purgeDeadToken('${t.mint}')" style="margin-left:10px;">Purge</button>
+      </div>`).join('');
+    c.innerHTML = summary + `<div class="panel">${rows}</div>`;
+  } catch(err) { console.error('Dead tokens error:', err); }
+}
+
+async function purgeDeadTokens() {
+  if (!confirm('Purger TOUS les tokens morts ?')) return;
+  try {
+    const r = await fetch(`${API}/api/dead-tokens/purge`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({all:true}),
+    });
+    const result = await r.json();
+    if (result.success) { showToast(`${result.purged} tokens purgés`, 'ok'); loadDeadTokens(); }
+  } catch(err) { showToast(err.message, 'err'); }
+}
+
+async function purgeDeadToken(mint) {
+  try {
+    const r = await fetch(`${API}/api/dead-tokens/purge`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mints:[mint]}),
+    });
+    const result = await r.json();
+    if (result.success) { showToast('Token purgé', 'ok'); loadDeadTokens(); }
+  } catch(err) { showToast(err.message, 'err'); }
+}
+
+async function resetNegCache() {
+  try {
+    const r = await fetch(`${API}/api/neg-cache/reset`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({all:true}),
+    });
+    const result = await r.json();
+    if (result.success) { showToast(`Cache reset (${result.cleared})`, 'ok'); loadDeadTokens(); }
+  } catch(err) { showToast(err.message, 'err'); }
+}
+
+async function resetCircuitBreaker() {
+  try {
+    const r = await fetch(`${API}/api/reset-circuit-breaker`, {method:'POST'});
+    const result = await r.json();
+    if (result.success) { showToast('Circuit-breaker reset', 'ok'); loadData(); }
+  } catch(err) { showToast(err.message, 'err'); }
+}
+
+async function clearReentry(mint) {
+  try {
+    const r = await fetch(`${API}/api/reentry/clear`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mint}),
+    });
+    const result = await r.json();
+    if (result.success) { showToast('Re-entry annulé', 'ok'); loadReentry(); }
+  } catch(err) { showToast(err.message, 'err'); }
+}
+
+// ─── BUY MODAL
+function openBuyModal(mint='') {
+  document.getElementById('buyTokenAddress').value = mint;
+  document.getElementById('buyAmount').value = '';
+  document.getElementById('buyModal').classList.add('active');
+}
+function closeBuyModal() { document.getElementById('buyModal').classList.remove('active'); }
+function setBuyAmount(a) { document.getElementById('buyAmount').value = a; }
+async function setMaxBuy() {
+  if (solBalance > 0) document.getElementById('buyAmount').value = Math.max(0, solBalance - 0.05).toFixed(4);
+}
+async function executeBuy() {
+  const mint = document.getElementById('buyTokenAddress').value.trim();
+  const amount = parseFloat(document.getElementById('buyAmount').value);
+  const slippage = parseInt(document.getElementById('buySlippage').value);
+  const useSmartSize = document.getElementById('buySmartSize').value === 'true';
+  if (!mint || (!amount && !useSmartSize)) { showToast('Remplir tous les champs', 'err'); return; }
+  const btn = event.currentTarget;
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;display:inline-block;border-width:2px;"></span>';
+  try {
+    const r = await fetch(`${API}/api/buy`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mint, solAmount: amount, slippageBps: slippage, useSmartSize}),
+    });
+    const result = await r.json();
+    if (result.success) {
+      showToast(`Achat OK · ${result.outAmount?.toFixed(4)} tokens`, 'ok');
+      closeBuyModal();
+      setTimeout(() => loadData(), 3000);
+    } else showToast(result.error, 'err');
+  } catch(err) { showToast(err.message, 'err'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+}
+
+// ─── SELL MODAL
+function openSellModal(mint, symbol, balance) {
+  document.getElementById('sellTokenInfo').value = `${symbol} · ${mint.slice(0,4)}…${mint.slice(-4)}`;
+  document.getElementById('sellBalance').value = balance.toFixed(4);
+  document.getElementById('sellModal').dataset.mint = mint;
+  document.getElementById('sellModal').classList.add('active');
+}
+function closeSellModal() { document.getElementById('sellModal').classList.remove('active'); }
+function setSellPercent(pct) {
+  const bal = parseFloat(document.getElementById('sellBalance').value);
+  document.getElementById('sellAmount').value = (bal * pct / 100).toFixed(4);
+}
+async function executeSell() {
+  const mint = document.getElementById('sellModal').dataset.mint;
+  const amount = parseFloat(document.getElementById('sellAmount').value);
+  const slippage = parseInt(document.getElementById('sellSlippage').value);
+  const useJito = document.getElementById('sellJito').value === 'true';
+  if (!mint || !amount) { showToast('Montant invalide', 'err'); return; }
+  const btn = event.currentTarget;
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;display:inline-block;border-width:2px;"></span>';
+  try {
+    const r = await fetch(`${API}/api/sell`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mint, amount, slippageBps: slippage, useJito, reason:'MANUAL'}),
+    });
+    const result = await r.json();
+    if (result.success) {
+      showToast(`Vente OK · ${result.solOut?.toFixed(6)} SOL`, 'ok');
+      closeSellModal();
+      setTimeout(() => loadData(), 3000);
+    } else showToast(result.error, 'err');
+  } catch(err) { showToast(err.message, 'err'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+}
+
+// ─── TOKEN DETAIL
+async function openTokenDetail(mint) {
+  currentDetailMint = mint;
+  const tok = portfolio.find(t => t.mintFull === mint);
+  if (!tok) return;
+  document.getElementById('tokenDetailTitle').textContent = tok.symbol || mint.slice(0,8);
+  document.getElementById('detailValue').textContent = `$${(tok.value||0).toFixed(2)}`;
+  document.getElementById('detailLiq').textContent = `$${((tok.liquidity||0)/1000).toFixed(1)}k`;
+  document.getElementById('detailMcap').textContent = `$${(tok.mcap||0).toLocaleString()}`;
+  document.getElementById('detailVol24h').textContent = `$${(tok.volume24h||0).toLocaleString()}`;
+  document.getElementById('detailScore').textContent = `${tok.score||0}/100`;
+  document.getElementById('detailEntry').textContent = `$${(tok.entryPrice||0).toFixed(6)}`;
+  document.getElementById('detailPeak').textContent = `+${(tok.peakPnl||0).toFixed(2)}%`;
+  document.getElementById('detailLiqDrop').textContent = `${(tok.liqDrop||0).toFixed(1)}%`;
+  try {
+    const res = await fetch(`${API}/api/auto-buys`);
+    const data = await res.json();
+    const pos = data.positions?.find(p => p.mint === mint);
+    if (pos) {
+      const pc = document.getElementById('pyramidTiers');
+      if (data.pyramidEnabled && pos.pyramidTiers?.length) {
+        pc.innerHTML = pos.pyramidTiers.map(t => `
+          <div class="auto-row">
+            <span class="${t.triggered ? 'tier-done' : t.willTrigger ? 'tier-next' : 'tier-idle'}">T${t.idx+1} · ${t.pnl}%</span>
+            <span class="${t.triggered ? 'tier-done' : t.willTrigger ? 'tier-next' : 'tier-idle'}">${t.addSol} SOL · ${t.triggered ? '✓' : t.willTrigger ? '⏳' : '○'}</span>
+          </div>`).join('');
+        document.getElementById('pyramidBudget').textContent = `${(pos.pyramidBudgetLeft||0).toFixed(4)} SOL`;
+      } else {
+        pc.innerHTML = '<div style="padding:4px 0; font-size:11px; color:var(--text-dim);">Pyramid OFF</div>';
+      }
+      const dc = document.getElementById('dcadTiers');
+      if (data.dcadEnabled && pos.dcadTiers?.length) {
+        dc.innerHTML = pos.dcadTiers.map(t => `
+          <div class="auto-row">
+            <span class="${t.triggered ? 'tier-done' : t.willTrigger ? 'tier-next' : 'tier-idle'}">T${t.idx+1} · ${t.pnl}%</span>
+            <span class="${t.triggered ? 'tier-done' : t.willTrigger ? 'tier-next' : 'tier-idle'}">${t.addSol} SOL · ${t.triggered ? '✓' : t.willTrigger ? '⏳' : '○'}</span>
+          </div>`).join('');
+        document.getElementById('dcadAddsLeft').textContent = pos.dcadAddsLeft || 0;
+      } else {
+        dc.innerHTML = '<div style="padding:4px 0; font-size:11px; color:var(--text-dim);">DCA-Down OFF</div>';
+      }
+    }
+  } catch(err) { console.error('Detail auto-buys:', err); }
+  document.getElementById('tokenDetailModal').classList.add('active');
+}
+function closeTokenDetailModal() { document.getElementById('tokenDetailModal').classList.remove('active'); currentDetailMint = null; }
+function openDexScreener() { if (currentDetailMint) window.open(`https://dexscreener.com/solana/${currentDetailMint}`, '_blank'); }
+async function scanHistory() {
+  if (!currentDetailMint) return;
+  try {
+    const r = await fetch(`${API}/api/positions/scan-history`);
+    const result = await r.json();
+    showToast(result.fixed > 0 ? `${result.fixed} positions corrigées` : 'Aucune correction', result.fixed > 0 ? 'ok' : '');
+    if (result.fixed > 0) loadData();
+  } catch(err) { showToast(err.message, 'err'); }
+}
+function openBuyFromDetail() { closeTokenDetailModal(); if (currentDetailMint) openBuyModal(currentDetailMint); }
+function openSellFromDetail() {
+  closeTokenDetailModal();
+  if (currentDetailMint) {
+    const t = portfolio.find(t => t.mintFull === currentDetailMint);
+    if (t) openSellModal(t.mintFull, t.symbol || t.mint.slice(0,8), t.balance);
+  }
+}
+
+// ─── TOAST
+function showToast(message, type='') {
+  const c = document.getElementById('toastContainer');
+  const d = document.createElement('div');
+  d.className = `toast ${type}`;
+  d.textContent = message;
+  c.appendChild(d);
+  setTimeout(() => { d.style.opacity='0'; d.style.transition='opacity .25s'; setTimeout(() => d.remove(), 260); }, 3200);
+}
+
+// ─── CLOSE MODALS ON BACKDROP CLICK
+document.querySelectorAll('.modal').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
+});
+</script>
 </body>
 </html>
