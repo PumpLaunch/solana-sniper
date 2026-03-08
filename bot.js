@@ -189,6 +189,7 @@ const CFG = {
   SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.05'),   // SOL par achat scanner
   SCANNER_COOLDOWN_MS: parseInt(process.env.SCANNER_COOLDOWN_MS   || '300000'), // 5 min cooldown par mint
   SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '15000'),  // délai avant éval (laisser DexScreener indexer)
+  SCANNER_POLL_SEC:    parseInt(process.env.SCANNER_POLL_SEC      || '30'),     // fréquence polling DexScreener
   SCANNER_PROGRAMS: [
     '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium AMM v4
     '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',  // PumpFun
@@ -1526,9 +1527,18 @@ class SwapEngine {
   // ── Public : Sell (mutex — zéro double-sell) ──────────────────────────────
 
   async sell(mint, amount, reason = 'MANUAL', slippageBps = CFG.DEFAULT_SLIPPAGE, useJito = false) {
+    // Circuit-breaker — auto-reset après 5 min (erreurs transitoires au démarrage)
+    const CB_RESET_MS = 5 * 60 * 1000;
     if (this.sellFailures >= CFG.MAX_SELL_RETRIES) {
-      const msg = `Circuit-breaker actif (${this.sellFailures} échecs consécutifs)`;
-      log('error', msg); return { success: false, error: msg };
+      const age = Date.now() - (this._cbTrippedAt || 0);
+      if (age >= CB_RESET_MS) {
+        log('info', `Circuit-breaker auto-reset (${Math.round(age / 60000)}min écoulées)`);
+        this.sellFailures = 0;
+        this._cbTrippedAt = null;
+      } else {
+        const msg = `Circuit-breaker actif (${this.sellFailures} échecs — reset dans ${Math.round((CB_RESET_MS - age) / 1000)}s)`;
+        log('error', msg); return { success: false, error: msg };
+      }
     }
     const release = await this.mutex.lock();
     try {
@@ -1573,6 +1583,10 @@ class SwapEngine {
       return { success: true, sig: res.sig, txUrl: res.txUrl, solOut, usdcOut, amountSold: amount };
     } catch (err) {
       this.sellFailures++;
+      if (this.sellFailures >= CFG.MAX_SELL_RETRIES && !this._cbTrippedAt) {
+        this._cbTrippedAt = Date.now();
+        log('warn', `🔒 Circuit-breaker déclenché — auto-reset dans 5min`);
+      }
       log('error', '❌ Vente échouée', { err: err.message, failures: this.sellFailures, reason });
       return { success: false, error: err.message };
     } finally { release(); }
@@ -2067,7 +2081,9 @@ class BotLoop {
 
       const accounts = [...r1.value, ...r2.value].filter(acc => {
         const info = acc.account.data.parsed.info;
-        if (info.mint === SOL_MINT) return false;
+        // Exclure SOL natif ET USDC — traités séparément en fin de tick
+        if (info.mint === SOL_MINT)  return false;
+        if (info.mint === USDC_MINT) return false;
         const ta = info.tokenAmount;
         return parseFloat(ta.uiAmount ?? ta.uiAmountString ?? '0') > 0;
       });
@@ -2530,6 +2546,8 @@ class BotLoop {
       },
       negCacheSize:       _negCache.size,
       sellCircuitBreaker: this.swap.sellFailures,
+      cbTrippedAt:        this.swap._cbTrippedAt ? new Date(this.swap._cbTrippedAt).toISOString() : null,
+      cbAutoResetIn:      this.swap._cbTrippedAt ? Math.max(0, Math.round((5*60000 - (Date.now() - this.swap._cbTrippedAt)) / 1000)) : null,
       lastUpdate:         new Date().toISOString(),
       // §v6
       dailyLoss: {
@@ -2549,37 +2567,32 @@ class BotLoop {
 // §16  TOKEN SCANNER — Détection automatique nouveaux tokens
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const WebSocket = require('ws');
-
 class TokenScanner {
+  /**
+   * Deux sources de détection :
+   * 1. WebSocket Solana RPC standard (logsSubscribe) — temps réel via Helius RPC gratuit
+   * 2. Polling DexScreener /token-profiles/latest — toutes les SCANNER_POLL_SEC secondes
+   *
+   * Les deux alimentent la même file d'évaluation (_processQueue).
+   */
   constructor(bot) {
-    this.bot        = bot;
-    this.seen       = new Set();        // mints traités/blacklistés
-    this.cooldowns  = new Map();        // mint → lastAttemptTs
-    this.queue      = [];               // mints en attente d'évaluation
-    this.ws         = null;
-    this.wsId       = 0;
-    this.subIds     = [];
-    this.running    = false;
+    this.bot       = bot;
+    this.seen      = new Set();
+    this.cooldowns = new Map();
+    this.queue     = [];
+    this.ws        = null;
+    this.wsId      = 0;
+    this.running   = false;
     this.reconnects = 0;
-    this.stats = {
-      detected: 0,
-      evaluated: 0,
-      bought: 0,
-      rejected: 0,
-      errors: 0,
-    };
+    this.lastPollTs = 0;
+    this.stats = { detected: 0, evaluated: 0, bought: 0, rejected: 0, errors: 0 };
   }
 
   start() {
-    if (!CFG.HELIUS_KEY) {
-      log('warn', '⚠️  Scanner désactivé — HELIUS_API_KEY manquant');
-      return;
-    }
     this.running = true;
-    log('info', '🔍 TokenScanner démarré', { programs: CFG.SCANNER_PROGRAMS.length });
-    this._connect();
-    this._processQueue();
+    log('info', '🔍 TokenScanner démarré (WS + polling DexScreener)');
+    this._connectWs();
+    this._loop();
   }
 
   stop() {
@@ -2587,35 +2600,40 @@ class TokenScanner {
     if (this.ws) { try { this.ws.close(); } catch {} this.ws = null; }
   }
 
-  // ── WebSocket Helius ────────────────────────────────────────────────────────
+  // ── WebSocket RPC standard (logsSubscribe) ─────────────────────────────────
 
-  _connect() {
+  _wsUrl() {
+    // Helius RPC WS standard (gratuit) — pas atlas-mainnet (payant)
+    if (CFG.HELIUS_KEY) return `wss://mainnet.helius-rpc.com/?api-key=${CFG.HELIUS_KEY}`;
+    // Fallback public Solana
+    return 'wss://api.mainnet-beta.solana.com';
+  }
+
+  _connectWs() {
     if (!this.running) return;
-    const wsUrl = `wss://atlas-mainnet.helius-rpc.com/?api-key=${CFG.HELIUS_KEY}`;
-    log('info', `🔗 Scanner WebSocket connexion (tentative ${this.reconnects + 1})`);
+    const url = this._wsUrl();
+    log('info', `🔗 Scanner WS connexion (tentative ${this.reconnects + 1})`);
 
-    try {
-      this.ws = new WebSocket(wsUrl);
-    } catch (e) {
-      log('error', 'Scanner WebSocket init error', { e: e.message });
-      this._scheduleReconnect();
+    let WebSocket;
+    try { WebSocket = require('ws'); } catch {
+      log('warn', 'Module ws absent — scanner WebSocket désactivé');
+      return;
+    }
+
+    try { this.ws = new WebSocket(url); } catch (e) {
+      log('warn', `Scanner WS init error: ${e.message}`);
+      this._scheduleWsReconnect();
       return;
     }
 
     this.ws.on('open', () => {
-      log('success', '✅ Scanner WebSocket connecté');
+      log('success', '✅ Scanner WS connecté');
       this.reconnects = 0;
-      this.subIds = [];
-      // Subscribe aux logs de chaque programme cible
       for (const programId of CFG.SCANNER_PROGRAMS) {
-        const id = ++this.wsId;
         this.ws.send(JSON.stringify({
-          jsonrpc: '2.0', id,
+          jsonrpc: '2.0', id: ++this.wsId,
           method: 'logsSubscribe',
-          params: [
-            { mentions: [programId] },
-            { commitment: 'confirmed' },
-          ],
+          params: [{ mentions: [programId] }, { commitment: 'confirmed' }],
         }));
       }
     });
@@ -2623,200 +2641,193 @@ class TokenScanner {
     this.ws.on('message', (data) => {
       try {
         const msg = JSON.parse(data.toString());
-        if (msg.method === 'logsNotification') {
-          this._handleLogs(msg.params?.result?.value);
-        }
+        if (msg.method === 'logsNotification') this._handleLogs(msg.params?.result?.value);
       } catch {}
     });
 
-    this.ws.on('error',  (e) => { log('warn', 'Scanner WS error', { e: e.message }); });
-    this.ws.on('close',  ()  => {
+    this.ws.on('error', (e) => log('warn', `Scanner WS error: ${e.message}`));
+    this.ws.on('close', () => {
       log('warn', 'Scanner WS fermé — reconnexion...');
-      this._scheduleReconnect();
+      this._scheduleWsReconnect();
     });
   }
 
-  _scheduleReconnect() {
+  _scheduleWsReconnect() {
     if (!this.running) return;
     this.reconnects++;
-    const delay = Math.min(5000 * this.reconnects, 60000);
-    setTimeout(() => this._connect(), delay);
+    // Après 3 échecs consécutifs (403 = endpoint payant), on arrête les tentatives WS
+    // Le polling DexScreener prend le relais automatiquement
+    if (this.reconnects >= 3) {
+      log('warn', `Scanner WS abandonné après ${this.reconnects} échecs — polling DexScreener actif`);
+      return; // pas de setTimeout → WS définitivement désactivé
+    }
+    const delay = Math.min(10000 * this.reconnects, 60000);
+    setTimeout(() => this._connectWs(), delay);
   }
-
-  // ── Parsing des logs ────────────────────────────────────────────────────────
 
   _handleLogs(value) {
     if (!value?.logs || !value?.signature) return;
     const logs = value.logs;
-    const sig  = value.signature;
 
-    // Détecter init pool Raydium AMM
-    const isRaydiumInit = logs.some(l =>
-      l.includes('initialize2') || l.includes('initialize') && l.includes('675kPX9')
-    );
-
-    // Détecter nouvelle graduation PumpFun → Raydium
-    const isPumpGrad = logs.some(l =>
-      l.includes('MigrateFunds') || l.includes('WithdrawFees') || l.includes('Migrate')
-    );
-
-    // Détecter nouveau token PumpFun (create)
-    const isPumpCreate = logs.some(l => l.includes('Create') || l.includes('create'));
-
+    const isRaydiumInit = logs.some(l => l.includes('initialize2') || l.includes('InitializePool'));
+    const isPumpGrad    = logs.some(l => l.includes('MigrateFunds') || l.includes('Migrate'));
+    const isPumpCreate  = logs.some(l => l.includes('Create') && l.includes('Program log'));
     if (!isRaydiumInit && !isPumpGrad && !isPumpCreate) return;
 
-    // Extraire les mints des logs (adresses base58 de 32-44 chars)
     const mintCandidates = new Set();
-    for (const log of logs) {
-      const matches = log.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g) || [];
+    for (const l of logs) {
+      const matches = l.match(/[1-9A-HJ-NP-Za-km-z]{43,44}/g) || [];
       for (const m of matches) {
-        if (m !== SOL_MINT && m !== USDC_MINT &&
-            !CFG.SCANNER_PROGRAMS.includes(m) && m.length >= 32) {
+        if (m !== SOL_MINT && m !== USDC_MINT && !CFG.SCANNER_PROGRAMS.includes(m))
           mintCandidates.add(m);
-        }
       }
     }
 
-    for (const mint of mintCandidates) {
-      if (this.seen.has(mint)) continue;
-      if (_negCache.has(mint)) continue;
+    const reason = isRaydiumInit ? 'RAYDIUM_NEW' : isPumpGrad ? 'PUMP_GRAD' : 'PUMP_NEW';
+    for (const mint of mintCandidates) this._enqueue(mint, reason);
+  }
 
-      // Vérifier cooldown
-      const last = this.cooldowns.get(mint) || 0;
-      if (Date.now() - last < CFG.SCANNER_COOLDOWN_MS) continue;
+  // ── Polling DexScreener /token-profiles/latest ─────────────────────────────
 
-      this.seen.add(mint);
-      this.stats.detected++;
-      const reason = isRaydiumInit ? 'RAYDIUM_NEW' : isPumpGrad ? 'PUMP_GRAD' : 'PUMP_NEW';
-      log('info', `🆕 Scanner détecté: ${mint.slice(0, 8)}… (${reason})`, { sig: sig.slice(0, 16) });
+  async _pollDexScreener() {
+    try {
+      const r = await fetch('https://api.dexscreener.com/token-profiles/latest/v1', {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Accept': 'application/json' },
+      });
+      if (!r.ok) return;
+      const items = await r.json();
+      if (!Array.isArray(items)) return;
 
-      // Délai avant évaluation (laisser DexScreener indexer)
-      this.queue.push({ mint, reason, ts: Date.now() + CFG.SCANNER_DELAY_MS });
+      for (const item of items) {
+        const mint = item?.tokenAddress;
+        const chain = item?.chainId;
+        if (!mint || chain !== 'solana') continue;
+        this._enqueue(mint, 'DEX_LATEST');
+      }
+    } catch (err) {
+      log('debug', `Scanner poll error: ${err.message}`);
     }
   }
 
-  // ── File d'évaluation ───────────────────────────────────────────────────────
+  // ── Boucle principale ──────────────────────────────────────────────────────
 
-  async _processQueue() {
+  async _loop() {
     while (this.running) {
       await sleep(3000);
-      const now = Date.now();
+
+      // Polling DexScreener toutes les SCANNER_POLL_SEC (défaut 30s)
+      const pollIntervalMs = (CFG.SCANNER_POLL_SEC || 30) * 1000;
+      if (Date.now() - this.lastPollTs >= pollIntervalMs) {
+        this.lastPollTs = Date.now();
+        await this._pollDexScreener().catch(() => {});
+      }
+
+      // Traiter la file
+      const now   = Date.now();
       const ready = this.queue.filter(e => e.ts <= now);
-      this.queue = this.queue.filter(e => e.ts > now);
+      this.queue  = this.queue.filter(e => e.ts > now);
 
       for (const entry of ready) {
-        try {
-          await this._evaluate(entry.mint, entry.reason);
-        } catch (err) {
+        try { await this._evaluate(entry.mint, entry.reason); }
+        catch (err) {
           this.stats.errors++;
-          log('warn', `Scanner eval error: ${err.message}`, { mint: entry.mint.slice(0, 8) });
+          log('warn', `Scanner eval error: ${err.message}`);
         }
-        await sleep(500); // rate limit
+        await sleep(400);
       }
     }
   }
 
-  // ── Évaluation et achat potentiel ──────────────────────────────────────────
+  // ── Enfile un mint (dédup + cooldown) ─────────────────────────────────────
+
+  _enqueue(mint, reason) {
+    if (this.seen.has(mint)) return;
+    if (_negCache.has(mint)) return;
+    const last = this.cooldowns.get(mint) || 0;
+    if (Date.now() - last < CFG.SCANNER_COOLDOWN_MS) return;
+
+    this.seen.add(mint);
+    this.stats.detected++;
+    log('info', `🆕 Scanner détecté: ${mint.slice(0, 8)}… (${reason})`);
+    this.queue.push({ mint, reason, ts: Date.now() + CFG.SCANNER_DELAY_MS });
+  }
+
+  // ── Évaluation et achat potentiel ─────────────────────────────────────────
 
   async _evaluate(mint, reason) {
     this.cooldowns.set(mint, Date.now());
 
-    // Vérif: déjà en portfolio ?
     const already = this.bot.portfolio.find(t => t.mintFull === mint);
     if (already) { this.stats.rejected++; return; }
 
-    // Vérif: trop de positions ouvertes ?
-    const openPositions = this.bot.portfolio.filter(t =>
-      !t.isSol && !t.isUsdc && t.balance > 0
-    ).length;
+    const openPositions = this.bot.portfolio.filter(t => !t.isSol && !t.isUsdc && t.balance > 0).length;
     if (openPositions >= CFG.MAX_POSITIONS) {
       log('debug', `Scanner skip — max positions atteint (${openPositions})`);
       this.stats.rejected++;
       return;
     }
 
-    // Vérif: Daily Loss Limit
     if (this.bot.isDailyLossPaused()) {
       log('warn', 'Scanner skip — Daily Loss Limit actif');
       this.stats.rejected++;
       return;
     }
 
-    // Récupérer les données de prix
     await prefetchPrices([mint]);
     const pd = getPrice(mint);
 
-    if (!pd || !pd.price || pd.price <= 0) {
-      log('debug', `Scanner: pas de données prix pour ${mint.slice(0, 8)}`);
-      this.stats.rejected++;
-      return;
-    }
+    if (!pd || !pd.price || pd.price <= 0) { this.stats.rejected++; return; }
 
-    // Filtres liquidité
     const liq = pd.liquidity || 0;
-    if (liq < CFG.SCANNER_MIN_LIQ) {
-      log('debug', `Scanner reject — liq trop faible $${liq.toFixed(0)} < $${CFG.SCANNER_MIN_LIQ}`, { mint: mint.slice(0, 8) });
-      this.stats.rejected++;
-      return;
-    }
-    if (liq > CFG.SCANNER_MAX_LIQ) {
-      log('debug', `Scanner reject — liq trop élevée $${liq.toFixed(0)} > $${CFG.SCANNER_MAX_LIQ}`, { mint: mint.slice(0, 8) });
+    if (liq < CFG.SCANNER_MIN_LIQ || liq > CFG.SCANNER_MAX_LIQ) {
+      log('debug', `Scanner reject — liq $${liq.toFixed(0)} hors plage [$${CFG.SCANNER_MIN_LIQ}-$${CFG.SCANNER_MAX_LIQ}]`);
       this.stats.rejected++;
       return;
     }
 
-    // Score
     const score = this.bot.scorer.score(pd);
     this.stats.evaluated++;
 
     if (score < CFG.SCANNER_MIN_SCORE) {
-      log('debug', `Scanner reject — score ${score} < ${CFG.SCANNER_MIN_SCORE}`, {
-        mint: mint.slice(0, 8), sym: pd.symbol,
-      });
+      log('debug', `Scanner reject — score ${score} < ${CFG.SCANNER_MIN_SCORE}`, { mint: mint.slice(0, 8), sym: pd.symbol });
       this.stats.rejected++;
       return;
     }
 
-    // Calculer le montant SOL (Smart Sizing si activé)
     const solAmount = this.bot.calcSmartSize(score) || CFG.SCANNER_SOL_AMOUNT;
-
-    log('info', `🟢 Scanner BUY — score:${score} liq:$${liq.toFixed(0)} sol:${solAmount}`, {
-      mint: mint.slice(0, 8), sym: pd.symbol, reason,
-    });
+    log('info', `🟢 Scanner BUY — score:${score} liq:$${liq.toFixed(0)} sol:${solAmount}`, { mint: mint.slice(0, 8), sym: pd.symbol, reason });
 
     const ok = await this.bot._autoBuy(mint, solAmount, `SCANNER_${reason}`, pd, {
-      webhookTitle:  `Scanner — Nouveau token détecté`,
+      webhookTitle:  'Scanner — Nouveau token',
       webhookDesc:   `**${pd.symbol || mint.slice(0, 8)}** | Score: **${score}/100** | Liq: $${liq.toFixed(0)}`,
       webhookColor:  0x00d9ff,
       webhookFields: [
-        { name: 'Raison',    value: reason,                   inline: true },
-        { name: 'SOL',       value: solAmount.toFixed(4),     inline: true },
-        { name: 'Score',     value: `${score}/100`,           inline: true },
-        { name: 'Liquidité', value: `$${liq.toFixed(0)}`,     inline: true },
+        { name: 'Raison',    value: reason,               inline: true },
+        { name: 'SOL',       value: solAmount.toFixed(4), inline: true },
+        { name: 'Score',     value: `${score}/100`,       inline: true },
+        { name: 'Liquidité', value: `$${liq.toFixed(0)}`, inline: true },
       ],
     });
 
-    if (ok) {
-      this.stats.bought++;
-      log('success', `✅ Scanner acheté ${pd.symbol || mint.slice(0, 8)} (${score}/100)`);
-    } else {
-      this.stats.errors++;
-    }
+    if (ok) { this.stats.bought++; log('success', `✅ Scanner acheté ${pd.symbol || mint.slice(0, 8)} (${score}/100)`); }
+    else this.stats.errors++;
   }
 
   getStatus() {
     return {
-      running:      this.running,
-      wsConnected:  this.ws?.readyState === 1,
-      enabled:      CFG.SCANNER_ENABLED,
-      minScore:     CFG.SCANNER_MIN_SCORE,
-      minLiq:       CFG.SCANNER_MIN_LIQ,
-      maxLiq:       CFG.SCANNER_MAX_LIQ,
-      solAmount:    CFG.SCANNER_SOL_AMOUNT,
-      delayMs:      CFG.SCANNER_DELAY_MS,
-      queueLength:  this.queue.length,
-      seenCount:    this.seen.size,
-      stats:        this.stats,
+      running:       this.running,
+      wsConnected:   this.ws?.readyState === 1,
+      wsUrl:         this._wsUrl().replace(/api-key=[^&]+/, 'api-key=[REDACTED]'),
+      pollIntervalS: CFG.SCANNER_POLL_SEC || 30,
+      enabled:       CFG.SCANNER_ENABLED,
+      minScore:      CFG.SCANNER_MIN_SCORE,
+      minLiq:        CFG.SCANNER_MIN_LIQ,
+      maxLiq:        CFG.SCANNER_MAX_LIQ,
+      solAmount:     CFG.SCANNER_SOL_AMOUNT,
+      queueLength:   this.queue.length,
+      seenCount:     this.seen.size,
+      stats:         this.stats,
     };
   }
 }
@@ -3347,7 +3358,8 @@ function startApi(bot, wallet, scanner) {
 
   app.post('/api/reset-circuit-breaker', (_, res) => {
     bot.swap.sellFailures = 0;
-    log('info', 'Circuit-breaker reset');
+    bot.swap._cbTrippedAt = null;
+    log('info', 'Circuit-breaker reset manuellement');
     res.json({ success: true });
   });
 
