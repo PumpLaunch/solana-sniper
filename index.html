@@ -6,16 +6,14 @@
     <meta name="theme-color" content="#0a0e1a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
     <title>SolBot Pro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
             -webkit-user-select: none;
             user-select: none;
         }
@@ -49,7 +47,6 @@
             padding-top: var(--safe-top);
             padding-bottom: calc(80px + var(--safe-bottom));
             overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
         }
 
         /* HEADER */
@@ -60,7 +57,6 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            backdrop-filter: blur(10px);
         }
 
         .header-top {
@@ -127,7 +123,7 @@
             50% { opacity: 0.5; }
         }
 
-        /* STATS GRID */
+        /* STATS */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -146,7 +142,6 @@
             color: var(--text-muted);
             text-transform: uppercase;
             margin-bottom: 4px;
-            font-weight: 500;
         }
 
         .stat-value {
@@ -164,7 +159,6 @@
             gap: 6px;
             padding: 12px 16px;
             overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
         }
 
         .tabs::-webkit-scrollbar { display: none; }
@@ -181,7 +175,6 @@
             font-weight: 500;
             cursor: pointer;
             text-align: center;
-            transition: all 0.2s;
         }
 
         .tab.active {
@@ -208,7 +201,6 @@
             border-radius: var(--radius);
             padding: 12px;
             cursor: pointer;
-            transition: all 0.2s;
         }
 
         .token-card:active {
@@ -240,13 +232,6 @@
             justify-content: center;
             font-size: 18px;
             flex-shrink: 0;
-            overflow: hidden;
-        }
-
-        .token-logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
         }
 
         .token-details {
@@ -258,9 +243,6 @@
             font-weight: 600;
             font-size: 14px;
             margin-bottom: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .token-address {
@@ -271,14 +253,12 @@
 
         .token-price {
             text-align: right;
-            flex-shrink: 0;
         }
 
         .price-value {
             font-family: 'JetBrains Mono', monospace;
             font-weight: 600;
             font-size: 14px;
-            margin-bottom: 2px;
         }
 
         .price-change {
@@ -300,22 +280,9 @@
             border-top: 1px solid var(--border);
         }
 
-        .token-stat {
-            text-align: center;
-        }
-
-        .token-stat-label {
-            font-size: 9px;
-            color: var(--text-muted);
-            margin-bottom: 3px;
-            text-transform: uppercase;
-        }
-
-        .token-stat-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            font-size: 12px;
-        }
+        .token-stat { text-align: center; }
+        .token-stat-label { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
+        .token-stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; }
 
         .token-actions {
             display: flex;
@@ -332,127 +299,65 @@
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
             min-height: 44px;
         }
 
         .btn:active { transform: scale(0.95); }
-
         .btn-buy { background: var(--success); color: white; }
         .btn-sell { background: var(--danger); color: white; }
         .btn-chart { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
         .btn-primary { background: linear-gradient(135deg, var(--accent), #8b5cf6); color: white; }
         .btn-secondary { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
 
-        /* FLOATING ACTION BUTTON */
-        .fab {
-            position: fixed;
-            bottom: calc(90px + var(--safe-bottom));
-            right: 16px;
-            width: 56px;
-            height: 56px;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
-            z-index: 90;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .fab:active { transform: scale(0.9); }
-
-        /* BOTTOM NAV */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: calc(70px + var(--safe-bottom));
-            background: var(--bg-card);
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: space-around;
-            align-items: flex-start;
-            padding-top: 8px;
-            z-index: 100;
-        }
-
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            padding: 8px 12px;
-            color: var(--text-muted);
-            cursor: pointer;
-            flex: 1;
-        }
-
-        .nav-item.active { color: var(--accent); }
-
-        .nav-icon { font-size: 20px; }
-
-        .nav-label {
-            font-size: 10px;
-            font-weight: 500;
-        }
-
-        /* MODALS */
-        .modal {
+        /* TOKEN DETAIL MODAL - 50% CHART + 50% INFO */
+        .token-modal {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
+            background: var(--bg);
             z-index: 200;
-            align-items: flex-end;
-            justify-content: center;
-            backdrop-filter: blur(4px);
+            flex-direction: column;
         }
 
-        .modal.active { display: flex; }
-
-        .modal-content {
-            background: var(--bg-card);
-            border-radius: var(--radius) var(--radius) 0 0;
-            width: 100%;
-            max-height: 85vh;
-            overflow-y: auto;
-            padding: 20px 16px calc(20px + var(--safe-bottom));
-            animation: slideUp 0.3s ease;
+        .token-modal.active {
+            display: flex;
         }
 
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-
-        .modal-header {
+        .token-modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
+            padding: calc(12px + var(--safe-top)) 16px 12px;
+            background: var(--bg-card);
             border-bottom: 1px solid var(--border);
         }
 
-        .modal-title {
+        .token-modal-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .token-modal-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: var(--bg-hover);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .token-modal-name {
             font-size: 16px;
             font-weight: 700;
         }
 
-        .modal-close {
+        .token-modal-close {
             width: 36px;
             height: 36px;
             background: var(--bg-hover);
@@ -461,69 +366,72 @@
             color: var(--text);
             font-size: 20px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
-        /* FORM */
-        .form-group { margin-bottom: 16px; }
-
-        .form-label {
-            display: block;
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            font-weight: 500;
+        /* CHART SECTION - 50% HEIGHT */
+        .token-modal-chart {
+            flex: 1;
+            min-height: 50vh;
+            background: #000;
+            border-bottom: 1px solid var(--border);
         }
 
-        .form-input {
+        .token-modal-chart iframe {
             width: 100%;
-            padding: 12px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 14px;
-            font-family: 'Inter', sans-serif;
+            height: 100%;
+            border: none;
         }
 
-        .form-input:focus {
-            outline: none;
-            border-color: var(--accent);
+        /* INFO SECTION - 50% HEIGHT */
+        .token-modal-info {
+            flex: 1;
+            min-height: 50vh;
+            padding: 16px;
+            overflow-y: auto;
+            background: var(--bg-card);
         }
 
-        .quick-amounts {
+        .info-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-            margin-top: 6px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
         }
 
-        .quick-btn {
-            padding: 8px;
+        .info-card {
             background: var(--bg-hover);
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: var(--radius);
+            padding: 12px;
+        }
+
+        .info-label {
+            font-size: 10px;
             color: var(--text-muted);
-            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
             font-weight: 600;
-            cursor: pointer;
-            text-align: center;
-            min-height: 40px;
         }
 
-        .quick-btn:active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
         }
 
-        .quick-btn.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
+        .info-row:last-child { border-bottom: none; }
+
+        .info-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
         }
 
         /* CONFIG */
@@ -566,15 +474,8 @@
             flex: 1;
         }
 
-        .toggle-title {
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .toggle-desc {
-            font-size: 10px;
-            color: var(--text-muted);
-        }
+        .toggle-title { font-size: 12px; font-weight: 500; }
+        .toggle-desc { font-size: 10px; color: var(--text-muted); }
 
         .toggle {
             width: 48px;
@@ -583,7 +484,6 @@
             border-radius: 13px;
             position: relative;
             cursor: pointer;
-            transition: background 0.2s;
             flex-shrink: 0;
             margin-left: 10px;
         }
@@ -603,6 +503,148 @@
         }
 
         .toggle.active::after { transform: translateX(22px); }
+
+        .form-group { margin-bottom: 12px; }
+        .form-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 13px;
+        }
+
+        /* FLOATING BUTTON */
+        .fab {
+            position: fixed;
+            bottom: calc(90px + var(--safe-bottom));
+            right: 16px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+            z-index: 90;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* BOTTOM NAV */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: calc(70px + var(--safe-bottom));
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            padding-top: 8px;
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            color: var(--text-muted);
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .nav-item.active { color: var(--accent); }
+        .nav-icon { font-size: 20px; }
+        .nav-label { font-size: 10px; font-weight: 500; }
+
+        /* BUY/SELL MODALS */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 300;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .modal.active { display: flex; }
+
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: var(--radius) var(--radius) 0 0;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 20px 16px calc(20px + var(--safe-bottom));
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-title { font-size: 16px; font-weight: 700; }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            background: var(--bg-hover);
+            border: none;
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .quick-amounts {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .quick-btn {
+            padding: 8px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            min-height: 40px;
+        }
+
+        .quick-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
 
         /* LOADING */
         .loading {
@@ -634,46 +676,14 @@
             color: var(--text-muted);
         }
 
-        .empty-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-            opacity: 0.5;
-        }
-
-        /* CHART */
-        .chart-container {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 12px;
-            margin-bottom: 16px;
-            height: 280px;
-            position: relative;
-        }
-
-        .chart-container canvas {
-            width: 100% !important;
-            height: 100% !important;
-        }
-
-        /* RESPONSIVE */
-        @media (min-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(4, 1fr); }
-            .token-stats { grid-template-columns: repeat(5, 1fr); }
-            .modal { align-items: center; }
-            .modal-content {
-                border-radius: var(--radius);
-                max-width: 500px;
-                max-height: 80vh;
-            }
-        }
+        .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
 
         /* TOAST */
         .toast-container {
             position: fixed;
             top: calc(20px + var(--safe-top));
             right: 16px;
-            z-index: 300;
+            z-index: 400;
             display: flex;
             flex-direction: column;
             gap: 8px;
@@ -688,12 +698,18 @@
             font-size: 13px;
             animation: slideIn 0.3s ease;
             min-width: 280px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
 
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* RESPONSIVE */
+        @media (min-width: 768px) {
+            .stats-grid { grid-template-columns: repeat(4, 1fr); }
+            .token-stats { grid-template-columns: repeat(5, 1fr); }
+            .info-grid { grid-template-columns: repeat(4, 1fr); }
         }
     </style>
 </head>
@@ -753,9 +769,6 @@
 
     <!-- ANALYTICS SECTION -->
     <section id="analytics" class="section">
-        <div class="chart-container">
-            <canvas id="pnlChart"></canvas>
-        </div>
         <div class="stats-grid" style="margin-bottom: 16px;">
             <div class="stat-card">
                 <div class="stat-label">PnL Réalisé</div>
@@ -906,6 +919,81 @@
         </div>
     </nav>
 
+    <!-- TOKEN DETAIL MODAL - 50% CHART + 50% INFO -->
+    <div class="token-modal" id="tokenModal">
+        <div class="token-modal-header">
+            <div class="token-modal-title">
+                <div class="token-modal-logo" id="modalLogo">🪙</div>
+                <div>
+                    <div class="token-modal-name" id="modalName">Token</div>
+                    <div style="font-size: 10px; color: var(--text-muted);" id="modalAddress">0x0000...0000</div>
+                </div>
+            </div>
+            <button class="token-modal-close" onclick="closeTokenModal()">×</button>
+        </div>
+        
+        <!-- CHART - 50% SCREEN -->
+        <div class="token-modal-chart">
+            <iframe id="chartFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+        </div>
+        
+        <!-- INFO - 50% SCREEN -->
+        <div class="token-modal-info">
+            <div class="info-grid">
+                <div class="info-card">
+                    <div class="info-label">Prix</div>
+                    <div class="info-value" id="infoPrice">$0.00</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">PnL</div>
+                    <div class="info-value" id="infoPnl">0%</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Valeur</div>
+                    <div class="info-value" id="infoValue">$0.00</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Balance</div>
+                    <div class="info-value" id="infoBalance">0</div>
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <div class="info-label">Liquidité</div>
+                <div class="info-value" id="infoLiq">$0k</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Volume 24h</div>
+                <div class="info-value" id="infoVol24h">$0</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Change 24h</div>
+                <div class="info-value" id="infoChange24h">0%</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">MCap</div>
+                <div class="info-value" id="infoMcap">$0</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">FDV</div>
+                <div class="info-value" id="infoFdv">$0</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Buys 24h</div>
+                <div class="info-value" id="infoBuys">0</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Sells 24h</div>
+                <div class="info-value" id="infoSells">0</div>
+            </div>
+            
+            <div class="info-actions">
+                <button class="btn btn-buy" id="modalBuyBtn">▲ Acheter</button>
+                <button class="btn btn-sell" id="modalSellBtn">▼ Vendre</button>
+            </div>
+        </div>
+    </div>
+
     <!-- BUY MODAL -->
     <div class="modal" id="buyModal">
         <div class="modal-content">
@@ -983,12 +1071,11 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const API = window.location.origin;
         let portfolio = [];
         let configData = {};
-        let pnlChart = null;
+        let currentToken = null;
         let solBalance = 0;
 
         // INIT
@@ -1012,7 +1099,6 @@
                 const balanceData = await balanceRes.json();
                 solBalance = balanceData.balance || 0;
                 
-                // Update stats
                 document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
                 document.getElementById('tokenCount').textContent = statsData.tokens || 0;
                 
@@ -1069,11 +1155,11 @@
                 const pnlClass = token.pnl >= 0 ? 'pos' : 'neg';
                 const pnlSign = token.pnl >= 0 ? '+' : '';
                 const logo = token.logo 
-                    ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'">`
+                    ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'" style="width:100%;height:100%;border-radius:10px;object-fit:cover;">`
                     : '🪙';
                 
                 return `
-                    <div class="token-card">
+                    <div class="token-card" onclick="openTokenModal('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}')">
                         <div class="token-header">
                             <div class="token-info">
                                 <div class="token-logo">${logo}</div>
@@ -1104,11 +1190,51 @@
                         <div class="token-actions">
                             <button class="btn btn-buy" onclick="event.stopPropagation(); openBuyModal('${token.mintFull}')">Buy</button>
                             <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">Sell</button>
-                            <button class="btn btn-chart" onclick="event.stopPropagation(); window.open('https://dexscreener.com/solana/${token.mint}', '_blank')">🦎</button>
+                            <button class="btn btn-chart" onclick="event.stopPropagation(); openTokenModal('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}')">📊</button>
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        // OPEN TOKEN MODAL - 50% CHART + 50% INFO
+        function openTokenModal(mint, symbol) {
+            currentToken = portfolio.find(t => t.mintFull === mint) || { mintFull: mint, symbol };
+            
+            document.getElementById('modalName').textContent = symbol;
+            document.getElementById('modalAddress').textContent = `${mint.slice(0, 6)}...${mint.slice(-4)}`;
+            document.getElementById('chartFrame').src = `https://dexscreener.com/solana/${mint}`;
+            
+            // Update info
+            document.getElementById('infoPrice').textContent = `$${(currentToken.price || 0).toFixed(6)}`;
+            document.getElementById('infoPnl').textContent = `${currentToken.pnl >= 0 ? '+' : ''}${(currentToken.pnl || 0).toFixed(2)}%`;
+            document.getElementById('infoPnl').className = `info-value ${currentToken.pnl >= 0 ? 'pos' : 'neg'}`;
+            document.getElementById('infoValue').textContent = `$${(currentToken.value || 0).toFixed(2)}`;
+            document.getElementById('infoBalance').textContent = (currentToken.balance || 0).toFixed(4);
+            document.getElementById('infoLiq').textContent = `$${((currentToken.liquidity || 0) / 1000).toFixed(1)}k`;
+            document.getElementById('infoVol24h').textContent = `$${(currentToken.volume24h || 0).toLocaleString()}`;
+            document.getElementById('infoChange24h').textContent = `${(currentToken.change24h || 0).toFixed(2)}%`;
+            document.getElementById('infoMcap').textContent = `$${(currentToken.mcap || 0).toLocaleString()}`;
+            document.getElementById('infoFdv').textContent = `$${(currentToken.fdv || 0).toLocaleString()}`;
+            document.getElementById('infoBuys').textContent = currentToken.buys24h || 0;
+            document.getElementById('infoSells').textContent = currentToken.sells24h || 0;
+            
+            // Setup action buttons
+            document.getElementById('modalBuyBtn').onclick = () => {
+                closeTokenModal();
+                openBuyModal(mint);
+            };
+            document.getElementById('modalSellBtn').onclick = () => {
+                closeTokenModal();
+                openSellModal(mint, symbol, currentToken.balance || 0);
+            };
+            
+            document.getElementById('tokenModal').classList.add('active');
+        }
+
+        function closeTokenModal() {
+            document.getElementById('tokenModal').classList.remove('active');
+            document.getElementById('chartFrame').src = '';
         }
 
         // TAB SWITCHING
@@ -1312,10 +1438,6 @@
                 document.getElementById('totalTrades').textContent = analytics.totalTrades || 0;
                 document.getElementById('roi').textContent = `${analytics.roi || 0}%`;
                 
-                // Update chart
-                updateChart(analytics.pnlHistory || []);
-                
-                // Update recent trades
                 const recentTrades = trades.trades?.slice(0, 10) || [];
                 const container = document.getElementById('recentTrades');
                 
@@ -1349,57 +1471,6 @@
             } catch (err) {
                 console.error('Analytics load error:', err);
             }
-        }
-
-        // CHART
-        function updateChart(pnlHistory) {
-            const ctx = document.getElementById('pnlChart').getContext('2d');
-            
-            if (pnlChart) {
-                pnlChart.destroy();
-            }
-            
-            const labels = pnlHistory.slice(-30).map((_, i) => i + 1);
-            const data = pnlHistory.slice(-30).map(p => p.cumul);
-            
-            pnlChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'PnL Cumulé (SOL)',
-                        data: data,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: { display: false },
-                        y: {
-                            grid: { color: 'rgba(42, 53, 80, 0.5)' },
-                            ticks: {
-                                color: '#6b7a99',
-                                font: { family: 'JetBrains Mono', size: 10 }
-                            }
-                        }
-                    },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    }
-                }
-            });
         }
 
         // TOAST
