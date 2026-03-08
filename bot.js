@@ -2800,9 +2800,13 @@ class TokenScanner {
     const already = this.bot.portfolio.find(t => t.mintFull === mint);
     if (already) { this.stats.rejected++; return; }
 
-    const openPositions = this.bot.portfolio.filter(t => !t.isSol && !t.isUsdc && t.balance > 0).length;
+    // Ne compter que les positions actives (valeur ≥ $0.10 et prix connu)
+    // Les tokens morts/rugpullés à $0 ne bloquent pas les nouveaux achats du scanner
+    const openPositions = this.bot.portfolio.filter(t =>
+      !t.isSol && !t.isUsdc && t.balance > 0 && t.price > 0 && (t.value || 0) >= 0.10
+    ).length;
     if (openPositions >= CFG.MAX_POSITIONS) {
-      log('debug', `Scanner skip — max positions atteint (${openPositions})`);
+      log('debug', `Scanner skip — max positions actives atteint (${openPositions}/${CFG.MAX_POSITIONS})`);
       this.stats.rejected++;
       return;
     }
@@ -3694,4 +3698,3 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
-
