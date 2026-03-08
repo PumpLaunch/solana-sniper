@@ -1004,6 +1004,29 @@ body {
 
     <!-- ─── CONFIG ─── -->
     <section id="config" class="section">
+      <!-- Sticky save bar — always visible at top of config -->
+      <div id="cfgSaveBar" style="
+        position:sticky; top:0; z-index:10;
+        display:flex; align-items:center; gap:10px;
+        background:var(--bg-panel); border:1px solid var(--border-mid);
+        border-radius:var(--radius); padding:10px 14px; margin-bottom:16px;
+        box-shadow:0 4px 16px rgba(0,0,0,0.4);
+      ">
+        <div style="flex:1; font-family:var(--font-hd); font-size:12px; letter-spacing:.06em; color:var(--text-dim);">
+          PARAMÈTRES DU BOT
+        </div>
+        <div id="cfgSaveStatus" style="font-family:var(--font-mono); font-size:11px; color:var(--text-dim);"></div>
+        <button id="saveCfgBtn" class="btn btn-primary" onclick="saveConfig()" style="padding:9px 20px; font-size:12px; letter-spacing:.07em; min-width:160px;">
+          ▸ SAUVEGARDER ◂
+        </button>
+      </div>
+
+      <!-- Debug panel -->
+      <div id="cfgDebugPanel" style="display:none; margin-bottom:14px; padding:12px 14px; background:#0a0a0c; border:1px solid var(--border-mid); border-radius:6px; font-family:var(--font-mono); font-size:11px; color:var(--text-dim); line-height:1.6; word-break:break-all;">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-ghost);margin-bottom:6px;">DERNIÈRE RÉPONSE API</div>
+        <pre id="cfgDebugText" style="margin:0;white-space:pre-wrap;"></pre>
+      </div>
+
       <div class="config-grid">
 
         <div class="config-section">
@@ -1015,6 +1038,14 @@ body {
           <div class="form-group" style="margin-top:10px;">
             <label class="form-label">Hysteresis (%)</label>
             <input type="number" class="form-input" id="tpHysteresis" value="5" min="0" max="50">
+          </div>
+          <!-- TP Tiers editor -->
+          <div style="margin-top:10px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <label class="form-label" style="margin:0;">Paliers · PnL% → Sell%</label>
+              <button onclick="addTpTier()" style="padding:2px 8px; background:var(--gold-dim); border:1px solid rgba(201,162,39,0.4); border-radius:3px; color:var(--gold); font-size:10px; cursor:pointer;">+ Palier</button>
+            </div>
+            <div id="tpTiersContainer"></div>
           </div>
         </div>
 
@@ -1259,10 +1290,7 @@ body {
           </div>
         </div>
 
-      </div>
-      <button class="btn btn-primary btn-full" onclick="saveConfig()" style="padding:13px; margin-top:14px; font-size:13px; letter-spacing:.08em;">
-        ▸ SAUVEGARDER LA CONFIG ◂
-      </button>
+      </div><!-- /config-grid -->
     </section>
 
     <!-- ─── AUTO-BUYS ─── -->
@@ -1491,13 +1519,29 @@ let API = (() => {
 
 // Helper fetch avec gestion d'erreur JSON propre
 async function apiFetch(path, opts = {}) {
-  const res = await fetch(`${API}${path}`, opts);
+  const res = await fetch(`${API}${path}`, { mode: 'cors', ...opts });
+  if (!res.ok) {
+    // Try to get error message from body
+    let msg = `HTTP ${res.status}`;
+    try {
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const j = await res.json();
+        msg = j.error || j.message || msg;
+      } else {
+        const t = await res.text();
+        msg = t.slice(0, 120) || msg;
+      }
+    } catch {}
+    throw new Error(msg);
+  }
+  // Empty body (204, or POST with no JSON response)
   const ct = res.headers.get('content-type') || '';
   if (!ct.includes('application/json')) {
-    const txt = await res.text();
-    throw new Error(`API ${path} → HTTP ${res.status} (non-JSON): ${txt.slice(0, 120)}`);
+    return { success: true };
   }
-  return res.json();
+  const data = await res.json();
+  return data;
 }
 
 let portfolio = [];
@@ -1522,13 +1566,18 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => loadData(), 30000);
 });
 
-function applyApiUrl() {
+async function applyApiUrl() {
   const input = document.getElementById('apiUrlInput');
   const url = input.value.trim().replace(/\/$/, '');
   if (!url.startsWith('http')) { showToast('URL invalide (doit commencer par http)', 'err'); return; }
   API = url;
   try { localStorage.setItem('solbot_api_url', url); } catch {}
-  showToast(`API → ${url}`, 'ok');
+  try {
+    await apiFetch('/health');
+    showToast(`✅ Connecté → ${url}`, 'ok');
+  } catch(err) {
+    showToast(`⚠ URL définie — ${err.message.slice(0,60)}`, 'err');
+  }
   loadData();
   loadConfig();
 }
@@ -1576,6 +1625,53 @@ async function loadConfig() {
   } catch(err) { console.error('Config error:', err); showToast(`Config: ${err.message.slice(0,80)}`, 'err'); }
 }
 
+function renderTpTiers(tiers) {
+  const c = document.getElementById('tpTiersContainer');
+  if (!c) return;
+  const defaultTiers = tiers?.length ? tiers : [
+    { pnl:20, sell:20 }, { pnl:50, sell:25 }, { pnl:100, sell:25 }, { pnl:200, sell:25 }
+  ];
+  c.innerHTML = defaultTiers.map((t, i) => `
+    <div class="tp-tier-row" style="display:grid; grid-template-columns:1fr 1fr auto; gap:6px; margin-bottom:5px; align-items:center;">
+      <div style="position:relative;">
+        <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-dim);pointer-events:none;">+</span>
+        <input type="number" class="form-input tp-tier-pnl" value="${t.pnl}" min="1" max="10000" step="5"
+          style="padding-left:18px;" placeholder="PnL%">
+        <span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-dim);pointer-events:none;">%</span>
+      </div>
+      <div style="position:relative;">
+        <input type="number" class="form-input tp-tier-sell" value="${t.sell}" min="1" max="100" step="5"
+          placeholder="Sell%">
+        <span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-dim);pointer-events:none;">%</span>
+      </div>
+      <button onclick="removeTpTier(this)" style="width:28px;height:34px;background:var(--dn-dim);border:1px solid rgba(239,83,80,0.3);border-radius:4px;color:var(--dn);font-size:14px;cursor:pointer;line-height:1;">×</button>
+    </div>`).join('');
+}
+function addTpTier() {
+  const c = document.getElementById('tpTiersContainer');
+  if (!c) return;
+  const row = document.createElement('div');
+  row.className = 'tp-tier-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:5px;align-items:center;';
+  row.innerHTML = `
+    <div style="position:relative;">
+      <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-dim);pointer-events:none;">+</span>
+      <input type="number" class="form-input tp-tier-pnl" value="" min="1" max="10000" step="5" style="padding-left:18px;" placeholder="PnL%">
+    </div>
+    <div style="position:relative;">
+      <input type="number" class="form-input tp-tier-sell" value="" min="1" max="100" step="5" placeholder="Sell%">
+      <span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-dim);pointer-events:none;">%</span>
+    </div>
+    <button onclick="removeTpTier(this)" style="width:28px;height:34px;background:var(--dn-dim);border:1px solid rgba(239,83,80,0.3);border-radius:4px;color:var(--dn);font-size:14px;cursor:pointer;line-height:1;">×</button>`;
+  c.appendChild(row);
+  row.querySelector('.tp-tier-pnl').focus();
+}
+function removeTpTier(btn) {
+  const row = btn.closest('.tp-tier-row');
+  if (document.querySelectorAll('.tp-tier-row').length > 1) row.remove();
+  else showToast('Au moins 1 palier requis', 'err');
+}
+
 function updateConfigUI() {
   const bools = {
     'toggle-tp': 'takeProfitEnabled', 'toggle-be': 'breakEvenEnabled',
@@ -1610,6 +1706,8 @@ function updateConfigUI() {
     const el = document.getElementById(id);
     if (el) el.value = val;
   }
+  // Render TP tiers
+  renderTpTiers(configData.takeProfitTiers);
 }
 
 function renderPortfolio(tokens) {
@@ -1713,56 +1811,111 @@ function toggleConfig(key) {
 }
 
 async function saveConfig() {
+  const btn        = document.getElementById('saveCfgBtn');
+  const statusEl   = document.getElementById('cfgSaveStatus');
+  const debugPanel = document.getElementById('cfgDebugPanel');
+  const debugText  = document.getElementById('cfgDebugText');
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enregistrement...'; }
+  if (statusEl) statusEl.textContent = '';
+  if (debugPanel) debugPanel.style.display = 'none';
+
+  const g      = id => document.getElementById(id);
+  const getBool = id => g(id)?.classList.contains('active') ?? false;
+  const getNum  = (id, fb) => { const v = parseFloat(g(id)?.value); return isNaN(v) ? fb : v; };
+  const getInt  = (id, fb) => { const v = parseInt(g(id)?.value);   return isNaN(v) ? fb : v; };
+  const getSel  = id => g(id)?.value ?? '';
+
+  // Collect TP tiers from the dynamic tier editor
+  const tpTiers = [];
+  document.querySelectorAll('.tp-tier-row').forEach(row => {
+    const pnl  = parseFloat(row.querySelector('.tp-tier-pnl')?.value);
+    const sell = parseFloat(row.querySelector('.tp-tier-sell')?.value);
+    if (!isNaN(pnl) && pnl > 0 && !isNaN(sell) && sell > 0 && sell <= 100) {
+      tpTiers.push({ pnl, sell });
+    }
+  });
+
+  const config = {
+    takeProfitEnabled:   getBool('toggle-tp'),
+    breakEvenEnabled:    getBool('toggle-be'),
+    stopLossEnabled:     getBool('toggle-sl'),
+    trailingEnabled:     getBool('toggle-ts'),
+    trailingVol:         getSel('tsVol') === 'true',
+    antiRugEnabled:      getBool('toggle-ar'),
+    liqExitEnabled:      getBool('toggle-le'),
+    timeStopEnabled:     getBool('toggle-tt'),
+    momentumEnabled:     getBool('toggle-me'),
+    jitoEnabled:         getBool('toggle-jito'),
+    pyramidEnabled:      getBool('toggle-pyramid'),
+    dcadEnabled:         getBool('toggle-dcad'),
+    reentryEnabled:      getBool('toggle-reentry'),
+    smartSizeEnabled:    getBool('toggle-smartsize'),
+    hysteresis:          getNum('tpHysteresis',      5),
+    breakEvenBuffer:     getNum('beBuffer',           2),
+    stopLossPct:         getNum('slPct',            -50),
+    trailingPct:         getNum('tsPct',             20),
+    antiRugPct:          getNum('arPct',             60),
+    liqExitPct:          getNum('lePct',             70),
+    timeStopHours:       getNum('ttHours',           24),
+    timeStopMinPnl:      getNum('ttMinPnl',           0),
+    momentumThreshold:   getNum('meThreshold',       -3),
+    jitoTipSol:          getNum('jitoTip',        0.0001),
+    pyramidMaxSol:       getNum('pyramidMaxSol',    0.5),
+    pyramidHysteresis:   getNum('pyramidHysteresis', 5),
+    dcadMaxAdds:         getInt('dcadMaxAdds',        2),
+    dcadRequireMomentum: getSel('dcadRequireMomentum') === 'true',
+    reentryDelayMin:     getNum('reentryDelayMin',   30),
+    reentryMinGain:      getNum('reentryMinGain',    15),
+    reentryMinScore:     getNum('reentryMinScore',   60),
+    smartSizeBase:       getNum('smartSizeBase',   0.05),
+    smartSizeMult:       getNum('smartSizeMult',    2.0),
+    smartSizeMin:        getNum('smartSizeMin',    0.02),
+    smartSizeMax:        getNum('smartSizeMax',     0.5),
+    defaultSlippage:     getInt('defaultSlippage',  500),
+    minSolReserve:       getNum('minSolReserve',   0.05),
+    intervalSec:         getInt('intervalSec',       30),
+    maxPositions:        getInt('maxPositions',      10),
+    minScore:            getNum('minScore',           0),
+  };
+
+  // Only send tiers if user has configured them
+  if (tpTiers.length > 0) config.takeProfitTiers = tpTiers;
+
+  let debugInfo = `POST ${API}/api/config\n${JSON.stringify(config, null, 2).slice(0, 400)}\n\n`;
+
   try {
-    const g = id => document.getElementById(id);
-    const config = {
-      takeProfitEnabled: g('toggle-tp').classList.contains('active'),
-      breakEvenEnabled: g('toggle-be').classList.contains('active'),
-      stopLossEnabled: g('toggle-sl').classList.contains('active'),
-      trailingEnabled: g('toggle-ts').classList.contains('active'),
-      trailingVol: g('tsVol').value === 'true',
-      antiRugEnabled: g('toggle-ar').classList.contains('active'),
-      liqExitEnabled: g('toggle-le').classList.contains('active'),
-      timeStopEnabled: g('toggle-tt').classList.contains('active'),
-      momentumEnabled: g('toggle-me').classList.contains('active'),
-      jitoEnabled: g('toggle-jito').classList.contains('active'),
-      pyramidEnabled: g('toggle-pyramid').classList.contains('active'),
-      dcadEnabled: g('toggle-dcad').classList.contains('active'),
-      reentryEnabled: g('toggle-reentry').classList.contains('active'),
-      smartSizeEnabled: g('toggle-smartsize').classList.contains('active'),
-      hysteresis: parseFloat(g('tpHysteresis').value),
-      breakEvenBuffer: parseFloat(g('beBuffer').value),
-      stopLossPct: parseFloat(g('slPct').value),
-      trailingPct: parseFloat(g('tsPct').value),
-      antiRugPct: parseFloat(g('arPct').value),
-      liqExitPct: parseFloat(g('lePct').value),
-      timeStopHours: parseFloat(g('ttHours').value),
-      timeStopMinPnl: parseFloat(g('ttMinPnl').value),
-      momentumThreshold: parseFloat(g('meThreshold').value),
-      jitoTipSol: parseFloat(g('jitoTip').value),
-      pyramidMaxSol: parseFloat(g('pyramidMaxSol').value),
-      pyramidHysteresis: parseFloat(g('pyramidHysteresis').value),
-      dcadMaxAdds: parseInt(g('dcadMaxAdds').value),
-      dcadRequireMomentum: g('dcadRequireMomentum').value === 'true',
-      reentryDelayMin: parseFloat(g('reentryDelayMin').value),
-      reentryMinGain: parseFloat(g('reentryMinGain').value),
-      reentryMinScore: parseFloat(g('reentryMinScore').value),
-      smartSizeBase: parseFloat(g('smartSizeBase').value),
-      smartSizeMult: parseFloat(g('smartSizeMult').value),
-      smartSizeMin: parseFloat(g('smartSizeMin').value),
-      smartSizeMax: parseFloat(g('smartSizeMax').value),
-      defaultSlippage: parseInt(g('defaultSlippage').value),
-      minSolReserve: parseFloat(g('minSolReserve').value),
-      intervalSec: parseInt(g('intervalSec').value),
-      maxPositions: parseInt(g('maxPositions').value),
-      minScore: parseFloat(g('minScore').value),
-    };
-    const result = await apiFetch('/api/config', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(config),
+    const res = await fetch(`${API}/api/config`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(config),
     });
-    showToast('Config sauvegardée', 'ok'); loadConfig();
-  } catch(err) { showToast(err.message, 'err'); }
+
+    const raw = await res.text();
+    debugInfo += `HTTP ${res.status}\n${raw.slice(0, 200)}`;
+
+    let body = null;
+    try { body = JSON.parse(raw); } catch {}
+
+    if (res.ok && body?.success !== false) {
+      if (statusEl) { statusEl.textContent = '✓ Sauvegardé'; statusEl.style.color = 'var(--up)'; }
+      if (debugPanel) { debugText.textContent = debugInfo; debugText.style.color = 'var(--up)'; debugPanel.style.display = 'block'; }
+      showToast('Config sauvegardée', 'ok');
+      loadConfig();
+    } else {
+      const msg = body?.error || body?.message || `HTTP ${res.status}`;
+      if (statusEl) { statusEl.textContent = `✗ ${msg}`; statusEl.style.color = 'var(--dn)'; }
+      if (debugPanel) { debugText.textContent = debugInfo; debugText.style.color = 'var(--dn)'; debugPanel.style.display = 'block'; }
+      showToast(`Erreur config: ${msg}`, 'err');
+    }
+  } catch (err) {
+    debugInfo += `\nException: ${err.message}`;
+    if (statusEl) { statusEl.textContent = `✗ ${err.message.slice(0,40)}`; statusEl.style.color = 'var(--dn)'; }
+    if (debugPanel) { debugText.textContent = debugInfo; debugText.style.color = 'var(--dn)'; debugPanel.style.display = 'block'; }
+    showToast(`Erreur: ${err.message}`, 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▸ SAUVEGARDER ◂'; }
+  }
 }
 
 async function loadAnalytics() {
