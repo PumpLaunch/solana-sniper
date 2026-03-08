@@ -9,702 +9,274 @@
     <title>SolBot Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         :root {
-            --bg: #0a0e1a;
-            --bg-card: #151a28;
-            --bg-hover: #1e2538;
-            --border: #2a3550;
-            --text: #ffffff;
-            --text-muted: #6b7a99;
-            --accent: #3b82f6;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --radius: 12px;
-            --safe-top: env(safe-area-inset-top);
+            --bg: #0a0e1a; --bg-card: #151a28; --bg-hover: #1e2538;
+            --border: #2a3550; --text: #ffffff; --text-muted: #6b7a99;
+            --accent: #3b82f6; --success: #10b981; --danger: #ef4444;
+            --radius: 12px; --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
         }
-
-        html {
-            font-size: 14px;
-            scroll-behavior: smooth;
-        }
-
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding-top: var(--safe-top);
+            font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+            min-height: 100vh; padding-top: var(--safe-top);
             padding-bottom: calc(80px + var(--safe-bottom));
-            overflow-x: hidden;
         }
-
-        /* HEADER */
         .header {
             background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg) 100%);
             border-bottom: 1px solid var(--border);
             padding: calc(12px + var(--safe-top)) 16px 12px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            position: sticky; top: 0; z-index: 100;
         }
-
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .logo { display: flex; align-items: center; gap: 8px; }
         .logo-icon {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
+            width: 36px; height: 36px; background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
         }
-
-        .logo-text {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
+        .logo-text { font-size: 16px; font-weight: 700; }
         .logo-version {
-            font-size: 10px;
-            color: var(--text-muted);
-            background: var(--bg-hover);
-            padding: 2px 6px;
-            border-radius: 4px;
-            margin-left: 4px;
+            font-size: 10px; color: var(--text-muted); background: var(--bg-hover);
+            padding: 2px 6px; border-radius: 4px; margin-left: 4px;
         }
-
         .status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            background: rgba(16, 185, 129, 0.15);
-            border: 1px solid var(--success);
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--success);
+            display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+            background: rgba(16, 185, 129, 0.15); border: 1px solid var(--success);
+            border-radius: 12px; font-size: 11px; font-weight: 600; color: var(--success);
         }
-
         .status-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--success);
-            border-radius: 50%;
+            width: 6px; height: 6px; background: var(--success); border-radius: 50%;
             animation: pulse 2s infinite;
         }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* STATS */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-        }
-
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
         .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 10px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 10px;
         }
-
-        .stat-label {
-            font-size: 10px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-
-        .stat-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 16px;
-            font-weight: 600;
-        }
-
+        .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; }
         .stat-value.pos { color: var(--success); }
         .stat-value.neg { color: var(--danger); }
-
-        /* TABS */
         .tabs {
-            display: flex;
-            gap: 6px;
-            padding: 12px 16px;
-            overflow-x: auto;
+            display: flex; gap: 6px; padding: 12px 16px; overflow-x: auto;
         }
-
         .tabs::-webkit-scrollbar { display: none; }
-
         .tab {
-            flex: 1;
-            min-width: 80px;
-            padding: 10px 16px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text-muted);
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            text-align: center;
+            flex: 1; min-width: 80px; padding: 10px 16px; background: var(--bg-card);
+            border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted);
+            font-size: 12px; font-weight: 500; cursor: pointer; text-align: center;
         }
-
-        .tab.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-
-        /* SECTIONS */
+        .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
         .section { display: none; padding: 0 16px; }
         .section.active { display: block; }
-
-        /* TOKEN LIST */
-        .token-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding-bottom: 20px;
-        }
-
+        .token-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px; }
         .token-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 12px;
-            cursor: pointer;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 12px; cursor: pointer;
         }
-
-        .token-card:active {
-            transform: scale(0.98);
-            border-color: var(--accent);
-        }
-
-        .token-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .token-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex: 1;
-        }
-
+        .token-card:active { transform: scale(0.98); border-color: var(--accent); }
+        .token-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .token-info { display: flex; align-items: center; gap: 10px; flex: 1; }
         .token-logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            background: var(--bg-hover);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
+            width: 40px; height: 40px; border-radius: 10px; background: var(--bg-hover);
+            display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
         }
-
-        .token-details {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .token-symbol {
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 2px;
-        }
-
-        .token-address {
-            font-size: 10px;
-            color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .token-price {
-            text-align: right;
-        }
-
-        .price-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
+        .token-details { flex: 1; min-width: 0; }
+        .token-symbol { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+        .token-address { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+        .token-price { text-align: right; }
+        .price-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 14px; }
         .price-change {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            display: inline-block;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            padding: 2px 6px; border-radius: 4px; display: inline-block;
         }
-
         .price-change.pos { background: rgba(16, 185, 129, 0.15); color: var(--success); }
         .price-change.neg { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
-
         .token-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            padding-top: 10px;
-            border-top: 1px solid var(--border);
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            padding-top: 10px; border-top: 1px solid var(--border);
         }
-
         .token-stat { text-align: center; }
         .token-stat-label { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
         .token-stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; }
-
-        .token-actions {
-            display: flex;
-            gap: 6px;
-            margin-top: 10px;
-        }
-
-        /* BUTTONS */
+        .token-actions { display: flex; gap: 6px; margin-top: 10px; }
         .btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            min-height: 44px;
+            flex: 1; padding: 10px; border: none; border-radius: 8px;
+            font-size: 12px; font-weight: 600; cursor: pointer; min-height: 44px;
         }
-
         .btn:active { transform: scale(0.95); }
         .btn-buy { background: var(--success); color: white; }
         .btn-sell { background: var(--danger); color: white; }
         .btn-chart { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
         .btn-primary { background: linear-gradient(135deg, var(--accent), #8b5cf6); color: white; }
         .btn-secondary { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
-
         /* TOKEN DETAIL MODAL - 50% CHART + 50% INFO */
         .token-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--bg);
-            z-index: 200;
-            flex-direction: column;
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg); z-index: 200; flex-direction: column;
         }
-
-        .token-modal.active {
-            display: flex;
-        }
-
+        .token-modal.active { display: flex; }
         .token-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: flex; justify-content: space-between; align-items: center;
             padding: calc(12px + var(--safe-top)) 16px 12px;
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
+            background: var(--bg-card); border-bottom: 1px solid var(--border);
         }
-
-        .token-modal-title {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
+        .token-modal-title { display: flex; align-items: center; gap: 10px; }
         .token-modal-logo {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            background: var(--bg-hover);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
+            width: 36px; height: 36px; border-radius: 10px; background: var(--bg-hover);
+            display: flex; align-items: center; justify-content: center; font-size: 18px;
         }
-
-        .token-modal-name {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
+        .token-modal-name { font-size: 16px; font-weight: 700; }
         .token-modal-close {
-            width: 36px;
-            height: 36px;
-            background: var(--bg-hover);
-            border: none;
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 20px;
-            cursor: pointer;
+            width: 36px; height: 36px; background: var(--bg-hover); border: none;
+            border-radius: 8px; color: var(--text); font-size: 20px; cursor: pointer;
         }
-
-        /* CHART SECTION - 50% HEIGHT */
+        /* CHART SECTION - 50% HEIGHT - TRADINGVIEW WIDGET */
         .token-modal-chart {
-            flex: 1;
-            min-height: 50vh;
-            background: #000;
+            flex: 1; min-height: 50vh; background: #000;
             border-bottom: 1px solid var(--border);
         }
-
         .token-modal-chart iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
+            width: 100%; height: 100%; border: none;
         }
-
         /* INFO SECTION - 50% HEIGHT */
         .token-modal-info {
-            flex: 1;
-            min-height: 50vh;
-            padding: 16px;
-            overflow-y: auto;
+            flex: 1; min-height: 50vh; padding: 16px; overflow-y: auto;
             background: var(--bg-card);
         }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-
+        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
         .info-card {
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 12px;
+            background: var(--bg-hover); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 12px;
         }
-
-        .info-label {
-            font-size: 10px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-
-        .info-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
+        .info-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .info-value { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; }
         .info-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid var(--border);
         }
-
         .info-row:last-child { border-bottom: none; }
-
-        .info-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 16px;
-        }
-
+        .info-actions { display: flex; gap: 10px; margin-top: 16px; }
         /* CONFIG */
-        .config-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
+        .config-grid { display: flex; flex-direction: column; gap: 16px; }
         .config-section {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 14px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 14px;
         }
-
         .config-section-title {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            font-size: 13px; font-weight: 600; margin-bottom: 12px;
+            display: flex; align-items: center; gap: 6px;
         }
-
         .toggle-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid var(--border);
         }
-
         .toggle-row:last-child { border-bottom: none; }
-
-        .toggle-label {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            flex: 1;
-        }
-
+        .toggle-label { display: flex; flex-direction: column; gap: 3px; flex: 1; }
         .toggle-title { font-size: 12px; font-weight: 500; }
         .toggle-desc { font-size: 10px; color: var(--text-muted); }
-
         .toggle {
-            width: 48px;
-            height: 26px;
-            background: var(--bg-hover);
-            border-radius: 13px;
-            position: relative;
-            cursor: pointer;
-            flex-shrink: 0;
-            margin-left: 10px;
+            width: 48px; height: 26px; background: var(--bg-hover); border-radius: 13px;
+            position: relative; cursor: pointer; flex-shrink: 0; margin-left: 10px;
         }
-
         .toggle.active { background: var(--success); }
-
         .toggle::after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            top: 3px;
-            left: 3px;
+            content: ''; position: absolute; width: 20px; height: 20px;
+            background: white; border-radius: 50%; top: 3px; left: 3px;
             transition: transform 0.2s;
         }
-
         .toggle.active::after { transform: translateX(22px); }
-
         .form-group { margin-bottom: 12px; }
         .form-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
         .form-input {
-            width: 100%;
-            padding: 10px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 13px;
+            width: 100%; padding: 10px; background: var(--bg-hover);
+            border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text); font-size: 13px;
         }
-
         /* FLOATING BUTTON */
         .fab {
-            position: fixed;
-            bottom: calc(90px + var(--safe-bottom));
-            right: 16px;
-            width: 56px;
-            height: 56px;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
-            z-index: 90;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: fixed; bottom: calc(90px + var(--safe-bottom)); right: 16px;
+            width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border: none; border-radius: 50%; color: white; font-size: 24px;
+            cursor: pointer; box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+            z-index: 90; display: flex; align-items: center; justify-content: center;
         }
-
         /* BOTTOM NAV */
         .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: calc(70px + var(--safe-bottom));
-            background: var(--bg-card);
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: space-around;
-            align-items: flex-start;
-            padding-top: 8px;
-            z-index: 100;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: calc(70px + var(--safe-bottom)); background: var(--bg-card);
+            border-top: 1px solid var(--border); display: flex; justify-content: space-around;
+            align-items: flex-start; padding-top: 8px; z-index: 100;
         }
-
         .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            padding: 8px 12px;
-            color: var(--text-muted);
-            cursor: pointer;
-            flex: 1;
+            display: flex; flex-direction: column; align-items: center;
+            gap: 4px; padding: 8px 12px; color: var(--text-muted);
+            cursor: pointer; flex: 1;
         }
-
         .nav-item.active { color: var(--accent); }
         .nav-icon { font-size: 20px; }
         .nav-label { font-size: 10px; font-weight: 500; }
-
-        /* BUY/SELL MODALS */
+        /* MODALS */
         .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 300;
-            align-items: flex-end;
-            justify-content: center;
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85); z-index: 300;
+            align-items: flex-end; justify-content: center;
         }
-
         .modal.active { display: flex; }
-
         .modal-content {
-            background: var(--bg-card);
-            border-radius: var(--radius) var(--radius) 0 0;
-            width: 100%;
-            max-height: 85vh;
-            overflow-y: auto;
+            background: var(--bg-card); border-radius: var(--radius) var(--radius) 0 0;
+            width: 100%; max-height: 85vh; overflow-y: auto;
             padding: 20px 16px calc(20px + var(--safe-bottom));
             animation: slideUp 0.3s ease;
         }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
         }
-
         .modal-title { font-size: 16px; font-weight: 700; }
-
         .modal-close {
-            width: 36px;
-            height: 36px;
-            background: var(--bg-hover);
-            border: none;
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 20px;
-            cursor: pointer;
+            width: 36px; height: 36px; background: var(--bg-hover); border: none;
+            border-radius: 8px; color: var(--text); font-size: 20px; cursor: pointer;
         }
-
         .quick-amounts {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-            margin-top: 6px;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px;
         }
-
         .quick-btn {
-            padding: 8px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-muted);
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: center;
-            min-height: 40px;
+            padding: 8px; background: var(--bg-hover); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text-muted); font-size: 11px;
+            font-weight: 600; cursor: pointer; text-align: center; min-height: 40px;
         }
-
-        .quick-btn.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-
+        .quick-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
         /* LOADING */
         .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            color: var(--text-muted);
-            gap: 10px;
+            display: flex; align-items: center; justify-content: center;
+            padding: 40px; color: var(--text-muted); gap: 10px;
         }
-
         .spinner {
-            width: 24px;
-            height: 24px;
-            border: 3px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
+            width: 24px; height: 24px; border: 3px solid var(--border);
+            border-top-color: var(--accent); border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
+        @keyframes spin { to { transform: rotate(360deg); } }
         /* EMPTY */
-        .empty {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-muted);
-        }
-
+        .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
         .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
-
         /* TOAST */
         .toast-container {
-            position: fixed;
-            top: calc(20px + var(--safe-top));
-            right: 16px;
-            z-index: 400;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+            position: fixed; top: calc(20px + var(--safe-top)); right: 16px;
+            z-index: 400; display: flex; flex-direction: column; gap: 8px;
         }
-
         .toast {
-            padding: 12px 16px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 13px;
-            animation: slideIn 0.3s ease;
-            min-width: 280px;
+            padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text); font-size: 13px;
+            animation: slideIn 0.3s ease; min-width: 280px;
         }
-
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
-
         /* RESPONSIVE */
         @media (min-width: 768px) {
             .stats-grid { grid-template-columns: repeat(4, 1fr); }
@@ -729,7 +301,6 @@
                 <span id="statusText">LIVE</span>
             </div>
         </div>
-        
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">Portfolio</div>
@@ -815,7 +386,6 @@
                     <input type="number" class="form-input" id="tpHysteresis" value="5" min="0" max="50">
                 </div>
             </div>
-
             <div class="config-section">
                 <div class="config-section-title">🛡 Stop-Loss</div>
                 <div class="toggle-row">
@@ -835,7 +405,6 @@
                     </select>
                 </div>
             </div>
-
             <div class="config-section">
                 <div class="config-section-title">📉 Trailing Stop</div>
                 <div class="toggle-row">
@@ -854,7 +423,6 @@
                     </select>
                 </div>
             </div>
-
             <div class="config-section">
                 <div class="config-section-title">🚨 Anti-Rug</div>
                 <div class="toggle-row">
@@ -873,7 +441,6 @@
                     </select>
                 </div>
             </div>
-
             <div class="config-section">
                 <div class="config-section-title">⚙ Général</div>
                 <div class="form-group">
@@ -894,7 +461,6 @@
                 </div>
             </div>
         </div>
-
         <button class="btn btn-primary" onclick="saveConfig()" style="width: 100%; padding: 14px; margin-top: 16px; min-height: 48px;">
             ▸ SAUVEGARDER LA CONFIG ◂
         </button>
@@ -919,7 +485,7 @@
         </div>
     </nav>
 
-    <!-- TOKEN DETAIL MODAL - 50% CHART + 50% INFO -->
+    <!-- TOKEN DETAIL MODAL - 50% TRADINGVIEW CHART + 50% INFO -->
     <div class="token-modal" id="tokenModal">
         <div class="token-modal-header">
             <div class="token-modal-title">
@@ -932,12 +498,12 @@
             <button class="token-modal-close" onclick="closeTokenModal()">×</button>
         </div>
         
-        <!-- CHART - 50% SCREEN -->
+        <!-- CHART SECTION - 50% SCREEN - TRADINGVIEW WIDGET -->
         <div class="token-modal-chart">
-            <iframe id="chartFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+            <div id="tradingview_widget"></div>
         </div>
         
-        <!-- INFO - 50% SCREEN -->
+        <!-- INFO SECTION - 50% SCREEN -->
         <div class="token-modal-info">
             <div class="info-grid">
                 <div class="info-card">
@@ -957,7 +523,6 @@
                     <div class="info-value" id="infoBalance">0</div>
                 </div>
             </div>
-            
             <div class="info-row">
                 <div class="info-label">Liquidité</div>
                 <div class="info-value" id="infoLiq">$0k</div>
@@ -986,7 +551,6 @@
                 <div class="info-label">Sells 24h</div>
                 <div class="info-value" id="infoSells">0</div>
             </div>
-            
             <div class="info-actions">
                 <button class="btn btn-buy" id="modalBuyBtn">▲ Acheter</button>
                 <button class="btn btn-sell" id="modalSellBtn">▼ Vendre</button>
@@ -1001,12 +565,10 @@
                 <div class="modal-title">▲ ACHETER</div>
                 <button class="modal-close" onclick="closeBuyModal()">×</button>
             </div>
-            
             <div class="form-group">
                 <label class="form-label">Token Address</label>
                 <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse complète">
             </div>
-            
             <div class="form-group">
                 <label class="form-label">Montant (SOL)</label>
                 <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01">
@@ -1017,7 +579,6 @@
                     <div class="quick-btn" onclick="setMaxBuy()">MAX</div>
                 </div>
             </div>
-            
             <div class="form-group">
                 <label class="form-label">Slippage</label>
                 <select class="form-input" id="buySlippage">
@@ -1026,7 +587,6 @@
                     <option value="500">5%</option>
                 </select>
             </div>
-            
             <button class="btn btn-buy" onclick="executeBuy()" style="width: 100%; padding: 14px; min-height: 48px;">
                 CONFIRMER L'ACHAT
             </button>
@@ -1040,17 +600,14 @@
                 <div class="modal-title">▼ VENDRE</div>
                 <button class="modal-close" onclick="closeSellModal()">×</button>
             </div>
-            
             <div class="form-group">
                 <label class="form-label">Token</label>
                 <input type="text" class="form-input" id="sellTokenInfo" readonly style="background: var(--bg-hover);">
             </div>
-            
             <div class="form-group">
                 <label class="form-label">Balance</label>
                 <input type="text" class="form-input" id="sellBalance" readonly style="background: var(--bg-hover);">
             </div>
-            
             <div class="form-group">
                 <label class="form-label">À vendre</label>
                 <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001">
@@ -1061,7 +618,6 @@
                     <div class="quick-btn" onclick="setSellPercent(100)">100%</div>
                 </div>
             </div>
-            
             <button class="btn btn-sell" onclick="executeSell()" style="width: 100%; padding: 14px; min-height: 48px;">
                 CONFIRMER LA VENTE
             </button>
@@ -1071,12 +627,16 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- TradingView Widget Script -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
     <script>
         const API = window.location.origin;
         let portfolio = [];
         let configData = {};
         let currentToken = null;
         let solBalance = 0;
+        let tradingViewWidget = null;
 
         // INIT
         document.addEventListener('DOMContentLoaded', () => {
@@ -1093,15 +653,12 @@
                     fetch(`${API}/api/portfolio`),
                     fetch(`${API}/api/sol-balance`)
                 ]);
-                
                 const statsData = await statsRes.json();
                 portfolio = (await portfolioRes.json()).tokens || [];
                 const balanceData = await balanceRes.json();
                 solBalance = balanceData.balance || 0;
-                
                 document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
                 document.getElementById('tokenCount').textContent = statsData.tokens || 0;
-                
                 renderPortfolio(portfolio);
             } catch (err) {
                 console.error('Load error:', err);
@@ -1137,7 +694,6 @@
         // RENDER PORTFOLIO
         function renderPortfolio(tokens) {
             const list = document.getElementById('tokenList');
-            
             if (tokens.length === 0) {
                 list.innerHTML = `
                     <div class="empty">
@@ -1150,14 +706,12 @@
                 `;
                 return;
             }
-            
             list.innerHTML = tokens.map(token => {
                 const pnlClass = token.pnl >= 0 ? 'pos' : 'neg';
                 const pnlSign = token.pnl >= 0 ? '+' : '';
                 const logo = token.logo 
                     ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'" style="width:100%;height:100%;border-radius:10px;object-fit:cover;">`
                     : '🪙';
-                
                 return `
                     <div class="token-card" onclick="openTokenModal('${token.mintFull}', '${token.symbol || token.mint.slice(0, 8)}')">
                         <div class="token-header">
@@ -1197,13 +751,14 @@
             }).join('');
         }
 
-        // OPEN TOKEN MODAL - 50% CHART + 50% INFO
+        // OPEN TOKEN MODAL - TRADINGVIEW WIDGET
         function openTokenModal(mint, symbol) {
             currentToken = portfolio.find(t => t.mintFull === mint) || { mintFull: mint, symbol };
-            
             document.getElementById('modalName').textContent = symbol;
             document.getElementById('modalAddress').textContent = `${mint.slice(0, 6)}...${mint.slice(-4)}`;
-            document.getElementById('chartFrame').src = `https://dexscreener.com/solana/${mint}`;
+            
+            // Initialize TradingView Widget
+            initTradingViewWidget(mint);
             
             // Update info
             document.getElementById('infoPrice').textContent = `$${(currentToken.price || 0).toFixed(6)}`;
@@ -1220,21 +775,58 @@
             document.getElementById('infoSells').textContent = currentToken.sells24h || 0;
             
             // Setup action buttons
-            document.getElementById('modalBuyBtn').onclick = () => {
-                closeTokenModal();
-                openBuyModal(mint);
-            };
-            document.getElementById('modalSellBtn').onclick = () => {
-                closeTokenModal();
-                openSellModal(mint, symbol, currentToken.balance || 0);
-            };
+            document.getElementById('modalBuyBtn').onclick = () => { closeTokenModal(); openBuyModal(mint); };
+            document.getElementById('modalSellBtn').onclick = () => { closeTokenModal(); openSellModal(mint, symbol, currentToken.balance || 0); };
             
             document.getElementById('tokenModal').classList.add('active');
         }
 
+        // INIT TRADINGVIEW WIDGET
+        function initTradingViewWidget(mint) {
+            // Clear previous widget
+            document.getElementById('tradingview_widget').innerHTML = '';
+            
+            // Create TradingView widget
+            tradingViewWidget = new TradingView.widget({
+                "width": "100%",
+                "height": "100%",
+                "symbol": `BINANCE:${symbolToTradingView(mint)}`,
+                "interval": "15",
+                "timezone": "Europe/Paris",
+                "theme": "dark",
+                "style": "1",
+                "locale": "fr",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "allow_symbol_change": true,
+                "container_id": "tradingview_widget",
+                "hide_top_toolbar": false,
+                "save_image": false,
+                "calendar": false,
+                "hide_volume": false,
+                "support_host": "https://www.tradingview.com"
+            });
+        }
+
+        // CONVERT TOKEN SYMBOL TO TRADINGVIEW FORMAT
+        function symbolToTradingView(mint) {
+            // For Solana tokens, we need to find the trading pair
+            // This is a simplified version - you may need to adjust based on available pairs
+            const knownPairs = {
+                'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDCUSD',
+                'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'USDTUSD',
+                'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'BONKUSD',
+                '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs': 'ETHUSD',
+                'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': 'MSOLUSD',
+            };
+            return knownPairs[mint] || 'SOLUSD'; // Default to SOL/USD
+        }
+
         function closeTokenModal() {
             document.getElementById('tokenModal').classList.remove('active');
-            document.getElementById('chartFrame').src = '';
+            // Clear widget to save resources
+            document.getElementById('tradingview_widget').innerHTML = '';
+            tradingViewWidget = null;
         }
 
         // TAB SWITCHING
@@ -1242,13 +834,9 @@
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
             document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-            
             event.currentTarget.classList.add('active');
             document.getElementById(tabName).classList.add('active');
-            
-            if (tabName === 'analytics') {
-                loadAnalytics();
-            }
+            if (tabName === 'analytics') { loadAnalytics(); }
         }
 
         // CONFIG TOGGLES
@@ -1272,13 +860,11 @@
                     minSolReserve: parseFloat(document.getElementById('minSolReserve').value),
                     intervalSec: parseInt(document.getElementById('intervalSec').value),
                 };
-                
                 const res = await fetch(`${API}/api/config`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config),
                 });
-                
                 if (res.ok) {
                     showToast('✅ Configuration sauvegardée', 'success');
                     loadConfig();
@@ -1296,16 +882,8 @@
             document.getElementById('buyAmount').value = '';
             document.getElementById('buyModal').classList.add('active');
         }
-
-        function closeBuyModal() {
-            document.getElementById('buyModal').classList.remove('active');
-        }
-
-        function setBuyAmount(amount) {
-            document.getElementById('buyAmount').value = amount;
-            updateQuickBtns('buy', amount);
-        }
-
+        function closeBuyModal() { document.getElementById('buyModal').classList.remove('active'); }
+        function setBuyAmount(amount) { document.getElementById('buyAmount').value = amount; updateQuickBtns('buy', amount); }
         async function setMaxBuy() {
             if (solBalance > 0) {
                 const max = Math.max(0, solBalance - 0.05);
@@ -1313,42 +891,31 @@
                 updateQuickBtns('buy', max);
             }
         }
-
         function updateQuickBtns(type, value) {
             const modalId = type === 'buy' ? 'buyModal' : 'sellModal';
             document.querySelectorAll(`#${modalId} .quick-btn`).forEach(btn => {
                 btn.classList.remove('active');
-                if (btn.textContent === value.toString() || 
-                    (btn.textContent === 'MAX' && value >= solBalance - 0.05)) {
+                if (btn.textContent === value.toString() || (btn.textContent === 'MAX' && value >= solBalance - 0.05)) {
                     btn.classList.add('active');
                 }
             });
         }
-
         async function executeBuy() {
             const mint = document.getElementById('buyTokenAddress').value.trim();
             const amount = parseFloat(document.getElementById('buyAmount').value);
             const slippage = parseInt(document.getElementById('buySlippage').value);
-            
-            if (!mint || !amount) {
-                showToast('❌ Veuillez remplir tous les champs', 'error');
-                return;
-            }
-            
+            if (!mint || !amount) { showToast('❌ Veuillez remplir tous les champs', 'error'); return; }
             const btn = event.currentTarget;
             const originalText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px;display:inline-block"></div> En cours...';
-            
             try {
                 const res = await fetch(`${API}/api/buy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ mint, solAmount: amount, slippageBps: slippage }),
                 });
-                
                 const result = await res.json();
-                
                 if (result.success) {
                     showToast(`✅ Achat réussi ! ${result.outAmount?.toFixed(4)} tokens`, 'success');
                     closeBuyModal();
@@ -1371,42 +938,28 @@
             document.getElementById('sellModal').dataset.mint = mint;
             document.getElementById('sellModal').classList.add('active');
         }
-
-        function closeSellModal() {
-            document.getElementById('sellModal').classList.remove('active');
-        }
-
+        function closeSellModal() { document.getElementById('sellModal').classList.remove('active'); }
         function setSellPercent(percent) {
             const balance = parseFloat(document.getElementById('sellBalance').value);
-            const amount = (balance * percent / 100).toFixed(4);
-            document.getElementById('sellAmount').value = amount;
+            document.getElementById('sellAmount').value = (balance * percent / 100).toFixed(4);
             updateQuickBtns('sell', percent);
         }
-
         async function executeSell() {
             const mint = document.getElementById('sellModal').dataset.mint;
             const amount = parseFloat(document.getElementById('sellAmount').value);
             const slippage = 500;
-            
-            if (!mint || !amount) {
-                showToast('❌ Veuillez entrer un montant valide', 'error');
-                return;
-            }
-            
+            if (!mint || !amount) { showToast('❌ Veuillez entrer un montant valide', 'error'); return; }
             const btn = event.currentTarget;
             const originalText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px;display:inline-block"></div> En cours...';
-            
             try {
                 const res = await fetch(`${API}/api/sell`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ mint, amount, slippageBps: slippage, reason: 'MANUAL' }),
                 });
-                
                 const result = await res.json();
-                
                 if (result.success) {
                     showToast(`✅ Vente réussie ! ${result.solOut?.toFixed(6)} SOL reçus`, 'success');
                     closeSellModal();
@@ -1429,33 +982,22 @@
                     fetch(`${API}/api/analytics`),
                     fetch(`${API}/api/trades`)
                 ]);
-                
                 const analytics = await analyticsRes.json();
                 const trades = await tradesRes.json();
-                
                 document.getElementById('realizedPnl').textContent = `${analytics.realizedPnlSol || 0} ◎`;
                 document.getElementById('analyticsWinRate').textContent = `${analytics.winRate || 0}%`;
                 document.getElementById('totalTrades').textContent = analytics.totalTrades || 0;
                 document.getElementById('roi').textContent = `${analytics.roi || 0}%`;
-                
                 const recentTrades = trades.trades?.slice(0, 10) || [];
                 const container = document.getElementById('recentTrades');
-                
                 if (recentTrades.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty">
-                            <div class="empty-icon">📊</div>
-                            <div>Aucun trade récent</div>
-                        </div>
-                    `;
+                    container.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div>Aucun trade récent</div></div>`;
                     return;
                 }
-                
                 container.innerHTML = recentTrades.map(trade => {
                     const pnlClass = trade.pnlPct >= 0 ? 'pos' : 'neg';
                     const pnlSign = trade.pnlPct >= 0 ? '+' : '';
                     const date = new Date(trade.ts).toLocaleString('fr-FR');
-                    
                     return `
                         <div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
                             <div>
@@ -1480,9 +1022,7 @@
             toast.className = 'toast';
             toast.style.borderColor = type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--border)';
             toast.textContent = message;
-            
             container.appendChild(toast);
-            
             setTimeout(() => {
                 toast.style.animation = 'slideIn 0.3s ease reverse';
                 setTimeout(() => toast.remove(), 300);
@@ -1492,9 +1032,7 @@
         // CLOSE MODALS ON OUTSIDE CLICK
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                }
+                if (e.target === modal) { modal.classList.remove('active'); }
             });
         });
     </script>
