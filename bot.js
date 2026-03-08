@@ -166,6 +166,10 @@ const CFG = {
   SMART_SIZE_MULT:    parseFloat(process.env.SMART_SIZE_MULT  || '2.0'),
   SMART_SIZE_MIN:     parseFloat(process.env.SMART_SIZE_MIN   || '0.02'),
   SMART_SIZE_MAX:     parseFloat(process.env.SMART_SIZE_MAX   || '0.5'),
+
+  // ── §NEW  Sortie USDC (sell → USDC au lieu de SOL) ────────────────────────
+  // Mettre SELL_TO_USDC=true dans les env vars Render pour activer
+  SELL_TO_USDC: process.env.SELL_TO_USDC === 'true',
 };
 
 if (!CFG.PRIVATE_KEY) { console.error('❌ PRIVATE_KEY manquante'); process.exit(1); }
@@ -185,6 +189,7 @@ const fs      = require('fs');
 const fetch   = (...a) => import('node-fetch').then(({ default: f }) => f(...a));
 
 const SOL_MINT   = 'So11111111111111111111111111111111111111112';
+const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SPL_TOKEN  = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const SPL_2022   = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 const JITO_TIP_WALLET = 'Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY';
@@ -1497,15 +1502,45 @@ class SwapEngine {
     }
     const release = await this.mutex.lock();
     try {
-      const dec = await getDecimals(mint, this.rpc.conn);
-      const raw = BigInt(Math.floor(amount * 10 ** dec));
+      const dec      = await getDecimals(mint, this.rpc.conn);
+      const raw      = BigInt(Math.floor(amount * 10 ** dec));
+      const outMint  = CFG.SELL_TO_USDC ? USDC_MINT : SOL_MINT;
+
       const res = useJito
-        ? await this._buildAndSendJito({ inputMint: mint, outputMint: SOL_MINT, amountRaw: raw, slippageBps })
-        : await this._buildAndSendTx({ inputMint: mint, outputMint: SOL_MINT, amountRaw: raw, slippageBps, priorityMode: 'high' });
-      const solOut = Number(res.quote.outAmount) / 1e9;
-      this.sellFailures = 0;
-      log('success', '✅ Vente confirmée', { mint: mint.slice(0, 8), solOut: solOut.toFixed(6), reason, sig: res.sig });
-      return { success: true, sig: res.sig, txUrl: res.txUrl, solOut, amountSold: amount };
+        ? await this._buildAndSendJito({ inputMint: mint, outputMint: outMint, amountRaw: raw, slippageBps })
+        : await this._buildAndSendTx({ inputMint: mint, outputMint: outMint, amountRaw: raw, slippageBps, priorityMode: 'high' });
+
+      let solOut;
+      let usdcOut = null;
+
+      if (CFG.SELL_TO_USDC) {
+        // USDC a 6 décimales
+        usdcOut = Number(res.quote.outAmount) / 1e6;
+        // Convertir USDC → SOL équivalent pour PnL (coût en SOL)
+        // On utilise le prix SOL en cache, ou on estime depuis le prix du token
+        const solPriceUSD = getPrice(SOL_MINT)?.price || getPrice('SOL')?.price || null;
+        if (solPriceUSD && solPriceUSD > 0) {
+          solOut = usdcOut / solPriceUSD;
+        } else {
+          // Fallback : utiliser le prix du token pour estimer la valeur SOL
+          const tokenPriceUSD = getPrice(mint)?.price || 0;
+          const tokenValueUSD = amount * tokenPriceUSD;
+          // Estimer SOL à ~150 USD si pas disponible
+          solOut = tokenValueUSD > 0 ? tokenValueUSD / 150 : usdcOut / 150;
+          log('warn', '⚠️ Prix SOL indisponible, estimation PnL approximative', { solOut: solOut.toFixed(6) });
+        }
+        this.sellFailures = 0;
+        log('success', '✅ Vente USDC confirmée', {
+          mint: mint.slice(0, 8), usdcOut: usdcOut.toFixed(4),
+          solEquiv: solOut.toFixed(6), reason, sig: res.sig,
+        });
+      } else {
+        solOut = Number(res.quote.outAmount) / 1e9;
+        this.sellFailures = 0;
+        log('success', '✅ Vente SOL confirmée', { mint: mint.slice(0, 8), solOut: solOut.toFixed(6), reason, sig: res.sig });
+      }
+
+      return { success: true, sig: res.sig, txUrl: res.txUrl, solOut, usdcOut, amountSold: amount };
     } catch (err) {
       this.sellFailures++;
       log('error', '❌ Vente échouée', { err: err.message, failures: this.sellFailures, reason });
@@ -1516,6 +1551,18 @@ class SwapEngine {
   async getSolBalance() {
     try { return await this.rpc.conn.getBalance(this.wallet.publicKey) / 1e9; }
     catch { return null; }
+  }
+
+  async getUsdcBalance() {
+    try {
+      const accounts = await this.rpc.conn.getParsedTokenAccountsByOwner(
+        this.wallet.publicKey,
+        { mint: new PublicKey(USDC_MINT) }
+      );
+      if (!accounts.value.length) return 0;
+      const info = accounts.value[0].account.data.parsed.info;
+      return parseFloat(info.tokenAmount.uiAmount ?? '0');
+    } catch { return null; }
   }
 }
 
@@ -2091,6 +2138,62 @@ class BotLoop {
       }
 
       this.portfolio = tokens.sort((a, b) => b.value - a.value);
+
+      // ── Ajouter SOL natif au portfolio ────────────────────────────────────
+      try {
+        const solBal = await this.swap.getSolBalance();
+        if (solBal !== null && solBal > 0) {
+          // Chercher le prix SOL depuis DexScreener via priceCache
+          await prefetchPrices([SOL_MINT]);
+          const solPd    = getPrice(SOL_MINT);
+          const solPrice = solPd?.price || null;
+          tokens.push({
+            mint:         SOL_MINT.slice(0, 8) + '…' + SOL_MINT.slice(-4),
+            mintFull:     SOL_MINT,
+            balance:      parseFloat(solBal.toFixed(6)),
+            price:        solPrice,
+            value:        solPrice ? parseFloat((solBal * solPrice).toFixed(4)) : null,
+            liquidity:    solPd?.liquidity  || 0,
+            volume24h:    solPd?.volume24h  || 0,
+            symbol:       'SOL',
+            name:         'Solana',
+            logo:         'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png',
+            pnl:          null,
+            peakPnl:      null,
+            entryPrice:   null,
+            bootstrapped: false,
+            isSol:        true,
+            score:        null,
+          });
+        }
+      } catch (err) { log('warn', 'SOL portfolio entry failed', { err: err.message }); }
+
+      // ── Ajouter USDC au portfolio si solde > 0 ────────────────────────────
+      try {
+        const usdcBal = await this.swap.getUsdcBalance();
+        if (usdcBal !== null && usdcBal > 0.01) {
+          tokens.push({
+            mint:         USDC_MINT.slice(0, 8) + '…' + USDC_MINT.slice(-4),
+            mintFull:     USDC_MINT,
+            balance:      parseFloat(usdcBal.toFixed(4)),
+            price:        1.0,
+            value:        parseFloat(usdcBal.toFixed(4)),
+            liquidity:    0,
+            volume24h:    0,
+            symbol:       'USDC',
+            name:         'USD Coin',
+            logo:         'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png',
+            pnl:          null,
+            peakPnl:      null,
+            entryPrice:   null,
+            bootstrapped: false,
+            isUsdc:       true,
+            score:        null,
+          });
+        }
+      } catch (err) { log('warn', 'USDC portfolio entry failed', { err: err.message }); }
+
+      this.portfolio = tokens.sort((a, b) => (b.value || 0) - (a.value || 0));
       const tv = tokens.reduce((s, t) => s + t.value, 0);
 
       // ── §NEW  Re-entry sur tokens stoppés ─────────────────────────────────
@@ -2268,8 +2371,16 @@ function startApi(bot, wallet) {
   app.get('/api/analytics',   (_, res) => res.json(bot.analytics.toApi(bot.history)));
 
   app.get('/api/sol-balance', async (_, res) => {
-    const bal = await bot.swap.getSolBalance();
-    res.json({ balance: bal, formatted: bal != null ? bal.toFixed(6) + ' SOL' : null });
+    const [sol, usdc] = await Promise.all([
+      bot.swap.getSolBalance(),
+      bot.swap.getUsdcBalance(),
+    ]);
+    res.json({
+      balance:   sol,
+      formatted: sol != null ? sol.toFixed(6) + ' SOL' : null,
+      usdc:      usdc,
+      sellToUsdc: CFG.SELL_TO_USDC,
+    });
   });
 
   // ─── §14.3 · Config ──────────────────────────────────────────────────────
@@ -2308,6 +2419,8 @@ function startApi(bot, wallet) {
     reentryMinGain: CFG.REENTRY_MIN_GAIN,
     smartSizeEnabled: CFG.SMART_SIZE_ENABLED, smartSizeBase: CFG.SMART_SIZE_BASE,
     smartSizeMult: CFG.SMART_SIZE_MULT, smartSizeMin: CFG.SMART_SIZE_MIN, smartSizeMax: CFG.SMART_SIZE_MAX,
+    // §NEW — Sortie USDC
+    sellToUsdc: CFG.SELL_TO_USDC,
   }));
 
   app.post('/api/config', (req, res) => {
@@ -2386,6 +2499,9 @@ function startApi(bot, wallet) {
     applyNum('smartSizeMult', 1,      5, n => CFG.SMART_SIZE_MULT = n);
     applyNum('smartSizeMin',  0.001, 10, n => CFG.SMART_SIZE_MIN  = n);
     applyNum('smartSizeMax',  0.001, 10, n => CFG.SMART_SIZE_MAX  = n);
+
+    // §NEW — Sortie USDC
+    if (b.sellToUsdc !== undefined) CFG.SELL_TO_USDC = !!b.sellToUsdc;
 
     log('info', 'Config mise à jour');
     res.json({ success: true });
@@ -2825,3 +2941,4 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
+
