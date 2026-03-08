@@ -1,1007 +1,799 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0a0e1a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>SolBot Pro v5.0</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        :root {
-            --bg: #0a0e1a; --bg-card: #151a28; --bg-hover: #1e2538;
-            --border: #2a3550; --text: #ffffff; --text-muted: #6b7a99;
-            --accent: #3b82f6; --success: #10b981; --danger: #ef4444;
-            --warning: #f59e0b; --radius: 12px;
-            --safe-top: env(safe-area-inset-top);
-            --safe-bottom: env(safe-area-inset-bottom);
-        }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg); color: var(--text);
-            min-height: 100vh; padding-top: var(--safe-top);
-            padding-bottom: calc(80px + var(--safe-bottom));
-        }
-        .header {
-            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg) 100%);
-            border-bottom: 1px solid var(--border);
-            padding: calc(12px + var(--safe-top)) 16px 12px;
-            position: sticky; top: 0; z-index: 100;
-        }
-        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-        .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; }
-        .status {
-            display: flex; align-items: center; gap: 6px; padding: 4px 10px;
-            background: rgba(16, 185, 129, 0.15); border: 1px solid var(--success);
-            border-radius: 12px; font-size: 11px; font-weight: 600; color: var(--success);
-        }
-        .status-dot {
-            width: 6px; height: 6px; background: var(--success); border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
-        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
-        .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
-        .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; }
-        .stat-value.pos { color: var(--success); }
-        .stat-value.neg { color: var(--danger); }
-        .tabs { display: flex; gap: 6px; padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .tabs::-webkit-scrollbar { display: none; }
-        .tab {
-            flex: 1; min-width: 70px; padding: 10px 12px; background: var(--bg-card);
-            border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted);
-            font-size: 11px; font-weight: 500; cursor: pointer; text-align: center; white-space: nowrap;
-        }
-        .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .section { display: none; padding: 0 16px; }
-        .section.active { display: block; }
-        .token-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px; }
-        .token-card {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 12px; cursor: pointer;
-        }
-        .token-card:active { transform: scale(0.98); }
-        .token-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .token-info { display: flex; align-items: center; gap: 10px; flex: 1; }
-        .token-logo {
-            width: 40px; height: 40px; border-radius: 10px; background: var(--bg-hover);
-            display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
-        }
-        .token-details { flex: 1; }
-        .token-symbol { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
-        .token-address { font-size: 10px; color: var(--text-muted); font-family: monospace; }
-        .token-price { text-align: right; }
-        .price-value { font-family: monospace; font-weight: 600; font-size: 14px; }
-        .price-change { font-family: monospace; font-size: 11px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; }
-        .price-change.pos { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-        .price-change.neg { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
-        .token-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
-        .token-stat { text-align: center; }
-        .token-stat-label { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
-        .token-stat-value { font-family: monospace; font-weight: 600; font-size: 12px; }
-        .token-actions { display: flex; gap: 6px; margin-top: 10px; }
-        .btn { flex: 1; padding: 8px; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
-        .btn:active { transform: scale(0.95); }
-        .btn-buy { background: var(--success); color: white; }
-        .btn-sell { background: var(--danger); color: white; }
-        .btn-chart { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-secondary { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
-        .fab {
-            position: fixed; bottom: calc(90px + var(--safe-bottom)); right: 16px;
-            width: 56px; height: 56px; background: var(--accent); border: none;
-            border-radius: 50%; color: white; font-size: 24px; cursor: pointer;
-            box-shadow: 0 4px 20px rgba(47, 129, 247, 0.4); z-index: 90;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0; height: calc(70px + var(--safe-bottom));
-            background: var(--bg-card); border-top: 1px solid var(--border);
-            display: flex; justify-content: space-around; align-items: center; z-index: 100;
-        }
-        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 12px; color: var(--text-muted); cursor: pointer; flex: 1; }
-        .nav-item.active { color: var(--accent); }
-        .nav-icon { font-size: 20px; }
-        .nav-label { font-size: 10px; font-weight: 500; }
-        .modal {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.85); z-index: 200;
-            align-items: flex-end; justify-content: center;
-        }
-        .modal.active { display: flex; }
-        .modal-content {
-            background: var(--bg-card); border-radius: 10px 10px 0 0;
-            width: 100%; max-height: 85vh; overflow-y: auto;
-            padding: 20px 16px calc(20px + var(--safe-bottom));
-            animation: slideUp 0.3s ease;
-        }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-        .modal-title { font-size: 16px; font-weight: 700; }
-        .modal-close { width: 36px; height: 36px; background: var(--bg-hover); border: none; border-radius: 8px; color: var(--text); font-size: 20px; cursor: pointer; }
-        .form-group { margin-bottom: 16px; }
-        .form-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
-        .form-input { width: 100%; padding: 10px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
-        .form-input:focus { outline: none; border-color: var(--accent); }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .quick-amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
-        .quick-btn { padding: 8px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; }
-        .quick-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .config-grid { display: flex; flex-direction: column; gap: 16px; }
-        .config-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
-        .config-section-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
-        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
-        .toggle-row:last-child { border-bottom: none; }
-        .toggle-label { display: flex; flex-direction: column; gap: 3px; flex: 1; }
-        .toggle-title { font-size: 12px; font-weight: 500; }
-        .toggle-desc { font-size: 10px; color: var(--text-muted); }
-        .toggle { width: 48px; height: 26px; background: var(--bg-hover); border-radius: 13px; position: relative; cursor: pointer; flex-shrink: 0; margin-left: 10px; }
-        .toggle.active { background: var(--success); }
-        .toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s; }
-        .toggle.active::after { transform: translateX(22px); }
-        .loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--text-muted); gap: 10px; }
-        .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
-        .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
-        .toast-container { position: fixed; top: calc(20px + var(--safe-top)); right: 16px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
-        .toast { padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; animation: slideIn 0.3s ease; min-width: 280px; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .api-status { background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 10px; font-size: 11px; }
-        
-        /* 📊 TOKEN DETAIL MODAL WITH CHART */
-        .token-detail-modal .modal-content { max-width: 800px; }
-        .chart-container {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            margin-bottom: 16px;
-            height: 400px;
-            overflow: hidden;
-        }
-        .chart-container iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        .chart-timeframes {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
-        }
-        .chart-tf {
-            padding: 6px 12px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-        .chart-tf.active {
-            background: var(--accent);
-            border-color: var(--accent);
-        }
-        .token-info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-        .token-detail-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 16px;
-        }
-        
-        @media (min-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(4, 1fr); }
-            .token-stats { grid-template-columns: repeat(5, 1fr); }
-            .token-info-grid { grid-template-columns: repeat(4, 1fr); }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#060910">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SolBot Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#060910;--bg1:#0c1120;--bg2:#111827;--bg3:#1a2235;
+  --border:#1e2d47;--border2:#253550;
+  --text:#e8edf5;--dim:#4a5a78;--muted:#2a3a55;
+  --up:#00d97e;--dn:#ff3860;--gold:#f0b429;--blue:#3b82f6;--purple:#9945ff;
+  --safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);
+  --font:'Space Grotesk',sans-serif;--mono:'Space Mono',monospace;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--text);
+  display:flex;flex-direction:column;
+  padding-top:var(--safe-top);padding-bottom:var(--safe-bot);}
+
+/* ── TOPBAR ── */
+.topbar{
+  flex-shrink:0;
+  background:var(--bg1);border-bottom:1px solid var(--border);
+  padding:10px 14px;display:flex;align-items:center;gap:10px;
+  min-height:52px;
+}
+.logo{font-size:15px;font-weight:700;letter-spacing:.03em;white-space:nowrap}
+.logo span{color:var(--gold)}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--up);flex-shrink:0;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,217,126,.4)}50%{opacity:.7;box-shadow:0 0 0 4px rgba(0,217,126,0)}}
+.topbar-stats{display:flex;gap:10px;flex:1;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.ts{display:flex;flex-direction:column;align-items:flex-end;min-width:0}
+.ts-lbl{font-size:9px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.ts-val{font-family:var(--mono);font-size:13px;font-weight:700;white-space:nowrap}
+.ts-val.pos{color:var(--up)}.ts-val.neg{color:var(--dn)}.ts-val.gold{color:var(--gold)}
+.sep{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.btn-refresh{background:none;border:1px solid var(--border2);border-radius:6px;color:var(--dim);padding:5px 8px;font-size:14px;cursor:pointer;flex-shrink:0;transition:color .15s}
+.btn-refresh:active{color:var(--text);background:var(--bg3)}
+
+/* ── TABS ── */
+.tabs{flex-shrink:0;display:flex;background:var(--bg1);border-bottom:1px solid var(--border);overflow-x:auto}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:80px;padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:.04em;
+  color:var(--dim);text-align:center;cursor:pointer;border-bottom:2px solid transparent;
+  transition:color .15s,border-color .15s;white-space:nowrap;text-transform:uppercase}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow:hidden;position:relative}
+.section{display:none;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.section::-webkit-scrollbar{width:3px}.section::-webkit-scrollbar-thumb{background:var(--border2)}
+.section.active{display:block}
+
+/* ── PORTFOLIO FILTER BAR ── */
+.filter-bar{
+  padding:8px 14px;display:flex;align-items:center;gap:8px;
+  background:var(--bg1);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:10;
+}
+.filter-count{font-size:10px;color:var(--dim);font-family:var(--mono);flex:1}
+.btn-filter{background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+  color:var(--dim);font-size:10px;font-weight:600;padding:4px 9px;cursor:pointer;letter-spacing:.04em}
+.btn-filter.active-dead{color:var(--dn);border-color:rgba(255,56,96,.3)}
+
+/* ── TOKEN CARD ── */
+.tok-list{padding:10px 12px;display:flex;flex-direction:column;gap:8px;padding-bottom:20px}
+.tok-card{
+  background:var(--bg1);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;cursor:pointer;transition:border-color .15s;
+}
+.tok-card:active{border-color:var(--border2)}
+.tok-card.sol-card{border-left:3px solid var(--purple)}
+.tok-card.usdc-card{border-left:3px solid var(--blue)}
+.tok-card.dead-card{opacity:.45}
+.tok-top{display:flex;align-items:center;gap:10px;padding:11px 12px 9px}
+.tok-logo{width:38px;height:38px;border-radius:9px;background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;overflow:hidden}
+.tok-logo img{width:100%;height:100%;object-fit:cover;border-radius:9px}
+.tok-name{flex:1;min-width:0}
+.tok-sym{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tok-sym.sol-sym{color:var(--purple)}.tok-sym.usdc-sym{color:var(--blue)}
+.tok-addr{font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:2px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.badge{font-size:8px;font-weight:700;letter-spacing:.05em;padding:1px 5px;border-radius:3px}
+.badge-boot{background:rgba(240,180,41,.15);color:var(--gold);border:1px solid rgba(240,180,41,.3)}
+.badge-sl{background:rgba(255,56,96,.15);color:var(--dn);border:1px solid rgba(255,56,96,.3)}
+.badge-be{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.badge-sol{background:rgba(153,69,255,.15);color:var(--purple);border:1px solid rgba(153,69,255,.3)}
+.badge-usdc{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.tok-right{text-align:right;flex-shrink:0}
+.tok-val{font-family:var(--mono);font-size:14px;font-weight:700}
+.tok-pnl{font-family:var(--mono);font-size:11px;padding:2px 6px;border-radius:4px;margin-top:3px;display:inline-block;font-weight:600}
+.tok-pnl.pos{background:rgba(0,217,126,.12);color:var(--up)}
+.tok-pnl.neg{background:rgba(255,56,96,.12);color:var(--dn)}
+.tok-pnl.dim{background:var(--bg3);color:var(--dim)}
+.tok-bottom{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border)}
+.tok-stat{padding:7px 0;text-align:center;border-right:1px solid var(--border)}
+.tok-stat:last-child{border-right:none}
+.tok-stat-lbl{font-size:8px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.tok-stat-val{font-family:var(--mono);font-size:11px;font-weight:600}
+
+/* ── DEAD SEPARATOR ── */
+.dead-sep{padding:5px 12px;background:rgba(255,56,96,.05);border-top:1px solid rgba(255,56,96,.2);
+  font-size:9px;color:rgba(255,56,96,.5);letter-spacing:.07em;text-transform:uppercase;font-weight:600}
+
+/* ── TOKEN DETAIL ── */
+.detail-view{display:none;height:100%;flex-direction:column}
+.detail-view.open{display:flex}
+.detail-header{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:var(--bg1);border-bottom:1px solid var(--border)}
+.detail-back{background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;padding:0 2px;line-height:1}
+.detail-title{font-size:15px;font-weight:700;flex:1}
+.detail-addr{font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:2px}
+.detail-stats{flex-shrink:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+.detail-stat{background:var(--bg1);padding:9px 8px;text-align:center}
+.detail-stat-lbl{font-size:8px;color:var(--dim);letter-spacing:.05em;text-transform:uppercase;margin-bottom:3px}
+.detail-stat-val{font-family:var(--mono);font-size:12px;font-weight:700}
+.chart-wrap{flex:1;position:relative;background:#0a0e1a;overflow:hidden}
+.chart-spinner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--dim);font-size:11px}
+.spinner{width:22px;height:22px;border:2px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#chartFrame{width:100%;height:100%;border:none;position:relative;z-index:1}
+.detail-footer{flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px;
+  background:var(--bg1);border-top:1px solid var(--border)}
+.btn-dex{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+  color:var(--text);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.03em;text-decoration:none}
+.btn-dex:active{background:var(--bg3)}
+.btn-copy{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+  color:var(--text);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.03em}
+.btn-copy:active{background:var(--bg3)}
+
+/* ── ANALYTICS ── */
+.an-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:12px}
+.kpi{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:12px}
+.kpi-lbl{font-size:9px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
+.kpi-val{font-family:var(--mono);font-size:18px;font-weight:700}
+.kpi-val.pos{color:var(--up)}.kpi-val.neg{color:var(--dn)}.kpi-val.gold{color:var(--gold)}
+.trades-list{padding:0 12px 20px}
+.trade-card{background:var(--bg1);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.trade-left .trade-sym{font-size:13px;font-weight:600}
+.trade-left .trade-meta{font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:2px}
+.trade-right{text-align:right}
+.trade-pnl{font-family:var(--mono);font-size:13px;font-weight:700}
+.trade-sol{font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:2px}
+
+/* ── CONFIG ── */
+.cfg-list{padding:12px;display:flex;flex-direction:column;gap:8px;padding-bottom:24px}
+.cfg-section{background:var(--bg1);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.cfg-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border);color:var(--gold)}
+.cfg-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)}
+.cfg-row:last-child{border-bottom:none}
+.cfg-row-label{flex:1}
+.cfg-row-title{font-size:12px;font-weight:600}
+.cfg-row-desc{font-size:9px;color:var(--dim);margin-top:2px}
+.toggle{width:44px;height:24px;background:var(--bg3);border-radius:12px;position:relative;cursor:pointer;flex-shrink:0;margin-left:10px;transition:background .2s}
+.toggle.on{background:var(--up)}
+.toggle::after{content:'';position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:3px;left:3px;transition:transform .2s}
+.toggle.on::after{transform:translateX(20px)}
+.cfg-input-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px}
+.cfg-field label{font-size:9px;color:var(--dim);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:4px}
+.cfg-field input,.cfg-field select{width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border2);
+  border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono)}
+.cfg-field input:focus,.cfg-field select:focus{outline:none;border-color:var(--gold)}
+.save-bar{flex-shrink:0;padding:10px 12px;background:var(--bg1);border-top:1px solid var(--border);position:sticky;bottom:0}
+.btn-save{width:100%;padding:13px;background:var(--gold);color:#060910;font-weight:700;font-size:13px;
+  border:none;border-radius:9px;cursor:pointer;letter-spacing:.05em;transition:opacity .15s}
+.btn-save:active{opacity:.85}
+.save-status{text-align:center;font-size:10px;height:16px;margin-top:6px;font-family:var(--mono);color:var(--dim)}
+.save-status.ok{color:var(--up)}.save-status.err{color:var(--dn)}
+
+/* ── TOAST ── */
+.toast-wrap{position:fixed;top:calc(16px + var(--safe-top));right:12px;z-index:999;display:flex;flex-direction:column;gap:6px}
+.toast{padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+  font-size:12px;color:var(--text);animation:tst .25s ease;max-width:280px;line-height:1.4}
+.toast.ok{border-color:rgba(0,217,126,.4)}.toast.err{border-color:rgba(255,56,96,.4)}
+@keyframes tst{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
+
+/* ── EMPTY / LOADING ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;color:var(--dim);text-align:center;gap:10px}
+.empty-icon{font-size:40px;opacity:.35}
+.empty-txt{font-size:12px}
+.load-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;color:var(--dim);font-size:12px}
+</style>
 </head>
 <body>
-    <!-- HEADER -->
-    <header class="header">
-        <div class="header-top">
-            <div class="logo">
-                <span>⚡</span>
-                <span>SOLBOT PRO</span>
-                <span style="font-size: 10px; color: var(--text-muted);">v5.0</span>
-            </div>
-            <div class="status">
-                <div class="status-dot"></div>
-                <span>PRODUCTION LIVE</span>
-            </div>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Portfolio</div>
-                <div class="stat-value" id="totalValue">$0.00</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">PnL Net</div>
-                <div class="stat-value" id="pnlNet">0 ◎</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Win Rate</div>
-                <div class="stat-value" id="winRate">—</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Actifs</div>
-                <div class="stat-value" id="tokenCount">0</div>
-            </div>
-        </div>
-    </header>
 
-    <!-- TABS -->
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('portfolio')">◈ Portfolio</div>
-        <div class="tab" onclick="switchTab('analytics')">⌇ Analytics</div>
-        <div class="tab" onclick="switchTab('config')">⚙ Config</div>
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="pulse-dot"></div>
+  <div class="logo">SOL<span>BOT</span> <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:2px;">v5</span></div>
+  <div class="topbar-stats">
+    <div class="ts"><div class="ts-lbl">Portfolio</div><div class="ts-val gold" id="tvTotal">—</div></div>
+    <div class="sep"></div>
+    <div class="ts"><div class="ts-lbl">PnL net</div><div class="ts-val" id="tvPnl">—</div></div>
+    <div class="sep"></div>
+    <div class="ts"><div class="ts-lbl">Win%</div><div class="ts-val" id="tvWin">—</div></div>
+    <div class="sep"></div>
+    <button class="btn-refresh" onclick="hardRefresh()" title="Refresh">↺</button>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" id="tab-portfolio" onclick="switchTab('portfolio',this)">◈ Portfolio</div>
+  <div class="tab" id="tab-analytics"  onclick="switchTab('analytics',this)">⌇ Analytics</div>
+  <div class="tab" id="tab-config"     onclick="switchTab('config',this)">⚙ Config</div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- TOKEN DETAIL (overlay inside content) -->
+  <div class="detail-view" id="detailView">
+    <div class="detail-header">
+      <button class="detail-back" onclick="closeDetail()">‹</button>
+      <div>
+        <div class="detail-title" id="dtTitle">—</div>
+        <div class="detail-addr" id="dtAddr">—</div>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:9px;color:var(--dim)">Score</div>
+        <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--gold)" id="dtScore">—</div>
+      </div>
     </div>
-
-    <!-- PORTFOLIO SECTION -->
-    <section id="portfolio" class="section active">
-        <div class="token-list" id="tokenList">
-            <div class="loading">
-                <div class="spinner"></div>
-                <span>Chargement...</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- ANALYTICS SECTION -->
-    <section id="analytics" class="section">
-        <div class="stats-grid" style="margin-bottom: 16px;">
-            <div class="stat-card">
-                <div class="stat-label">PnL Réalisé</div>
-                <div class="stat-value" id="analyticsPnl">0 ◎</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Win Rate</div>
-                <div class="stat-value" id="analyticsWinRate">0%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Trades</div>
-                <div class="stat-value" id="analyticsTrades">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">ROI</div>
-                <div class="stat-value" id="analyticsRoi">0%</div>
-            </div>
-        </div>
-        <div class="config-section">
-            <div class="config-section-title">📊 Derniers Trades</div>
-            <div id="recentTrades">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <span>Chargement...</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- CONFIG SECTION -->
-    <section id="config" class="section">
-        <div class="config-grid">
-            <div class="config-section">
-                <div class="config-section-title">🎯 Take-Profit</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Vente auto à chaque palier</div>
-                    </div>
-                    <div class="toggle" id="toggle-tp" onclick="toggleConfig('takeProfitEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Hysteresis (%)</label>
-                    <input type="number" class="form-input" id="tpHysteresis" value="5" min="0" max="50">
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">🛡 Stop-Loss</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Vente forcée sous le seuil</div>
-                    </div>
-                    <div class="toggle" id="toggle-sl" onclick="toggleConfig('stopLossEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Seuil (%)</label>
-                    <select class="form-input" id="slPct">
-                        <option value="-25">-25%</option>
-                        <option value="-40">-40%</option>
-                        <option value="-50" selected>-50%</option>
-                        <option value="-70">-70%</option>
-                    </select>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">📉 Trailing Stop</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Suit le peak, vend si recul</div>
-                    </div>
-                    <div class="toggle" id="toggle-ts" onclick="toggleConfig('trailingEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Recul max (%)</label>
-                    <select class="form-input" id="tsPct">
-                        <option value="10">10%</option>
-                        <option value="20" selected>20%</option>
-                        <option value="30">30%</option>
-                    </select>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">🚨 Anti-Rug</div>
-                <div class="toggle-row">
-                    <div class="toggle-label">
-                        <div class="toggle-title">Actif</div>
-                        <div class="toggle-desc">Urgence si chute brutale</div>
-                    </div>
-                    <div class="toggle" id="toggle-ar" onclick="toggleConfig('antiRugEnabled')"></div>
-                </div>
-                <div class="form-group" style="margin-top: 12px;">
-                    <label class="form-label">Chute (% / cycle)</label>
-                    <select class="form-input" id="arPct">
-                        <option value="40">40%</option>
-                        <option value="60" selected>60%</option>
-                        <option value="80">80%</option>
-                    </select>
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">⚙ Général</div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Slippage (bps)</label>
-                        <input type="number" class="form-input" id="defaultSlippage" value="500" min="10" max="5000">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Réserve SOL min</label>
-                        <input type="number" class="form-input" id="minSolReserve" value="0.05" step="0.01" min="0" max="10">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Intervalle (sec)</label>
-                        <select class="form-input" id="intervalSec">
-                            <option value="15">15s</option>
-                            <option value="30" selected>30s</option>
-                            <option value="60">60s</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Max positions</label>
-                        <input type="number" class="form-input" id="maxPositions" value="10" min="1" max="50">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Score min. achat (0 = off)</label>
-                    <input type="number" class="form-input" id="minScore" value="0" min="0" max="100">
-                </div>
-            </div>
-            <div class="config-section">
-                <div class="config-section-title">⚠ Circuit-Breaker</div>
-                <div style="padding: 10px; background: var(--bg-hover); border-radius: 8px; text-align: center;">
-                    <div style="font-size: 12px; color: var(--text-muted);">Échecs sell consécutifs</div>
-                    <div style="font-size: 24px; font-weight: 700; color: var(--danger);" id="circuitBreakerCount">—</div>
-                    <button class="btn btn-secondary btn-sm" onclick="resetCircuitBreaker()" style="margin-top: 8px; width: 100%;">
-                        🔄 RESET
-                    </button>
-                </div>
-            </div>
-        </div>
-        <button class="btn btn-primary" onclick="saveConfig()" style="width: 100%; padding: 14px; margin-top: 16px; min-height: 48px;">
-            ▸ SAUVEGARDER CONFIG ◂
-        </button>
-        <div class="api-status" id="apiStatus" style="display: none;">
-            <div style="font-weight: 600; margin-bottom: 4px;">DERNIÈRE RÉPONSE API</div>
-            <div id="apiStatusContent"></div>
-        </div>
-    </section>
-
-    <!-- FLOATING ACTION BUTTON -->
-    <button class="fab" onclick="openBuyModal()">+</button>
-
-    <!-- BOTTOM NAV -->
-    <nav class="bottom-nav">
-        <div class="nav-item active" onclick="switchTab('portfolio')">
-            <div class="nav-icon">◈</div>
-            <div class="nav-label">Portfolio</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('analytics')">
-            <div class="nav-icon">⌇</div>
-            <div class="nav-label">Analytics</div>
-        </div>
-        <div class="nav-item" onclick="switchTab('config')">
-            <div class="nav-icon">⚙</div>
-            <div class="nav-label">Config</div>
-        </div>
-    </nav>
-
-    <!-- BUY MODAL -->
-    <div class="modal" id="buyModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">▲ ACHETER</div>
-                <button class="modal-close" onclick="closeBuyModal()">×</button>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Token Address</label>
-                <input type="text" class="form-input" id="buyTokenAddress" placeholder="Coller l'adresse complète">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Montant (SOL)</label>
-                <input type="number" class="form-input" id="buyAmount" placeholder="0.00" step="0.01">
-                <div class="quick-amounts">
-                    <div class="quick-btn" onclick="setBuyAmount(0.1)">0.1</div>
-                    <div class="quick-btn" onclick="setBuyAmount(0.25)">0.25</div>
-                    <div class="quick-btn" onclick="setBuyAmount(0.5)">0.5</div>
-                    <div class="quick-btn" onclick="setMaxBuy()">MAX</div>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Slippage</label>
-                    <select class="form-input" id="buySlippage">
-                        <option value="100">1%</option>
-                        <option value="300" selected>3%</option>
-                        <option value="500">5%</option>
-                    </select>
-                </div>
-            </div>
-            <button class="btn btn-buy" onclick="executeBuy()" style="width: 100%; padding: 14px; min-height: 48px;">
-                CONFIRMER L'ACHAT
-            </button>
-        </div>
+    <div class="detail-stats" id="dtStats">
+      <div class="detail-stat"><div class="detail-stat-lbl">Valeur</div><div class="detail-stat-val" id="dtVal">—</div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">PnL</div><div class="detail-stat-val" id="dtPnl">—</div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">Peak</div><div class="detail-stat-val pos" id="dtPeak">—</div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">Entrée</div><div class="detail-stat-val" id="dtEntry">—</div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">Liq.</div><div class="detail-stat-val" id="dtLiq">—</div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">MCap</div><div class="detail-stat-val" id="dtMcap">—</div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">Vol 24h</div><div class="detail-stat-val" id="dtVol">—</div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">Balance</div><div class="detail-stat-val" id="dtBal">—</div></div>
     </div>
-
-    <!-- SELL MODAL -->
-    <div class="modal" id="sellModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">▼ VENDRE</div>
-                <button class="modal-close" onclick="closeSellModal()">×</button>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Token</label>
-                <input type="text" class="form-input" id="sellTokenInfo" readonly style="background: var(--bg-hover);">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Balance</label>
-                <input type="text" class="form-input" id="sellBalance" readonly style="background: var(--bg-hover);">
-            </div>
-            <div class="form-group">
-                <label class="form-label">À vendre</label>
-                <input type="number" class="form-input" id="sellAmount" placeholder="0.00" step="0.001">
-                <div class="quick-amounts">
-                    <div class="quick-btn" onclick="setSellPercent(25)">25%</div>
-                    <div class="quick-btn" onclick="setSellPercent(50)">50%</div>
-                    <div class="quick-btn" onclick="setSellPercent(75)">75%</div>
-                    <div class="quick-btn" onclick="setSellPercent(100)">100%</div>
-                </div>
-            </div>
-            <button class="btn btn-sell" onclick="executeSell()" style="width: 100%; padding: 14px; min-height: 48px;">
-                CONFIRMER LA VENTE
-            </button>
-        </div>
+    <div class="chart-wrap">
+      <div class="chart-spinner" id="chartSpinner">
+        <div class="spinner"></div>
+        <div>Chargement du graphe…</div>
+      </div>
+      <iframe id="chartFrame" src="about:blank" onload="onChartLoad()"></iframe>
     </div>
-
-    <!-- TOKEN DETAIL MODAL WITH CHART -->
-    <div class="modal token-detail-modal" id="tokenDetailModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title" id="tokenDetailTitle">Token</div>
-                <button class="modal-close" onclick="closeTokenDetailModal()">×</button>
-            </div>
-            
-            <!-- Chart Timeframes -->
-            <div class="chart-timeframes">
-                <div class="chart-tf" onclick="changeTimeframe('5m')">5m</div>
-                <div class="chart-tf" onclick="changeTimeframe('15m')">15m</div>
-                <div class="chart-tf active" onclick="changeTimeframe('1h')">1h</div>
-                <div class="chart-tf" onclick="changeTimeframe('4h')">4h</div>
-                <div class="chart-tf" onclick="changeTimeframe('1d')">1d</div>
-            </div>
-            
-            <!-- Chart Container -->
-            <div class="chart-container" id="chartContainer">
-                <iframe id="chartFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
-            </div>
-            
-            <!-- Token Info Grid -->
-            <div class="token-info-grid">
-                <div class="stat-card">
-                    <div class="stat-label">Valeur</div>
-                    <div class="stat-value" id="detailValue">$0.00</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">PnL</div>
-                    <div class="stat-value" id="detailPnl">0%</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Peak</div>
-                    <div class="stat-value pos" id="detailPeak">+0%</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Entrée</div>
-                    <div class="stat-value" id="detailEntry">$0.00</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Score</div>
-                    <div class="stat-value" id="detailScore">0/100</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Liq.</div>
-                    <div class="stat-value" id="detailLiq">$0k</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">MCap</div>
-                    <div class="stat-value" id="detailMcap">$0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Vol 24h</div>
-                    <div class="stat-value" id="detailVol24h">$0</div>
-                </div>
-            </div>
-            
-            <!-- Actions -->
-            <div class="token-detail-actions">
-                <button class="btn btn-secondary" onclick="openDexScreener()" style="flex: 1;">
-                    🦎 DexScreener ↗
-                </button>
-                <button class="btn btn-secondary" onclick="scanHistory()" style="flex: 1;">
-                    🔍 Scan History
-                </button>
-            </div>
-            <div class="token-detail-actions">
-                <button class="btn btn-buy" onclick="openBuyFromDetail()" style="flex: 1;">
-                    ▲ BUY
-                </button>
-                <button class="btn btn-sell" onclick="openSellFromDetail()" style="flex: 1;">
-                    ▼ SELL
-                </button>
-            </div>
-        </div>
+    <div class="detail-footer">
+      <a class="btn-dex" id="btnDex" href="#" target="_blank">🦎 DexScreener ↗</a>
+      <button class="btn-copy" onclick="copyMint()">📋 Copier adresse</button>
     </div>
+  </div>
 
-    <!-- TOAST CONTAINER -->
-    <div class="toast-container" id="toastContainer"></div>
+  <!-- PORTFOLIO -->
+  <section class="section active" id="sec-portfolio">
+    <div class="filter-bar">
+      <div class="filter-count" id="filterCount">Chargement…</div>
+      <button class="btn-filter" id="btnDead" onclick="toggleDead()">👁 Morts : cachés</button>
+    </div>
+    <div class="tok-list" id="tokList">
+      <div class="load-wrap"><div class="spinner"></div><span>Chargement…</span></div>
+    </div>
+  </section>
 
-    <script>
-        const API = window.location.origin;
-        let portfolio = [];
-        let configData = {};
-        let solBalance = 0;
-        let currentDetailMint = null;
-        let currentDetailToken = null;
+  <!-- ANALYTICS -->
+  <section class="section" id="sec-analytics">
+    <div class="an-grid">
+      <div class="kpi"><div class="kpi-lbl">PnL réalisé</div><div class="kpi-val" id="anPnl">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">Win Rate</div><div class="kpi-val" id="anWin">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">Trades</div><div class="kpi-val gold" id="anTrades">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">ROI</div><div class="kpi-val" id="anRoi">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">Sharpe</div><div class="kpi-val" id="anSharpe">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">Drawdown max</div><div class="kpi-val neg" id="anDD">—</div></div>
+    </div>
+    <div class="trades-list" id="tradesList">
+      <div class="load-wrap"><div class="spinner"></div><span>Chargement…</span></div>
+    </div>
+  </section>
 
-        // INIT
-        document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-            loadConfig();
-            setInterval(() => loadData(), 30000);
-        });
+  <!-- CONFIG -->
+  <section class="section" id="sec-config">
+    <div class="cfg-list">
 
-        // LOAD DATA
-        async function loadData() {
-            try {
-                const [statsRes, portfolioRes, balanceRes] = await Promise.all([
-                    fetch(`${API}/api/stats`),
-                    fetch(`${API}/api/portfolio`),
-                    fetch(`${API}/api/sol-balance`)
-                ]);
-                const statsData = await statsRes.json();
-                portfolio = (await portfolioRes.json()).tokens || [];
-                const balanceData = await balanceRes.json();
-                solBalance = balanceData.balance || 0;
-                
-                document.getElementById('totalValue').textContent = `$${(statsData.totalValue || 0).toFixed(2)}`;
-                document.getElementById('tokenCount').textContent = statsData.tokens || 0;
-                document.getElementById('circuitBreakerCount').textContent = statsData.sellCircuitBreaker || 0;
-                
-                renderPortfolio(portfolio);
-            } catch (err) {
-                console.error('Load error:', err);
-            }
-        }
+      <!-- Take-Profit -->
+      <div class="cfg-section">
+        <div class="cfg-title">🎯 Take-Profit</div>
+        <div class="cfg-row">
+          <div class="cfg-row-label"><div class="cfg-row-title">Actif</div><div class="cfg-row-desc">Vente auto à chaque palier</div></div>
+          <div class="toggle" id="tog-tp" onclick="tog(this)"></div>
+        </div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Hysteresis (%)</label><input type="number" id="tpHysteresis" value="5" min="0" max="50"></div>
+        </div>
+      </div>
 
-        // LOAD CONFIG
-        async function loadConfig() {
-            try {
-                const res = await fetch(`${API}/api/config`);
-                configData = await res.json();
-                updateConfigUI();
-            } catch (err) {
-                console.error('Config load error:', err);
-            }
-        }
+      <!-- Break-Even -->
+      <div class="cfg-section">
+        <div class="cfg-title">⚖ Break-Even Stop</div>
+        <div class="cfg-row">
+          <div class="cfg-row-label"><div class="cfg-row-title">Actif</div><div class="cfg-row-desc">SL → entry+buffer après TP1</div></div>
+          <div class="toggle" id="tog-be" onclick="tog(this)"></div>
+        </div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Buffer (%)</label><input type="number" id="beBuffer" value="2" min="0" max="20"></div>
+        </div>
+      </div>
 
-        // UPDATE CONFIG UI
-        function updateConfigUI() {
-            document.getElementById('toggle-tp').classList.toggle('active', configData.takeProfitEnabled);
-            document.getElementById('toggle-sl').classList.toggle('active', configData.stopLossEnabled);
-            document.getElementById('toggle-ts').classList.toggle('active', configData.trailingEnabled);
-            document.getElementById('toggle-ar').classList.toggle('active', configData.antiRugEnabled);
-            
-            document.getElementById('tpHysteresis').value = configData.hysteresis || 5;
-            document.getElementById('slPct').value = configData.stopLossPct || -50;
-            document.getElementById('tsPct').value = configData.trailingPct || 20;
-            document.getElementById('arPct').value = configData.antiRugPct || 60;
-            document.getElementById('defaultSlippage').value = configData.defaultSlippage || 500;
-            document.getElementById('minSolReserve').value = configData.minSolReserve || 0.05;
-            document.getElementById('intervalSec').value = configData.intervalSec || 30;
-            document.getElementById('maxPositions').value = configData.maxPositions || 10;
-            document.getElementById('minScore').value = configData.minScore || 0;
-        }
+      <!-- Stop-Loss -->
+      <div class="cfg-section">
+        <div class="cfg-title">🛡 Stop-Loss</div>
+        <div class="cfg-row">
+          <div class="cfg-row-label"><div class="cfg-row-title">Actif</div><div class="cfg-row-desc">Vente forcée sous le seuil</div></div>
+          <div class="toggle" id="tog-sl" onclick="tog(this)"></div>
+        </div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Seuil (%)</label><input type="number" id="slPct" value="-50" min="-99" max="-1"></div>
+        </div>
+      </div>
 
-        // RENDER PORTFOLIO
-        function renderPortfolio(tokens) {
-            const list = document.getElementById('tokenList');
-            if (tokens.length === 0) {
-                list.innerHTML = `
-                    <div class="empty">
-                        <div class="empty-icon">💎</div>
-                        <div>Aucun token dans le portfolio</div>
-                        <button class="btn btn-primary" onclick="openBuyModal()" style="margin-top: 16px; min-height: 44px;">
-                            + Acheter un token
-                        </button>
-                    </div>
-                `;
-                return;
-            }
-            list.innerHTML = tokens.map(token => {
-                const pnlClass = token.pnl >= 0 ? 'pos' : 'neg';
-                const pnlSign = token.pnl >= 0 ? '+' : '';
-                const logo = token.logo 
-                    ? `<img src="${token.logo}" onerror="this.parentElement.innerHTML='🪙'" style="width:100%;height:100%;border-radius:10px;object-fit:cover;">`
-                    : '🪙';
-                return `
-                    <div class="token-card" onclick="openTokenDetail('${token.mintFull}', ${JSON.stringify(token).replace(/"/g, '&quot;')})">
-                        <div class="token-header">
-                            <div class="token-info">
-                                <div class="token-logo">${logo}</div>
-                                <div class="token-details">
-                                    <div class="token-symbol">${token.symbol || token.mint.slice(0, 8)}...</div>
-                                    <div class="token-address">${token.mint.slice(0, 4)}...${token.mint.slice(-4)}</div>
-                                </div>
-                            </div>
-                            <div class="token-price">
-                                <div class="price-value">$${(token.price || 0).toFixed(6)}</div>
-                                <div class="price-change ${pnlClass}">${pnlSign}${(token.pnl || 0).toFixed(2)}%</div>
-                            </div>
-                        </div>
-                        <div class="token-stats">
-                            <div class="token-stat">
-                                <div class="token-stat-label">Valeur</div>
-                                <div class="token-stat-value">$${(token.value || 0).toFixed(2)}</div>
-                            </div>
-                            <div class="token-stat">
-                                <div class="token-stat-label">Balance</div>
-                                <div class="token-stat-value">${(token.balance || 0).toFixed(4)}</div>
-                            </div>
-                            <div class="token-stat">
-                                <div class="token-stat-label">Liq.</div>
-                                <div class="token-stat-value">$${((token.liquidity || 0) / 1000).toFixed(1)}k</div>
-                            </div>
-                        </div>
-                        <div class="token-actions">
-                            <button class="btn btn-buy" onclick="event.stopPropagation(); openBuyModal('${token.mintFull}')">Buy</button>
-                            <button class="btn btn-sell" onclick="event.stopPropagation(); openSellModal('${token.mintFull}', '${token.symbol || token.mint.slice(0,8)}', ${token.balance})">Sell</button>
-                            <button class="btn btn-chart" onclick="event.stopPropagation(); openTokenDetail('${token.mintFull}', ${JSON.stringify(token).replace(/"/g, '&quot;')})">📊</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
+      <!-- Trailing -->
+      <div class="cfg-section">
+        <div class="cfg-title">📉 Trailing Stop</div>
+        <div class="cfg-row">
+          <div class="cfg-row-label"><div class="cfg-row-title">Actif</div><div class="cfg-row-desc">Suit le peak, vend si recul</div></div>
+          <div class="toggle" id="tog-ts" onclick="tog(this)"></div>
+        </div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Recul max (%)</label><input type="number" id="tsPct" value="20" min="1" max="90"></div>
+        </div>
+      </div>
 
-        // TAB SWITCHING
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-            
-            event.currentTarget.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
-            
-            if (tabName === 'analytics') {
-                loadAnalytics();
-            }
-        }
+      <!-- Anti-Rug -->
+      <div class="cfg-section">
+        <div class="cfg-title">🚨 Anti-Rug</div>
+        <div class="cfg-row">
+          <div class="cfg-row-label"><div class="cfg-row-title">Actif</div><div class="cfg-row-desc">Exit urgence si chute brutale</div></div>
+          <div class="toggle" id="tog-ar" onclick="tog(this)"></div>
+        </div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Chute % / cycle</label><input type="number" id="arPct" value="60" min="10" max="99"></div>
+        </div>
+      </div>
 
-        // LOAD ANALYTICS
-        async function loadAnalytics() {
-            try {
-                const [analyticsRes, tradesRes] = await Promise.all([
-                    fetch(`${API}/api/analytics`),
-                    fetch(`${API}/api/trades`)
-                ]);
-                
-                const analytics = await analyticsRes.json();
-                const trades = await tradesRes.json();
-                
-                document.getElementById('analyticsPnl').textContent = `${analytics.realizedPnlSol || 0} ◎`;
-                document.getElementById('analyticsWinRate').textContent = `${analytics.winRate || 0}%`;
-                document.getElementById('analyticsTrades').textContent = analytics.totalTrades || 0;
-                document.getElementById('analyticsRoi').textContent = `${analytics.roi || 0}%`;
-                
-                const recentTrades = trades.trades?.slice(0, 10) || [];
-                const container = document.getElementById('recentTrades');
-                
-                if (recentTrades.length === 0) {
-                    container.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div>Aucun trade récent</div></div>`;
-                    return;
-                }
-                
-                container.innerHTML = recentTrades.map(trade => {
-                    const pnlClass = trade.pnlPct >= 0 ? 'pos' : 'neg';
-                    const pnlSign = trade.pnlPct >= 0 ? '+' : '';
-                    const date = new Date(trade.ts).toLocaleString('fr-FR');
-                    return `
-                        <div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-weight: 600; font-size: 13px;">${trade.symbol || trade.mint?.slice(0,8)}</div>
-                                <div style="font-size: 10px; color: var(--text-muted);">${trade.type.toUpperCase()} • ${date}</div>
-                            </div>
-                            <div class="${pnlClass}" style="font-weight: 600; font-family: monospace;">
-                                ${pnlSign}${(trade.pnlPct || 0).toFixed(2)}%
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                
-            } catch (err) {
-                console.error('Analytics load error:', err);
-            }
-        }
+      <!-- Jito -->
+      <div class="cfg-section">
+        <div class="cfg-title">⚡ Jito Bundles</div>
+        <div class="cfg-row">
+          <div class="cfg-row-label"><div class="cfg-row-title">Actif</div><div class="cfg-row-desc">Transactions prioritaires Jito</div></div>
+          <div class="toggle" id="tog-jito" onclick="tog(this)"></div>
+        </div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Tip (SOL)</label><input type="number" id="jitoTip" value="0.0001" step="0.00001" min="0"></div>
+        </div>
+      </div>
 
-        // CONFIG TOGGLES
-        function toggleConfig(key) {
-            const toggle = document.getElementById(`toggle-${key}`);
-            if (toggle) toggle.classList.toggle('active');
-        }
+      <!-- Sortie USDC -->
+      <div class="cfg-section" style="border-color:rgba(240,180,41,.2)">
+        <div class="cfg-title" style="color:var(--gold);background:rgba(240,180,41,.06)">💰 Sortie des ventes</div>
+        <div class="cfg-row">
+          <div class="cfg-row-label">
+            <div class="cfg-row-title">Vendre en USDC</div>
+            <div class="cfg-row-desc">OFF = SOL (défaut) · ON = USDC stablecoin</div>
+          </div>
+          <div class="toggle" id="tog-usdc" onclick="tog(this)"></div>
+        </div>
+      </div>
 
-        async function saveConfig() {
-            try {
-                const config = {
-                    takeProfitEnabled: document.getElementById('toggle-tp').classList.contains('active'),
-                    stopLossEnabled: document.getElementById('toggle-sl').classList.contains('active'),
-                    trailingEnabled: document.getElementById('toggle-ts').classList.contains('active'),
-                    antiRugEnabled: document.getElementById('toggle-ar').classList.contains('active'),
-                    hysteresis: parseFloat(document.getElementById('tpHysteresis').value),
-                    stopLossPct: parseFloat(document.getElementById('slPct').value),
-                    trailingPct: parseFloat(document.getElementById('tsPct').value),
-                    antiRugPct: parseFloat(document.getElementById('arPct').value),
-                    defaultSlippage: parseInt(document.getElementById('defaultSlippage').value),
-                    minSolReserve: parseFloat(document.getElementById('minSolReserve').value),
-                    intervalSec: parseInt(document.getElementById('intervalSec').value),
-                    maxPositions: parseInt(document.getElementById('maxPositions').value),
-                    minScore: parseFloat(document.getElementById('minScore').value),
-                };
-                const res = await fetch(`${API}/api/config`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast('✅ Configuration sauvegardée', 'success');
-                    loadConfig();
-                } else {
-                    showToast('❌ Erreur lors de la sauvegarde', 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
+      <!-- Général -->
+      <div class="cfg-section">
+        <div class="cfg-title">⚙ Général</div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Slippage (bps)</label><input type="number" id="defaultSlippage" value="500" min="10" max="5000"></div>
+          <div class="cfg-field"><label>Réserve SOL min</label><input type="number" id="minSolReserve" value="0.05" step="0.01" min="0"></div>
+        </div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Intervalle (sec)</label><select id="intervalSec"><option value="15">15s</option><option value="30" selected>30s</option><option value="60">60s</option></select></div>
+          <div class="cfg-field"><label>Max positions</label><input type="number" id="maxPositions" value="10" min="1" max="50"></div>
+        </div>
+        <div class="cfg-input-row">
+          <div class="cfg-field"><label>Score min. achat</label><input type="number" id="minScore" value="0" min="0" max="100"></div>
+        </div>
+      </div>
 
-        // BUY MODAL
-        function openBuyModal(mint = '') {
-            document.getElementById('buyTokenAddress').value = mint;
-            document.getElementById('buyAmount').value = '';
-            document.getElementById('buyModal').classList.add('active');
-        }
-        function closeBuyModal() { document.getElementById('buyModal').classList.remove('active'); }
-        function setBuyAmount(amount) { document.getElementById('buyAmount').value = amount; }
-        async function setMaxBuy() {
-            if (solBalance > 0) {
-                const max = Math.max(0, solBalance - 0.05);
-                document.getElementById('buyAmount').value = max.toFixed(4);
-            }
-        }
-        async function executeBuy() {
-            const mint = document.getElementById('buyTokenAddress').value.trim();
-            const amount = parseFloat(document.getElementById('buyAmount').value);
-            const slippage = parseInt(document.getElementById('buySlippage').value);
-            if (!mint || !amount) { showToast('❌ Veuillez remplir tous les champs', 'error'); return; }
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px;display:inline-block"></div> En cours...';
-            try {
-                const res = await fetch(`${API}/api/buy`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, solAmount: amount, slippageBps: slippage }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast(`✅ Achat réussi ! ${result.outAmount?.toFixed(4)} tokens`, 'success');
-                    closeBuyModal();
-                    setTimeout(() => loadData(), 3000);
-                } else {
-                    showToast('❌ ' + result.error, 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }
+      <!-- Circuit Breaker -->
+      <div class="cfg-section">
+        <div class="cfg-title">⚠ Circuit-Breaker</div>
+        <div style="padding:14px;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:11px;color:var(--dim)">Échecs sell consécutifs</div>
+            <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--dn)" id="cbCount">—</div>
+          </div>
+          <button onclick="resetCB()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 16px;color:var(--text);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.04em">🔄 RESET</button>
+        </div>
+      </div>
 
-        // SELL MODAL
-        function openSellModal(mint, symbol, balance) {
-            document.getElementById('sellTokenInfo').value = `${symbol} (${mint.slice(0, 4)}...${mint.slice(-4)})`;
-            document.getElementById('sellBalance').value = balance.toFixed(4);
-            document.getElementById('sellModal').dataset.mint = mint;
-            document.getElementById('sellModal').classList.add('active');
-        }
-        function closeSellModal() { document.getElementById('sellModal').classList.remove('active'); }
-        function setSellPercent(percent) {
-            const balance = parseFloat(document.getElementById('sellBalance').value);
-            document.getElementById('sellAmount').value = (balance * percent / 100).toFixed(4);
-        }
-        async function executeSell() {
-            const mint = document.getElementById('sellModal').dataset.mint;
-            const amount = parseFloat(document.getElementById('sellAmount').value);
-            const slippage = 500;
-            if (!mint || !amount) { showToast('❌ Veuillez entrer un montant valide', 'error'); return; }
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px;display:inline-block"></div> En cours...';
-            try {
-                const res = await fetch(`${API}/api/sell`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mint, amount, slippageBps: slippage, reason: 'MANUAL' }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showToast(`✅ Vente réussie ! ${result.solOut?.toFixed(6)} SOL reçus`, 'success');
-                    closeSellModal();
-                    setTimeout(() => loadData(), 3000);
-                } else {
-                    showToast('❌ ' + result.error, 'error');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }
+    </div>
+    <!-- sticky save bar inside config section scroll -->
+    <div style="height:80px"></div>
+  </section>
 
-        // TOKEN DETAIL MODAL WITH CHART
-        function openTokenDetail(mint, token) {
-            currentDetailMint = mint;
-            currentDetailToken = token;
-            
-            document.getElementById('tokenDetailTitle').textContent = `${token.symbol || mint.slice(0,8)}...`;
-            document.getElementById('detailValue').textContent = `$${(token.value || 0).toFixed(2)}`;
-            document.getElementById('detailPnl').textContent = `${token.pnl >= 0 ? '+' : ''}${(token.pnl || 0).toFixed(2)}%`;
-            document.getElementById('detailPnl').className = `stat-value ${token.pnl >= 0 ? 'pos' : 'neg'}`;
-            document.getElementById('detailPeak').textContent = `+${(token.peakPnl || 0).toFixed(2)}%`;
-            document.getElementById('detailEntry').textContent = `$${(token.entryPrice || 0).toFixed(6)}`;
-            document.getElementById('detailScore').textContent = `${token.score || 0}/100`;
-            document.getElementById('detailLiq').textContent = `$${((token.liquidity || 0) / 1000).toFixed(1)}k`;
-            document.getElementById('detailMcap').textContent = `$${(token.mcap || 0).toLocaleString()}`;
-            document.getElementById('detailVol24h').textContent = `$${(token.volume24h || 0).toLocaleString()}`;
-            
-            // Load DexScreener chart
-            loadDexScreenerChart(mint);
-            
-            document.getElementById('tokenDetailModal').classList.add('active');
-        }
-        
-        function loadDexScreenerChart(mint) {
-            const chartUrl = `https://dexscreener.com/solana/${mint}`;
-            document.getElementById('chartFrame').src = chartUrl;
-        }
-        
-        function changeTimeframe(tf) {
-            document.querySelectorAll('.chart-tf').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            // DexScreener gère les timeframes automatiquement
-            showToast(`⏱ Timeframe: ${tf}`, 'info');
-        }
-        
-        function closeTokenDetailModal() {
-            document.getElementById('tokenDetailModal').classList.remove('active');
-            document.getElementById('chartFrame').src = '';
-            currentDetailMint = null;
-            currentDetailToken = null;
-        }
-        
-        function openDexScreener() {
-            if (currentDetailMint) {
-                window.open(`https://dexscreener.com/solana/${currentDetailMint}`, '_blank');
-            }
-        }
-        
-        async function scanHistory() {
-            if (!currentDetailMint) return;
-            try {
-                const res = await fetch(`${API}/api/positions/scan-history`);
-                const result = await res.json();
-                if (result.fixed > 0) {
-                    showToast(`✅ ${result.fixed} positions corrigées`, 'success');
-                    loadData();
-                } else {
-                    showToast('ℹ️ Aucune position à corriger', 'info');
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
-        
-        function openBuyFromDetail() {
-            closeTokenDetailModal();
-            if (currentDetailMint) openBuyModal(currentDetailMint);
-        }
-        
-        function openSellFromDetail() {
-            closeTokenDetailModal();
-            if (currentDetailToken) {
-                openSellModal(currentDetailToken.mintFull, currentDetailToken.symbol || currentDetailToken.mint.slice(0,8), currentDetailToken.balance);
-            }
-        }
+</div>
 
-        // TOAST
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.style.borderColor = type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--border)';
-            toast.textContent = message;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.animation = 'slideIn 0.3s ease reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
+<!-- SAVE BAR (config only) -->
+<div class="save-bar" id="saveBar" style="display:none">
+  <button class="btn-save" onclick="saveConfig()">▸ SAUVEGARDER ◂</button>
+  <div class="save-status" id="saveStatus"></div>
+</div>
 
-        async function resetCircuitBreaker() {
-            try {
-                const res = await fetch(`${API}/api/reset-circuit-breaker`, { method: 'POST' });
-                const result = await res.json();
-                if (result.success) {
-                    showToast('✅ Circuit-breaker reset', 'success');
-                    loadData();
-                }
-            } catch (err) {
-                showToast('❌ ' + err.message, 'error');
-            }
-        }
+<!-- TOAST -->
+<div class="toast-wrap" id="toasts"></div>
 
-        // CLOSE MODALS ON OUTSIDE CLICK
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                }
-            });
-        });
-    </script>
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const API = 'https://solana-sniper-7o8s.onrender.com';
+let _portfolio = [];
+let _showDead  = false;
+let _cfgData   = {};
+let _detailMint = null;
+let _ticker    = null;
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadAll();
+  _ticker = setInterval(loadAll, 30000);
+});
+
+async function apiFetch(path, opts = {}) {
+  const r = await fetch(API + path, opts);
+  const ct = r.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) throw new Error(`Non-JSON (${r.status})`);
+  return r.json();
+}
+
+async function loadAll() {
+  await Promise.allSettled([loadPortfolio(), loadAnalytics()]);
+}
+
+async function hardRefresh() {
+  const btn = document.querySelector('.btn-refresh');
+  btn.style.color = 'var(--gold)';
+  btn.style.transform = 'rotate(180deg)';
+  btn.style.transition = 'transform .4s';
+  await loadAll();
+  setTimeout(() => { btn.style.color = ''; btn.style.transform = ''; }, 500);
+}
+
+// ─── PORTFOLIO ───────────────────────────────────────────────────────────────
+async function loadPortfolio() {
+  try {
+    const [statsD, portD, balD, anD] = await Promise.allSettled([
+      apiFetch('/api/stats'),
+      apiFetch('/api/portfolio'),
+      apiFetch('/api/sol-balance'),
+      apiFetch('/api/analytics'),
+    ]);
+    const stats = statsD.value || {};
+    const toks  = portD.value?.tokens || [];
+    const an    = anD.value || {};
+
+    _portfolio = toks;
+
+    // Topbar
+    const tv = document.getElementById('tvTotal');
+    if (tv) tv.textContent = stats.totalValue != null ? '$' + stats.totalValue.toFixed(2) : '—';
+    const pnlEl = document.getElementById('tvPnl');
+    if (pnlEl) {
+      const p = an.realizedPnlSol ?? null;
+      pnlEl.textContent = p !== null ? (p >= 0 ? '+' : '') + p.toFixed(4) + ' ◎' : '—';
+      pnlEl.className = 'ts-val ' + (p == null ? '' : p >= 0 ? 'pos' : 'neg');
+    }
+    const winEl = document.getElementById('tvWin');
+    if (winEl) { winEl.textContent = an.winRate != null ? an.winRate + '%' : '—'; winEl.className = 'ts-val ' + ((an.winRate||0) >= 50 ? 'pos' : 'neg'); }
+
+    const cb = document.getElementById('cbCount');
+    if (cb) { cb.textContent = stats.sellCircuitBreaker ?? '—'; }
+
+    renderPortfolio(_portfolio);
+  } catch (e) { console.error('loadPortfolio', e); }
+}
+
+// ─── DEAD FILTER ─────────────────────────────────────────────────────────────
+function isDead(t) {
+  if (t.isSol || t.isUsdc) return false;
+  const hasPrice  = (t.price != null && t.price > 0);
+  const hasSymbol = t.symbol && /[a-zA-Z]{2,}/.test(t.symbol) && t.symbol.length <= 24;
+  return !hasPrice && !hasSymbol;
+}
+function toggleDead() {
+  _showDead = !_showDead;
+  const btn = document.getElementById('btnDead');
+  btn.textContent = '👁 Morts : ' + (_showDead ? 'visibles' : 'cachés');
+  btn.classList.toggle('active-dead', _showDead);
+  renderPortfolio(_portfolio);
+}
+
+// ─── RENDER PORTFOLIO ─────────────────────────────────────────────────────────
+function renderPortfolio(toks) {
+  const list  = document.getElementById('tokList');
+  const cnt   = document.getElementById('filterCount');
+
+  toks.forEach(t => { if (!t.mintFull) t.mintFull = t.mint; });
+  const live = toks.filter(t => !isDead(t));
+  const dead = toks.filter(t => isDead(t));
+  const show = _showDead ? toks : live;
+
+  if (cnt) cnt.textContent = dead.length > 0
+    ? live.length + ' actifs · ' + dead.length + ' morts ' + (_showDead ? 'visibles' : 'masqués')
+    : live.length + ' tokens';
+
+  if (!show.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">◈</div><div class="empty-txt">Portfolio vide</div></div>';
+    return;
+  }
+
+  const fmt  = (n, d=2) => n != null ? n.toFixed(d) : '—';
+  const fmtK = n => n > 0 ? '$' + (n/1000).toFixed(1) + 'k' : '—';
+  const fmtM = n => { if (!n) return '—'; if (n>1e6) return '$'+(n/1e6).toFixed(1)+'M'; if (n>1e3) return '$'+(n/1e3).toFixed(0)+'K'; return '$'+n.toFixed(0); };
+
+  let html = '';
+  let inDead = false;
+
+  show.forEach(t => {
+    const dead = isDead(t);
+    if (_showDead && !inDead && dead && live.length > 0) {
+      inDead = true;
+      html += '<div class="dead-sep">▼ Tokens sans prix — ruggés ou abandonnés (' + dead + ')</div>';
+    }
+    const pnl    = t.pnl ?? null;
+    const pCls   = pnl == null ? 'dim' : pnl >= 0 ? 'pos' : 'neg';
+    const pStr   = pnl == null ? '—' : (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
+    const val    = t.value ?? 0;
+    const logo   = t.logo
+      ? `<img src="${t.logo}" onerror="this.parentElement.innerHTML='🪙'" loading="lazy">`
+      : '🪙';
+
+    let cardCls  = 'tok-card';
+    if (t.isSol)   cardCls += ' sol-card';
+    if (t.isUsdc)  cardCls += ' usdc-card';
+    if (dead)      cardCls += ' dead-card';
+
+    let symCls   = 'tok-sym';
+    if (t.isSol)   symCls += ' sol-sym';
+    if (t.isUsdc)  symCls += ' usdc-sym';
+
+    let badges = '';
+    if (t.isSol)         badges += '<span class="badge badge-sol">SOL</span>';
+    else if (t.isUsdc)   badges += '<span class="badge badge-usdc">USDC</span>';
+    else if (t.bootstrapped) badges += '<span class="badge badge-boot">BOOT</span>';
+    if (t.stopLossHit)   badges += '<span class="badge badge-sl">SL</span>';
+    if (t.breakEven)     badges += '<span class="badge badge-be">BE</span>';
+
+    const valStr = val > 0 ? '$' + val.toFixed(2) : '—';
+    const balStr = t.isSol ? fmt(t.balance, 4) + ' ◎' : t.isUsdc ? fmt(t.balance, 2) + ' $' : fmt(t.balance, 4);
+
+    const safeT = encodeURIComponent(t.mintFull);
+    html += `
+    <div class="${cardCls}" onclick="openDetail('${safeT}')">
+      <div class="tok-top">
+        <div class="tok-logo">${logo}</div>
+        <div class="tok-name">
+          <div class="${symCls}">${t.symbol || t.mint.slice(0,8)}</div>
+          <div class="tok-addr">
+            <span>${t.mint.slice(0,4)}…${t.mint.slice(-4)}</span>
+            ${badges}
+          </div>
+        </div>
+        <div class="tok-right">
+          <div class="tok-val">${valStr}</div>
+          <div class="tok-pnl ${pCls}">${pStr}</div>
+        </div>
+      </div>
+      <div class="tok-bottom">
+        <div class="tok-stat"><div class="tok-stat-lbl">Balance</div><div class="tok-stat-val">${balStr}</div></div>
+        <div class="tok-stat"><div class="tok-stat-lbl">Peak</div><div class="tok-stat-val pos">+${fmt(t.peakPnl,1)}%</div></div>
+        <div class="tok-stat"><div class="tok-stat-lbl">Liq.</div><div class="tok-stat-val">${fmtK(t.liquidity)}</div></div>
+      </div>
+    </div>`;
+  });
+
+  list.innerHTML = html;
+}
+
+// ─── TOKEN DETAIL ─────────────────────────────────────────────────────────────
+function openDetail(enc) {
+  const mint = decodeURIComponent(enc);
+  const tok  = _portfolio.find(t => t.mintFull === mint);
+  if (!tok) return;
+  _detailMint = mint;
+
+  document.getElementById('dtTitle').textContent = tok.symbol || mint.slice(0,8);
+  document.getElementById('dtAddr').textContent  = mint.slice(0,12) + '…' + mint.slice(-6);
+  document.getElementById('dtScore').textContent = tok.score != null ? tok.score + '/100' : '—';
+  document.getElementById('dtBal').textContent   = tok.isSol
+    ? (tok.balance?.toFixed(4) || '—') + ' ◎'
+    : tok.isUsdc ? (tok.balance?.toFixed(2) || '—') + ' $'
+    : (tok.balance?.toFixed(4) || '—');
+
+  const pnl = tok.pnl ?? null;
+  const dtPnl = document.getElementById('dtPnl');
+  dtPnl.textContent = pnl == null ? '—' : (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
+  dtPnl.className = 'detail-stat-val ' + (pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg');
+
+  const fmt = (n, d=2) => n != null ? '$' + n.toFixed(d) : '—';
+  const fmtK = n => n > 0 ? '$' + (n/1000).toFixed(1) + 'k' : '—';
+  const fmtM = n => { if (!n) return '—'; if (n>1e6) return '$'+(n/1e6).toFixed(1)+'M'; if (n>1e3) return '$'+(n/1e3).toFixed(0)+'K'; return '$'+n.toFixed(0); };
+
+  document.getElementById('dtVal').textContent   = tok.value > 0 ? '$' + tok.value.toFixed(2) : '—';
+  document.getElementById('dtPeak').textContent  = '+' + (tok.peakPnl || 0).toFixed(2) + '%';
+  document.getElementById('dtEntry').textContent = tok.entryPrice ? '$' + tok.entryPrice.toFixed(8) : '—';
+  document.getElementById('dtLiq').textContent   = fmtK(tok.liquidity);
+  document.getElementById('dtMcap').textContent  = fmtM(tok.mcap);
+  document.getElementById('dtVol').textContent   = fmtM(tok.volume24h);
+
+  // DexScreener link
+  const btnDex = document.getElementById('btnDex');
+  btnDex.href = 'https://dexscreener.com/solana/' + mint;
+
+  // Chart — embed mode avec theme dark
+  const spinner = document.getElementById('chartSpinner');
+  spinner.style.display = 'flex';
+  const frame = document.getElementById('chartFrame');
+  frame.src = 'about:blank';
+  // Petit délai pour laisser le repaint
+  setTimeout(() => {
+    frame.src = `https://dexscreener.com/solana/${mint}?embed=1&theme=dark&trades=0&info=0`;
+  }, 80);
+
+  document.getElementById('detailView').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detailView').classList.remove('open');
+  document.getElementById('chartFrame').src = 'about:blank';
+  _detailMint = null;
+}
+
+function onChartLoad() {
+  const frame = document.getElementById('chartFrame');
+  if (frame.src !== 'about:blank') {
+    document.getElementById('chartSpinner').style.display = 'none';
+  }
+}
+
+function copyMint() {
+  if (!_detailMint) return;
+  if (navigator.clipboard) navigator.clipboard.writeText(_detailMint).then(() => toast('📋 Adresse copiée', 'ok'));
+  else { const t = document.createElement('textarea'); t.value = _detailMint; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); toast('📋 Adresse copiée', 'ok'); }
+}
+
+// ─── ANALYTICS ───────────────────────────────────────────────────────────────
+async function loadAnalytics() {
+  try {
+    const [an, trD] = await Promise.allSettled([
+      apiFetch('/api/analytics'),
+      apiFetch('/api/trades'),
+    ]);
+    const a  = an.value || {};
+    const tr = trD.value?.trades || [];
+
+    const g = id => document.getElementById(id);
+    const p = a.realizedPnlSol ?? null;
+    const anPnl = g('anPnl'); if (anPnl) { anPnl.textContent = p !== null ? (p>=0?'+':'') + p.toFixed(4) + ' ◎' : '—'; anPnl.className = 'kpi-val ' + (p==null ? '' : p>=0 ? 'pos':'neg'); }
+    const anWin = g('anWin'); if (anWin) { anWin.textContent = a.winRate != null ? a.winRate + '%' : '—'; anWin.className = 'kpi-val ' + ((a.winRate||0)>=50?'pos':'neg'); }
+    if (g('anTrades')) g('anTrades').textContent = a.totalTrades ?? '—';
+    const roi = g('anRoi'); if (roi) { roi.textContent = a.roi != null ? a.roi + '%' : '—'; roi.className = 'kpi-val ' + (a.roi == null ? '' : a.roi >= 0 ? 'pos':'neg'); }
+    if (g('anSharpe')) g('anSharpe').textContent = a.sharpeRatio ?? '—';
+    if (g('anDD')) g('anDD').textContent = a.maxDrawdownSol ? '-' + a.maxDrawdownSol + ' ◎' : '—';
+
+    const list = g('tradesList');
+    if (!list) return;
+    if (!tr.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-txt">Aucun trade clôturé</div></div>'; return; }
+    list.innerHTML = tr.slice(0,20).map(t => {
+      const p = t.pnlPct ?? null;
+      const cls = p == null ? '' : p >= 0 ? 'pos' : 'neg';
+      const d = new Date(t.ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      return `<div class="trade-card">
+        <div class="trade-left">
+          <div class="trade-sym">${t.symbol || t.mint?.slice(0,8)}</div>
+          <div class="trade-meta">${t.type?.toUpperCase()} · ${d}</div>
+        </div>
+        <div class="trade-right">
+          <div class="trade-pnl ${cls}">${p!=null?(p>=0?'+':'')+p.toFixed(2)+'%':'—'}</div>
+          <div class="trade-sol">${t.solOut != null ? t.solOut.toFixed(4)+' ◎' : t.reason||''}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) { console.error('loadAnalytics', e); }
+}
+
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    _cfgData = await apiFetch('/api/config');
+    applyConfig();
+  } catch(e) { console.error('loadConfig', e); }
+}
+
+function applyConfig() {
+  const c = _cfgData;
+  const setBool = (id, v) => { const el = document.getElementById(id); if (el) el.classList.toggle('on', !!v); };
+  setBool('tog-tp',   c.takeProfitEnabled);
+  setBool('tog-be',   c.breakEvenEnabled);
+  setBool('tog-sl',   c.stopLossEnabled);
+  setBool('tog-ts',   c.trailingEnabled);
+  setBool('tog-ar',   c.antiRugEnabled);
+  setBool('tog-jito', c.jitoEnabled);
+  setBool('tog-usdc', c.sellToUsdc);
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  setVal('tpHysteresis',   c.hysteresis);
+  setVal('beBuffer',       c.breakEvenBuffer);
+  setVal('slPct',          c.stopLossPct);
+  setVal('tsPct',          c.trailingPct);
+  setVal('arPct',          c.antiRugPct);
+  setVal('jitoTip',        c.jitoTipSol);
+  setVal('defaultSlippage',c.defaultSlippage);
+  setVal('minSolReserve',  c.minSolReserve);
+  setVal('intervalSec',    c.intervalSec);
+  setVal('maxPositions',   c.maxPositions);
+  setVal('minScore',       c.minScore);
+}
+
+function tog(el) { el.classList.toggle('on'); }
+
+function getNum(id) { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; }
+function getInt(id) { const v = parseInt(document.getElementById(id)?.value);   return isNaN(v) ? null : v; }
+function getBool(id){ return document.getElementById(id)?.classList.contains('on') ?? false; }
+
+async function saveConfig() {
+  const st = document.getElementById('saveStatus');
+  if (st) { st.textContent = '…'; st.className = 'save-status'; }
+  try {
+    const body = {
+      takeProfitEnabled: getBool('tog-tp'),
+      breakEvenEnabled:  getBool('tog-be'),
+      stopLossEnabled:   getBool('tog-sl'),
+      trailingEnabled:   getBool('tog-ts'),
+      antiRugEnabled:    getBool('tog-ar'),
+      jitoEnabled:       getBool('tog-jito'),
+      sellToUsdc:        getBool('tog-usdc'),
+      hysteresis:        getNum('tpHysteresis'),
+      breakEvenBuffer:   getNum('beBuffer'),
+      stopLossPct:       getNum('slPct'),
+      trailingPct:       getNum('tsPct'),
+      antiRugPct:        getNum('arPct'),
+      jitoTipSol:        getNum('jitoTip'),
+      defaultSlippage:   getInt('defaultSlippage'),
+      minSolReserve:     getNum('minSolReserve'),
+      intervalSec:       getInt('intervalSec'),
+      maxPositions:      getInt('maxPositions'),
+      minScore:          getNum('minScore'),
+    };
+    const r = await apiFetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    if (r.success) {
+      if (st) { st.textContent = '✓ Sauvegardé'; st.className = 'save-status ok'; }
+      toast('✅ Config sauvegardée', 'ok');
+    } else {
+      if (st) { st.textContent = '✗ Erreur'; st.className = 'save-status err'; }
+      toast('❌ Erreur sauvegarde', 'err');
+    }
+  } catch (e) {
+    if (st) { st.textContent = '✗ ' + e.message; st.className = 'save-status err'; }
+    toast('❌ ' + e.message, 'err');
+  }
+}
+
+async function resetCB() {
+  try {
+    const r = await apiFetch('/api/reset-circuit-breaker', { method:'POST' });
+    if (r.success) { document.getElementById('cbCount').textContent = '0'; toast('✅ Circuit-breaker reset', 'ok'); }
+  } catch(e) { toast('❌ ' + e.message, 'err'); }
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const sec = document.getElementById('sec-' + name);
+  if (sec) sec.classList.add('active');
+  const sb = document.getElementById('saveBar');
+  if (sb) sb.style.display = name === 'config' ? 'block' : 'none';
+  if (name === 'config') loadConfig();
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+function toast(msg, type = '') {
+  const w = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  w.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+</script>
 </body>
 </html>
