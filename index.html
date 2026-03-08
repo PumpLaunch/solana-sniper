@@ -1255,6 +1255,20 @@ body {
           </div>
         </div>
 
+        <div class="config-section" style="border-color:rgba(201,162,39,0.2);">
+          <div class="config-section-title" style="color:var(--gold);">Sortie des ventes</div>
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <div class="toggle-title">Vendre en USDC</div>
+              <div class="toggle-desc">OFF = SOL (défaut) · ON = USDC stablecoin</div>
+            </div>
+            <div class="toggle" id="toggle-sellusdc" onclick="toggleConfig('sellToUsdc')"></div>
+          </div>
+          <div style="margin-top:8px;padding:8px 10px;background:var(--bg-row);border-radius:4px;border:1px solid var(--border);font-size:10px;color:var(--text-dim);line-height:1.5;">
+            ⚠️ En mode USDC, les profits apparaissent dans ton solde USDC (EPjFW…). Le PnL en ◎ est une estimation. Nécessite <code style="color:var(--gold);">SELL_TO_USDC=true</code> dans les env vars Render pour persister après redémarrage.
+          </div>
+        </div>
+
         <div class="config-section">
           <div class="config-section-title">Général</div>
           <div class="form-row">
@@ -1696,7 +1710,7 @@ function updateConfigUI() {
     'toggle-tt': 'timeStopEnabled', 'toggle-me': 'momentumEnabled',
     'toggle-jito': 'jitoEnabled', 'toggle-pyramid': 'pyramidEnabled',
     'toggle-dcad': 'dcadEnabled', 'toggle-reentry': 'reentryEnabled',
-    'toggle-smartsize': 'smartSizeEnabled',
+    'toggle-smartsize': 'smartSizeEnabled', 'toggle-sellusdc': 'sellToUsdc',
   };
   for (const [id, key] of Object.entries(bools)) {
     const el = document.getElementById(id);
@@ -1729,30 +1743,9 @@ function updateConfigUI() {
 function renderPortfolio(tokens) {
   const list = document.getElementById('tokenList');
 
-  // Normalise mintFull
   tokens.forEach(t => { if (!t.mintFull) t.mintFull = t.mint; });
 
-  // Filter out unnamed tokens (address as name = no real symbol)
-  const hasName = t => {
-    const s = t.symbol || '';
-    // Reject if symbol looks like a raw address (long hex/base58, no letters or all hex)
-    if (!s || s.length > 20) return false;
-    // Keep if has at least 2 alpha chars and no internal '…'
-    return /[a-zA-Z]{2,}/.test(s);
-  };
-  const named   = tokens.filter(hasName);
-  const unnamed = tokens.filter(t => !hasName(t));
-
-  // Sort named by PnL descending (null pnl → bottom)
-  named.sort((a, b) => {
-    const pa = a.pnl ?? -Infinity;
-    const pb = b.pnl ?? -Infinity;
-    return pb - pa;
-  });
-
-  const visible = [...named, ...unnamed]; // unnamed appended at bottom (hidden by default)
-
-  if (!visible.length) {
+  if (!tokens.length) {
     list.innerHTML = `
       <div class="empty">
         <div class="empty-icon">◈</div>
@@ -1761,8 +1754,6 @@ function renderPortfolio(tokens) {
       </div>`;
     return;
   }
-
-  const totalVal = named.reduce((s, t) => s + (t.value || 0), 0);
 
   const header = `
     <div class="token-table-header">
@@ -1776,19 +1767,7 @@ function renderPortfolio(tokens) {
       <div class="th">ACTIONS</div>
     </div>`;
 
-  // Summary bar
-  const pnlPositive = named.filter(t => (t.pnl ?? 0) > 0).length;
-  const pnlNegative = named.filter(t => (t.pnl ?? 0) < 0).length;
-  const summary = `
-    <div style="display:flex; align-items:center; gap:16px; padding:9px 14px; border-bottom:1px solid var(--border); background:var(--bg-row);">
-      <span style="font-family:var(--font-hd); font-size:11px; font-weight:700; color:var(--text-dim);">${named.length} TOKEN${named.length>1?'S':''}</span>
-      <span style="font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--gold);">$${totalVal.toFixed(2)}</span>
-      <span style="font-family:var(--font-mono); font-size:10px; color:var(--up);">▲ ${pnlPositive}</span>
-      <span style="font-family:var(--font-mono); font-size:10px; color:var(--dn);">▼ ${pnlNegative}</span>
-      ${unnamed.length > 0 ? `<span style="font-size:10px; color:var(--text-ghost); margin-left:auto;">${unnamed.length} non-identifiés masqués</span>` : ''}
-    </div>`;
-
-  const rows = named.map((tok, i) => {
+  const rows = tokens.map((tok, i) => {
     const pnl    = tok.pnl ?? null;
     const pClass = pnl === null ? 'dim' : pnl >= 0 ? 'pos' : 'neg';
     const pStr   = pnl === null ? '—' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`;
@@ -1804,36 +1783,33 @@ function renderPortfolio(tokens) {
     if (tok.stopLossHit)  badges.push('<span class="badge-xs badge-dn">SL</span>');
     if (tok.breakEven)    badges.push('<span class="badge-xs badge-info">BE</span>');
 
-    // Rank color: gold for top 3
-    const rankStyle = i < 3 ? 'color:var(--gold);font-weight:700;' : '';
-
     return `
       <div class="token-row ${tok.stopLossHit ? 'sl-row' : ''}" onclick="openTokenDetail('${tok.mintFull}')">
-        <div class="row-rank" style="${rankStyle}">${i + 1}</div>
+        <div class="row-rank">${i + 1}</div>
         <div class="row-token">
           <div class="row-logo">${logo}</div>
           <div>
-            <div class="row-sym">${tok.symbol}</div>
+            <div class="row-sym">${tok.symbol || tok.mint.slice(0,8)}</div>
             <div style="display:flex;gap:3px;align-items:center;margin-top:2px;">
               <span class="row-addr">${tok.mint.slice(0,4)}…${tok.mint.slice(-4)}</span>
               ${badges.join('')}
             </div>
           </div>
         </div>
-        <div class="row-num neu col-value" style="color:${val >= 1 ? 'var(--text)' : 'var(--text-dim)'};">$${val.toFixed(2)}</div>
+        <div class="row-num neu col-value">$${val.toFixed(2)}</div>
         <div class="row-num ${pClass} pnl-col" data-value="$${val.toFixed(2)}">${pStr}</div>
         <div class="row-num pos col-peak">+${peak.toFixed(1)}%</div>
         <div class="row-num gold col-score">${tok.score ?? '—'}</div>
         <div class="row-num dim col-liq">$${(liq/1000).toFixed(1)}k</div>
         <div class="row-actions">
           <button class="btn-row buy"  onclick="event.stopPropagation(); openBuyModal('${tok.mintFull}')">B</button>
-          <button class="btn-row sell" onclick="event.stopPropagation(); openSellModal('${tok.mintFull}','${(tok.symbol||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${tok.balance||0})">S</button>
+          <button class="btn-row sell" onclick="event.stopPropagation(); openSellModal('${tok.mintFull}','${(tok.symbol||tok.mint.slice(0,8)).replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${tok.balance||0})">S</button>
           <button class="btn-row info" onclick="event.stopPropagation(); openTokenDetail('${tok.mintFull}')">▸</button>
         </div>
       </div>`;
   }).join('');
 
-  list.innerHTML = `<div class="panel" style="overflow:hidden;">${header}${summary}${rows}</div>`;
+  list.innerHTML = `<div class="panel" style="overflow:hidden;">${header}${rows}</div>`;
 }
 
 function switchTab(tabName) {
@@ -1866,6 +1842,7 @@ function toggleConfig(key) {
     timeStopEnabled:'toggle-tt', momentumEnabled:'toggle-me', jitoEnabled:'toggle-jito',
     pyramidEnabled:'toggle-pyramid', dcadEnabled:'toggle-dcad',
     reentryEnabled:'toggle-reentry', smartSizeEnabled:'toggle-smartsize',
+    sellToUsdc:'toggle-sellusdc',
   };
   const id = map[key];
   if (id) document.getElementById(id)?.classList.toggle('active');
@@ -1912,6 +1889,7 @@ async function saveConfig() {
     dcadEnabled:         getBool('toggle-dcad'),
     reentryEnabled:      getBool('toggle-reentry'),
     smartSizeEnabled:    getBool('toggle-smartsize'),
+    sellToUsdc:          getBool('toggle-sellusdc'),
     hysteresis:          getNum('tpHysteresis',      5),
     breakEvenBuffer:     getNum('beBuffer',           2),
     stopLossPct:         getNum('slPct',            -50),
