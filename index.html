@@ -391,7 +391,7 @@ body {
 .mini-stat-val.gold { color: var(--gold); }
 
 /* ─── CHART ─────────────────────────────────────────────── */
-.chart-wrap { height: 200px; position: relative; }
+.chart-wrap { height: 260px; position: relative; }
 
 /* ─── FORM CONTROLS ─────────────────────────────────────── */
 .form-group { margin-bottom: 12px; }
@@ -772,6 +772,12 @@ body {
   .token-row .col-score,
   .token-row .col-liq,
   .token-row .row-rank { display: none; }
+  /* On mobile show value inline inside token name area */
+  .token-row .pnl-col::before {
+    content: attr(data-value) ' · ';
+    color: var(--text-dim);
+    font-size: 11px;
+  }
 
   /* Token detail strip: 2 columns on mobile */
   #tokenDetailModal [style*="grid-template-columns:repeat(8"] {
@@ -1594,11 +1600,11 @@ async function loadData() {
 
     document.getElementById('totalValue').textContent = `$${(statsData.totalValue||0).toFixed(2)}`;
     document.getElementById('tokenCount').textContent = statsData.tokens || 0;
-    const cb = statsData.sellCircuitBreaker || 0;
-    document.getElementById('circuitBreakerCount').textContent = cb;
-    document.getElementById('circuitBreakerCount').className = 'topbar-stat-val' + (cb > 0 ? ' neg' : '');
-    const cbCfg = document.getElementById('circuitBreakerCountCfg');
-    if (cbCfg) cbCfg.textContent = cb;
+    const cb = statsData.sellCircuitBreaker ?? 0;
+    const el1 = document.getElementById('circuitBreakerCount');
+    const el2 = document.getElementById('circuitBreakerCountCfg');
+    if (el1) { el1.textContent = cb; el1.className = 'topbar-stat-val' + (cb > 0 ? ' neg' : ''); }
+    if (el2) el2.textContent = cb;
     const uptimeSec = statsData.uptime || 0;
     const h = Math.floor(uptimeSec/3600), m = Math.floor((uptimeSec%3600)/60);
     document.getElementById('uptimeDisplay').textContent = `${h}h ${String(m).padStart(2,'0')}m`;
@@ -1620,7 +1626,17 @@ async function loadData() {
 
 async function loadConfig() {
   try {
-    configData = await apiFetch('/api/config');
+    const [cfg, stats] = await Promise.all([
+      apiFetch('/api/config'),
+      apiFetch('/api/stats'),
+    ]);
+    configData = cfg;
+    // Sync CB count whenever config tab is loaded
+    const cb = stats.sellCircuitBreaker ?? 0;
+    const el1 = document.getElementById('circuitBreakerCount');
+    const el2 = document.getElementById('circuitBreakerCountCfg');
+    if (el1) { el1.textContent = cb; el1.className = 'topbar-stat-val' + (cb > 0 ? ' neg' : ''); }
+    if (el2) el2.textContent = cb;
     updateConfigUI();
   } catch(err) { console.error('Config error:', err); showToast(`Config: ${err.message.slice(0,80)}`, 'err'); }
 }
@@ -1712,7 +1728,31 @@ function updateConfigUI() {
 
 function renderPortfolio(tokens) {
   const list = document.getElementById('tokenList');
-  if (!tokens.length) {
+
+  // Normalise mintFull
+  tokens.forEach(t => { if (!t.mintFull) t.mintFull = t.mint; });
+
+  // Filter out unnamed tokens (address as name = no real symbol)
+  const hasName = t => {
+    const s = t.symbol || '';
+    // Reject if symbol looks like a raw address (long hex/base58, no letters or all hex)
+    if (!s || s.length > 20) return false;
+    // Keep if has at least 2 alpha chars and no internal '…'
+    return /[a-zA-Z]{2,}/.test(s);
+  };
+  const named   = tokens.filter(hasName);
+  const unnamed = tokens.filter(t => !hasName(t));
+
+  // Sort named by PnL descending (null pnl → bottom)
+  named.sort((a, b) => {
+    const pa = a.pnl ?? -Infinity;
+    const pb = b.pnl ?? -Infinity;
+    return pb - pa;
+  });
+
+  const visible = [...named, ...unnamed]; // unnamed appended at bottom (hidden by default)
+
+  if (!visible.length) {
     list.innerHTML = `
       <div class="empty">
         <div class="empty-icon">◈</div>
@@ -1721,8 +1761,8 @@ function renderPortfolio(tokens) {
       </div>`;
     return;
   }
-  // Normalise: ensure mintFull exists
-  tokens.forEach(t => { if (!t.mintFull) t.mintFull = t.mint; });
+
+  const totalVal = named.reduce((s, t) => s + (t.value || 0), 0);
 
   const header = `
     <div class="token-table-header">
@@ -1736,12 +1776,25 @@ function renderPortfolio(tokens) {
       <div class="th">ACTIONS</div>
     </div>`;
 
-  const rows = tokens.map((tok, i) => {
+  // Summary bar
+  const pnlPositive = named.filter(t => (t.pnl ?? 0) > 0).length;
+  const pnlNegative = named.filter(t => (t.pnl ?? 0) < 0).length;
+  const summary = `
+    <div style="display:flex; align-items:center; gap:16px; padding:9px 14px; border-bottom:1px solid var(--border); background:var(--bg-row);">
+      <span style="font-family:var(--font-hd); font-size:11px; font-weight:700; color:var(--text-dim);">${named.length} TOKEN${named.length>1?'S':''}</span>
+      <span style="font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--gold);">$${totalVal.toFixed(2)}</span>
+      <span style="font-family:var(--font-mono); font-size:10px; color:var(--up);">▲ ${pnlPositive}</span>
+      <span style="font-family:var(--font-mono); font-size:10px; color:var(--dn);">▼ ${pnlNegative}</span>
+      ${unnamed.length > 0 ? `<span style="font-size:10px; color:var(--text-ghost); margin-left:auto;">${unnamed.length} non-identifiés masqués</span>` : ''}
+    </div>`;
+
+  const rows = named.map((tok, i) => {
     const pnl    = tok.pnl ?? null;
     const pClass = pnl === null ? 'dim' : pnl >= 0 ? 'pos' : 'neg';
     const pStr   = pnl === null ? '—' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`;
     const peak   = tok.peakPnl ?? 0;
     const liq    = tok.liquidity ?? 0;
+    const val    = tok.value ?? 0;
     const logo   = tok.logo
       ? `<img src="${tok.logo}" onerror="this.parentElement.innerHTML='🪙'" loading="lazy">`
       : '🪙';
@@ -1751,33 +1804,36 @@ function renderPortfolio(tokens) {
     if (tok.stopLossHit)  badges.push('<span class="badge-xs badge-dn">SL</span>');
     if (tok.breakEven)    badges.push('<span class="badge-xs badge-info">BE</span>');
 
+    // Rank color: gold for top 3
+    const rankStyle = i < 3 ? 'color:var(--gold);font-weight:700;' : '';
+
     return `
       <div class="token-row ${tok.stopLossHit ? 'sl-row' : ''}" onclick="openTokenDetail('${tok.mintFull}')">
-        <div class="row-rank">${i + 1}</div>
+        <div class="row-rank" style="${rankStyle}">${i + 1}</div>
         <div class="row-token">
           <div class="row-logo">${logo}</div>
           <div>
-            <div class="row-sym">${tok.symbol || tok.mint.slice(0,8)}</div>
+            <div class="row-sym">${tok.symbol}</div>
             <div style="display:flex;gap:3px;align-items:center;margin-top:2px;">
               <span class="row-addr">${tok.mint.slice(0,4)}…${tok.mint.slice(-4)}</span>
               ${badges.join('')}
             </div>
           </div>
         </div>
-        <div class="row-num neu col-value">$${(tok.value||0).toFixed(2)}</div>
-        <div class="row-num ${pClass} pnl-col">${pStr}</div>
+        <div class="row-num neu col-value" style="color:${val >= 1 ? 'var(--text)' : 'var(--text-dim)'};">$${val.toFixed(2)}</div>
+        <div class="row-num ${pClass} pnl-col" data-value="$${val.toFixed(2)}">${pStr}</div>
         <div class="row-num pos col-peak">+${peak.toFixed(1)}%</div>
         <div class="row-num gold col-score">${tok.score ?? '—'}</div>
         <div class="row-num dim col-liq">$${(liq/1000).toFixed(1)}k</div>
         <div class="row-actions">
-          <button class="btn-row buy" onclick="event.stopPropagation(); openBuyModal('${tok.mintFull}')">B</button>
-          <button class="btn-row sell" onclick="event.stopPropagation(); openSellModal('${tok.mintFull}','${(tok.symbol||tok.mint.slice(0,8)).replace(/'/g,'\\\'').replace(/"/g,'&quot;')}',${tok.balance || 0})">S</button>
+          <button class="btn-row buy"  onclick="event.stopPropagation(); openBuyModal('${tok.mintFull}')">B</button>
+          <button class="btn-row sell" onclick="event.stopPropagation(); openSellModal('${tok.mintFull}','${(tok.symbol||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${tok.balance||0})">S</button>
           <button class="btn-row info" onclick="event.stopPropagation(); openTokenDetail('${tok.mintFull}')">▸</button>
         </div>
       </div>`;
   }).join('');
 
-  list.innerHTML = `<div class="panel" style="overflow:hidden;">${header}${rows}</div>`;
+  list.innerHTML = `<div class="panel" style="overflow:hidden;">${header}${summary}${rows}</div>`;
 }
 
 function switchTab(tabName) {
@@ -1792,7 +1848,12 @@ function switchTab(tabName) {
   const title = document.getElementById('topbarTitle');
   if (title) title.textContent = TAB_TITLES[tabName] || tabName.toUpperCase();
 
-  if (tabName === 'analytics') loadAnalytics();
+  if (tabName === 'analytics') {
+    loadAnalytics().then(() => {
+      // Chart.js needs the canvas to be visible before it can size itself
+      requestAnimationFrame(() => { if (pnlChart) pnlChart.resize(); });
+    });
+  }
   if (tabName === 'autobuys')  loadAutoBuys();
   if (tabName === 'reentry')   loadReentry();
   if (tabName === 'dead')      loadDeadTokens();
@@ -1965,38 +2026,93 @@ async function loadAnalytics() {
 }
 
 function updatePnlChart(pnlHistory) {
-  const ctx = document.getElementById('pnlChart').getContext('2d');
+  const canvas = document.getElementById('pnlChart');
+  if (!canvas) return;
+
   if (pnlChart) { pnlChart.destroy(); pnlChart = null; }
-  const pts = pnlHistory.slice(-50);
-  const labels = pts.map((_, i) => i+1);
-  const data = pts.map(p => p.cumul);
-  const last = data[data.length-1] || 0;
-  const color = last >= 0 ? '#26a69a' : '#ef5350';
+
+  // If no history, show a flat zero line with "Aucun trade" message
+  const pts = (pnlHistory || []).slice(-100);
+  const hasData = pts.length > 0;
+
+  const labels = hasData ? pts.map((_, i) => i + 1) : [0, 1];
+  const data   = hasData ? pts.map(p => typeof p === 'number' ? p : (p.cumul ?? p.pnl ?? 0)) : [0, 0];
+  const last   = data[data.length - 1] || 0;
+  const color  = last >= 0 ? '#26a69a' : '#ef5350';
+  const bgColor = last >= 0 ? 'rgba(38,166,154,0.08)' : 'rgba(239,83,80,0.08)';
+
+  const ctx = canvas.getContext('2d');
   pnlChart = new Chart(ctx, {
     type: 'line',
     data: {
       labels,
-      datasets: [{ label: 'PnL ◎', data, borderColor: color,
-        backgroundColor: last >= 0 ? 'rgba(38,166,154,0.08)' : 'rgba(239,83,80,0.08)',
-        borderWidth: 1.5, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 3 }]
+      datasets: [{
+        label: 'PnL ◎',
+        data,
+        borderColor: hasData ? color : 'rgba(122,126,142,0.3)',
+        backgroundColor: hasData ? bgColor : 'transparent',
+        borderWidth: hasData ? 1.5 : 1,
+        borderDash: hasData ? [] : [4, 4],
+        fill: hasData,
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: hasData ? 4 : 0,
+      }]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: {
-        backgroundColor: '#111318', borderColor: '#22252f', borderWidth: 1,
-        titleColor: '#7a7e8e', bodyColor: '#dddbd6',
-        titleFont: { family: 'DM Mono', size: 10 }, bodyFont: { family: 'DM Mono', size: 11 },
-      }},
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: hasData,
+          backgroundColor: '#111318',
+          borderColor: '#22252f',
+          borderWidth: 1,
+          titleColor: '#7a7e8e',
+          bodyColor: '#dddbd6',
+          titleFont: { family: 'DM Mono', size: 10 },
+          bodyFont: { family: 'DM Mono', size: 11 },
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toFixed(4)} ◎`
+          }
+        },
+        // "No data" annotation via afterDraw plugin
+        ...(!hasData ? {
+          afterDraw: {
+            id: 'nodata',
+            afterDraw(chart) {
+              const { ctx: c, chartArea: { left, top, right, bottom } } = chart;
+              c.save();
+              c.textAlign = 'center';
+              c.fillStyle = 'rgba(122,126,142,0.5)';
+              c.font = '12px DM Mono, monospace';
+              c.fillText('Aucun trade clôturé', (left + right) / 2, (top + bottom) / 2);
+              c.restore();
+            }
+          }
+        } : {})
+      },
       scales: {
         x: { display: false },
         y: {
-          grid: { color: 'rgba(34,37,47,0.8)', drawBorder: false },
-          ticks: { color: '#3a3e4e', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 4 }
+          display: hasData,
+          grid: { color: 'rgba(34,37,47,0.6)', drawBorder: false },
+          ticks: {
+            color: '#3a3e4e',
+            font: { family: 'DM Mono', size: 10 },
+            maxTicksLimit: 4,
+            callback: v => `${v >= 0 ? '+' : ''}${v.toFixed(3)} ◎`
+          }
         }
       },
       interaction: { intersect: false, mode: 'index' }
     }
   });
+
+  // Force resize in case canvas was hidden when first rendered
+  requestAnimationFrame(() => { if (pnlChart) pnlChart.resize(); });
 }
 
 async function loadAutoBuys() {
@@ -2146,7 +2262,15 @@ async function resetNegCache() {
 async function resetCircuitBreaker() {
   try {
     const result = await apiFetch('/api/reset-circuit-breaker', {method:'POST'});
-    if (result.success) { showToast('Circuit-breaker reset', 'ok'); loadData(); }
+    if (result.success) {
+      showToast('Circuit-breaker reset', 'ok');
+      // Immediately zero-out both displays without waiting for loadData
+      const el1 = document.getElementById('circuitBreakerCount');
+      const el2 = document.getElementById('circuitBreakerCountCfg');
+      if (el1) { el1.textContent = '0'; el1.className = 'topbar-stat-val'; }
+      if (el2) el2.textContent = '0';
+      loadData();
+    }
   } catch(err) { showToast(err.message, 'err'); }
 }
 
