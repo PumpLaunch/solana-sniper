@@ -98,11 +98,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .tok-pnl.pos{background:rgba(0,217,126,.12);color:var(--up)}
 .tok-pnl.neg{background:rgba(255,56,96,.12);color:var(--dn)}
 .tok-pnl.dim{background:var(--bg3);color:var(--dim)}
-.tok-bottom{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border)}
+.tok-bottom{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)}
 .tok-stat{padding:7px 0;text-align:center;border-right:1px solid var(--border)}
 .tok-stat:last-child{border-right:none}
 .tok-stat-lbl{font-size:8px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
 .tok-stat-val{font-family:var(--mono);font-size:11px;font-weight:600}
+.tok-stat-val.pos{color:var(--up)}.tok-stat-val.neg{color:var(--dn)}
 
 /* ── DEAD SEPARATOR ── */
 .dead-sep{padding:5px 12px;background:rgba(255,56,96,.05);border-top:1px solid rgba(255,56,96,.2);
@@ -135,21 +136,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
   color:var(--text);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.03em}
 .btn-copy:active{background:var(--bg3)}
-
-/* ── ANALYTICS ── */
-.an-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:12px}
-.kpi{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:12px}
-.kpi-lbl{font-size:9px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
-.kpi-val{font-family:var(--mono);font-size:18px;font-weight:700}
-.kpi-val.pos{color:var(--up)}.kpi-val.neg{color:var(--dn)}.kpi-val.gold{color:var(--gold)}
-.trades-list{padding:0 12px 20px}
-.trade-card{background:var(--bg1);border:1px solid var(--border);border-radius:8px;
-  padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.trade-left .trade-sym{font-size:13px;font-weight:600}
-.trade-left .trade-meta{font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:2px}
-.trade-right{text-align:right}
-.trade-pnl{font-family:var(--mono);font-size:13px;font-weight:700}
-.trade-sol{font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:2px}
 
 /* ── CONFIG ── */
 .cfg-list{padding:12px;display:flex;flex-direction:column;gap:8px;padding-bottom:24px}
@@ -208,11 +194,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   </div>
 </header>
 
-<!-- TABS -->
+<!-- TABS - Analytics removed -->
 <div class="tabs">
   <div class="tab active" id="tab-portfolio" onclick="switchTab('portfolio',this)">◈ Portfolio</div>
-  <div class="tab" id="tab-analytics"  onclick="switchTab('analytics',this)">⌇ Analytics</div>
-  <div class="tab" id="tab-config"     onclick="switchTab('config',this)">⚙ Config</div>
+  <div class="tab" id="tab-config" onclick="switchTab('config',this)">⚙ Config</div>
 </div>
 
 <!-- CONTENT -->
@@ -254,28 +239,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
     </div>
   </div>
 
-  <!-- PORTFOLIO -->
+  <!-- PORTFOLIO (with realized PnL per token) -->
   <section class="section active" id="sec-portfolio">
     <div class="filter-bar">
       <div class="filter-count" id="filterCount">Chargement…</div>
       <button class="btn-filter" id="btnDead" onclick="toggleDead()">👁 Morts : cachés</button>
     </div>
     <div class="tok-list" id="tokList">
-      <div class="load-wrap"><div class="spinner"></div><span>Chargement…</span></div>
-    </div>
-  </section>
-
-  <!-- ANALYTICS -->
-  <section class="section" id="sec-analytics">
-    <div class="an-grid">
-      <div class="kpi"><div class="kpi-lbl">PnL réalisé</div><div class="kpi-val" id="anPnl">—</div></div>
-      <div class="kpi"><div class="kpi-lbl">Win Rate</div><div class="kpi-val" id="anWin">—</div></div>
-      <div class="kpi"><div class="kpi-lbl">Trades</div><div class="kpi-val gold" id="anTrades">—</div></div>
-      <div class="kpi"><div class="kpi-lbl">ROI</div><div class="kpi-val" id="anRoi">—</div></div>
-      <div class="kpi"><div class="kpi-lbl">Sharpe</div><div class="kpi-val" id="anSharpe">—</div></div>
-      <div class="kpi"><div class="kpi-lbl">Drawdown max</div><div class="kpi-val neg" id="anDD">—</div></div>
-    </div>
-    <div class="trades-list" id="tradesList">
       <div class="load-wrap"><div class="spinner"></div><span>Chargement…</span></div>
     </div>
   </section>
@@ -420,6 +390,7 @@ let _showDead  = false;
 let _cfgData   = {};
 let _detailMint = null;
 let _ticker    = null;
+let _tradesByMint = {}; // mint → { realizedPnlSol, tradesCount }
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -435,7 +406,7 @@ async function apiFetch(path, opts = {}) {
 }
 
 async function loadAll() {
-  await Promise.allSettled([loadPortfolio(), loadAnalytics()]);
+  await Promise.allSettled([loadPortfolio(), loadTradesByMint()]);
 }
 
 async function hardRefresh() {
@@ -445,6 +416,23 @@ async function hardRefresh() {
   btn.style.transition = 'transform .4s';
   await loadAll();
   setTimeout(() => { btn.style.color = ''; btn.style.transform = ''; }, 500);
+}
+
+// ─── TRADES BY MINT (for realized PnL per token) ─────────────────────────────
+async function loadTradesByMint() {
+  try {
+    const trD = await apiFetch('/api/trades');
+    const trades = trD?.trades || [];
+    _tradesByMint = {};
+    for (const t of trades) {
+      if (t.type === 'sell' && t.mint && t.pnlSol != null) {
+        const mint = t.mintFull || t.mint;
+        if (!_tradesByMint[mint]) _tradesByMint[mint] = { realizedPnlSol: 0, tradesCount: 0 };
+        _tradesByMint[mint].realizedPnlSol += t.pnlSol;
+        _tradesByMint[mint].tradesCount += 1;
+      }
+    }
+  } catch (e) { console.error('loadTradesByMint', e); }
 }
 
 // ─── PORTFOLIO ───────────────────────────────────────────────────────────────
@@ -536,6 +524,13 @@ function renderPortfolio(toks) {
       ? `<img src="${t.logo}" onerror="this.parentElement.innerHTML='🪙'" loading="lazy">`
       : '🪙';
 
+    // Realized PnL for this token
+    const mintKey = t.mintFull || t.mint;
+    const tradeData = _tradesByMint[mintKey] || { realizedPnlSol: 0, tradesCount: 0 };
+    const realizedPnl = tradeData.realizedPnlSol;
+    const realizedStr = realizedPnl != null ? (realizedPnl >= 0 ? '+' : '') + realizedPnl.toFixed(4) + ' ◎' : '—';
+    const realizedCls = realizedPnl == null ? '' : realizedPnl >= 0 ? 'pos' : 'neg';
+
     let cardCls  = 'tok-card';
     if (t.isSol)   cardCls += ' sol-card';
     if (t.isUsdc)  cardCls += ' usdc-card';
@@ -576,6 +571,7 @@ function renderPortfolio(toks) {
         <div class="tok-stat"><div class="tok-stat-lbl">Balance</div><div class="tok-stat-val">${balStr}</div></div>
         <div class="tok-stat"><div class="tok-stat-lbl">Peak</div><div class="tok-stat-val pos">+${fmt(t.peakPnl,1)}%</div></div>
         <div class="tok-stat"><div class="tok-stat-lbl">Liq.</div><div class="tok-stat-val">${fmtK(t.liquidity)}</div></div>
+        <div class="tok-stat"><div class="tok-stat-lbl">PnL réalisé</div><div class="tok-stat-val ${realizedCls}">${realizedStr}</div></div>
       </div>
     </div>`;
   });
@@ -648,46 +644,6 @@ function copyMint() {
   if (!_detailMint) return;
   if (navigator.clipboard) navigator.clipboard.writeText(_detailMint).then(() => toast('📋 Adresse copiée', 'ok'));
   else { const t = document.createElement('textarea'); t.value = _detailMint; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); toast('📋 Adresse copiée', 'ok'); }
-}
-
-// ─── ANALYTICS ───────────────────────────────────────────────────────────────
-async function loadAnalytics() {
-  try {
-    const [an, trD] = await Promise.allSettled([
-      apiFetch('/api/analytics'),
-      apiFetch('/api/trades'),
-    ]);
-    const a  = an.value || {};
-    const tr = trD.value?.trades || [];
-
-    const g = id => document.getElementById(id);
-    const p = a.realizedPnlSol ?? null;
-    const anPnl = g('anPnl'); if (anPnl) { anPnl.textContent = p !== null ? (p>=0?'+':'') + p.toFixed(4) + ' ◎' : '—'; anPnl.className = 'kpi-val ' + (p==null ? '' : p>=0 ? 'pos':'neg'); }
-    const anWin = g('anWin'); if (anWin) { anWin.textContent = a.winRate != null ? a.winRate + '%' : '—'; anWin.className = 'kpi-val ' + ((a.winRate||0)>=50?'pos':'neg'); }
-    if (g('anTrades')) g('anTrades').textContent = a.totalTrades ?? '—';
-    const roi = g('anRoi'); if (roi) { roi.textContent = a.roi != null ? a.roi + '%' : '—'; roi.className = 'kpi-val ' + (a.roi == null ? '' : a.roi >= 0 ? 'pos':'neg'); }
-    if (g('anSharpe')) g('anSharpe').textContent = a.sharpeRatio ?? '—';
-    if (g('anDD')) g('anDD').textContent = a.maxDrawdownSol ? '-' + a.maxDrawdownSol + ' ◎' : '—';
-
-    const list = g('tradesList');
-    if (!list) return;
-    if (!tr.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-txt">Aucun trade clôturé</div></div>'; return; }
-    list.innerHTML = tr.slice(0,20).map(t => {
-      const p = t.pnlPct ?? null;
-      const cls = p == null ? '' : p >= 0 ? 'pos' : 'neg';
-      const d = new Date(t.ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-      return `<div class="trade-card">
-        <div class="trade-left">
-          <div class="trade-sym">${t.symbol || t.mint?.slice(0,8)}</div>
-          <div class="trade-meta">${t.type?.toUpperCase()} · ${d}</div>
-        </div>
-        <div class="trade-right">
-          <div class="trade-pnl ${cls}">${p!=null?(p>=0?'+':'')+p.toFixed(2)+'%':'—'}</div>
-          <div class="trade-sol">${t.solOut != null ? t.solOut.toFixed(4)+' ◎' : t.reason||''}</div>
-        </div>
-      </div>`;
-    }).join('');
-  } catch (e) { console.error('loadAnalytics', e); }
 }
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
