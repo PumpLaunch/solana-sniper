@@ -12,6 +12,7 @@ function safeJson(raw, fallback) {
 const CFG = {
   PRIVATE_KEY:   process.env.PRIVATE_KEY,
   HELIUS_KEY:    process.env.HELIUS_API_KEY    || null,
+  HELIUS_KEY2:   process.env.HELIUS_API_KEY2   || null,
   PORT:          parseInt(process.env.PORT)             || 10000,
   INTERVAL_SEC:  parseInt(process.env.INTERVAL_SEC)     || 30,
   NODE_ENV:      process.env.NODE_ENV                    || 'production',
@@ -195,7 +196,8 @@ function loadWallet() {
 
 function createRpc() {
   const eps = [
-    CFG.HELIUS_KEY ? `https://mainnet.helius-rpc.com/?api-key=${CFG.HELIUS_KEY}` : null,
+    CFG.HELIUS_KEY  ? `https://mainnet.helius-rpc.com/?api-key=${CFG.HELIUS_KEY}`  : null,
+    CFG.HELIUS_KEY2 ? `https://mainnet.helius-rpc.com/?api-key=${CFG.HELIUS_KEY2}` : null,
     'https://api.mainnet-beta.solana.com',
     'https://solana-mainnet.public.blastapi.io',
   ].filter(Boolean);
