@@ -905,6 +905,7 @@ class PositionManager {
       price, bootstrapped, ts: Date.now(),
       originalBalance: balance,
       triggeredTiers:  [], soldAmount: 0, peakPnl: 0,
+      bootAttempts:    0,   // nombre de tentatives Helius échouées
     });
     this.triggered.set(mint, new Set());
     this.sold.set(mint, 0);
@@ -2523,7 +2524,27 @@ class BotLoop {
             });
             fixed++;
           } else {
-            log('debug', `Bootstrap non résolu ${mint.slice(0, 8)} — tx introuvable`);
+            // Incrémenter le compteur d'échecs
+            const e = this.positions.entries.get(mint);
+            if (e) e.bootAttempts = (e.bootAttempts || 0) + 1;
+
+            // Après 3 tentatives → forcer le prix marché actuel comme entrée (PnL = 0%)
+            // Les stratégies TP/SL peuvent désormais s'activer
+            const BOOT_MAX_TRIES = 3;
+            if ((e?.bootAttempts || 0) >= BOOT_MAX_TRIES) {
+              const currentPrice = getPrice(mint)?.price || 0;
+              if (currentPrice > 0) {
+                this.positions.setEntryPrice(mint, currentPrice);
+                log('warn', `⚠️ Bootstrap forcé (prix actuel) ${mint.slice(0, 8)} — tx Helius introuvable après ${e.bootAttempts} tentatives`, {
+                  price: currentPrice.toPrecision(4),
+                });
+                fixed++;
+              } else {
+                log('debug', `Bootstrap non résolu ${mint.slice(0, 8)} — prix marché aussi indisponible`);
+              }
+            } else {
+              log('debug', `Bootstrap non résolu ${mint.slice(0, 8)} — tx introuvable (tentative ${e?.bootAttempts || 1}/${BOOT_MAX_TRIES})`);
+            }
           }
         }
         await sleep(300); // rate limit Helius
@@ -2829,10 +2850,11 @@ class TokenScanner {
     const already = this.bot.portfolio.find(t => t.mintFull === mint);
     if (already) { this.stats.rejected++; return; }
 
-    // Ne compter que les positions actives (valeur ≥ $0.10 et prix connu)
-    // Les tokens morts/rugpullés à $0 ne bloquent pas les nouveaux achats du scanner
+    // Ne compter que les positions actives NON-bootstrappées avec valeur ≥ $2
+    // Bootstrappées non résolues + tokens morts ne bloquent pas les nouveaux achats
     const openPositions = this.bot.portfolio.filter(t =>
-      !t.isSol && !t.isUsdc && t.balance > 0 && t.price > 0 && (t.value || 0) >= 0.10
+      !t.isSol && !t.isUsdc && t.balance > 0 && t.price > 0 &&
+      (t.value || 0) >= 2.0 && !t.bootstrapped
     ).length;
     if (openPositions >= CFG.MAX_POSITIONS) {
       log('debug', `Scanner skip — max positions actives atteint (${openPositions}/${CFG.MAX_POSITIONS})`);
@@ -3701,6 +3723,25 @@ async function main() {
   // §v6 — Token Scanner
   const scanner = new TokenScanner(bot);
   if (CFG.SCANNER_ENABLED) scanner.start();
+
+  // Attendre que le réseau soit prêt (Jupiter DNS peut prendre 5-15s sur Render au démarrage)
+  log('info', 'Vérification réseau avant premier tick…');
+  let networkReady = false;
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      const r = await fetch('https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000&slippageBps=50', {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (r.ok || r.status === 400) { // 400 = endpoint OK (param invalide) ou 200
+        networkReady = true;
+        log('info', `✅ Réseau OK (tentative ${attempt}) — démarrage tick`);
+        break;
+      }
+    } catch { /* DNS pas encore résolu */ }
+    log('warn', `⏳ Réseau non prêt (tentative ${attempt}/6) — attente 5s…`);
+    await sleep(5000);
+  }
+  if (!networkReady) log('warn', '⚠️ Jupiter toujours inaccessible — premier tick lancé quand même');
 
   log('info', 'Premier tick…');
   await bot.tick();
