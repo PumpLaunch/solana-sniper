@@ -252,14 +252,27 @@ function loadState() {
   try {
     if (fs.existsSync(CFG.DATA_FILE)) {
       const raw = JSON.parse(fs.readFileSync(CFG.DATA_FILE, 'utf8'));
+      // Restore persisted config overrides (survive restart)
+      const c = raw.configOverrides || {};
+      if (Array.isArray(c.tpTiers)  && c.tpTiers.length)  CFG.TP_TIERS  = c.tpTiers;
+      if (typeof c.tpEnabled        === 'boolean')          CFG.TP_ENABLED = c.tpEnabled;
+      if (typeof c.tpHysteresis     === 'number')           CFG.TP_HYSTERESIS = c.tpHysteresis;
+      if (typeof c.slEnabled        === 'boolean')          CFG.SL_ENABLED = c.slEnabled;
+      if (typeof c.slPct            === 'number')           CFG.SL_PCT = c.slPct;
+      if (typeof c.beEnabled        === 'boolean')          CFG.BE_ENABLED = c.beEnabled;
+      if (typeof c.beBuffer         === 'number')           CFG.BE_BUFFER = c.beBuffer;
+      if (typeof c.tsEnabled        === 'boolean')          CFG.TS_ENABLED = c.tsEnabled;
+      if (typeof c.tsPct            === 'number')           CFG.TS_PCT = c.tsPct;
+      if (typeof c.intervalSec      === 'number')           CFG.INTERVAL_SEC = c.intervalSec;
       log('info', 'Etat restaure', {
         positions: Object.keys(raw.entryPrices || {}).length,
         trades:    (raw.trades || []).length,
+        configOverrides: Object.keys(c).length,
       });
       return raw;
     }
   } catch (err) { log('warn', 'Chargement etat echoue -- demarrage propre', { err: err.message }); }
-  return { entryPrices: {}, trades: [], stopLossHit: [], slPending: [], breakEven: [] };
+  return { entryPrices: {}, trades: [], stopLossHit: [], slPending: [], breakEven: [], configOverrides: {} };
 }
 
 function saveState(data) {
@@ -1074,6 +1087,13 @@ class BotLoop {
       stopLossHit: Array.from(this.positions.slHit), slPending: Array.from(this.positions.slPending),
       breakEven:   Array.from(this.positions.breakEven), analytics: this.analytics.serialize(),
       costBasis:   Object.fromEntries(this.costBasis), slExits: this.positions.serializeSlExits(),
+      configOverrides: {
+        tpTiers: CFG.TP_TIERS, tpEnabled: CFG.TP_ENABLED, tpHysteresis: CFG.TP_HYSTERESIS,
+        slEnabled: CFG.SL_ENABLED, slPct: CFG.SL_PCT,
+        beEnabled: CFG.BE_ENABLED, beBuffer: CFG.BE_BUFFER,
+        tsEnabled: CFG.TS_ENABLED, tsPct: CFG.TS_PCT,
+        intervalSec: CFG.INTERVAL_SEC,
+      },
     });
   }
 
