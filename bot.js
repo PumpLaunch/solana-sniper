@@ -75,6 +75,13 @@ const CFG = {
   SMART_SIZE_MIN:     parseFloat(process.env.SMART_SIZE_MIN   || '0.02'),
   SMART_SIZE_MAX:     parseFloat(process.env.SMART_SIZE_MAX   || '0.5'),
   SELL_TO_USDC: process.env.SELL_TO_USDC === 'true',
+  // Scanner
+  SCAN_ENABLED:   process.env.SCAN_ENABLED !== 'false',
+  SCAN_MIN_LIQ:   parseFloat(process.env.SCAN_MIN_LIQ   || '5000'),
+  SCAN_MAX_LIQ:   parseFloat(process.env.SCAN_MAX_LIQ   || '300000'),
+  SCAN_MIN_SCORE: parseFloat(process.env.SCAN_MIN_SCORE || '60'),
+  SCAN_DELAY_MS:  parseInt(process.env.SCAN_DELAY_MS    || '45000'), // wait before DexScreener check
+  SCAN_SOL:       parseFloat(process.env.SCAN_SOL        || '0'),    // 0 = use smart size or base
 };
 
 if (!CFG.PRIVATE_KEY) { console.error('\u274c PRIVATE_KEY manquante'); process.exit(1); }
@@ -1337,6 +1344,103 @@ class BotLoop {
   }
 }
 
+// §13.5  SCANNER
+class TokenScanner {
+  constructor(bot) {
+    this.bot    = bot;
+    this._queue = new Map(); // mint → { ts, reason }
+    this._seen  = new Set();
+    this._ws    = null;
+  }
+
+  start() {
+    if (!CFG.SCAN_ENABLED) return;
+    this._connectPump();
+    setInterval(() => this._pollDexLatest(), 30_000);
+    setInterval(() => this._processQueue(),  15_000);
+    log('info', 'Scanner démarré', { delay: CFG.SCAN_DELAY_MS / 1000 + 's', liq: `$${CFG.SCAN_MIN_LIQ}-$${CFG.SCAN_MAX_LIQ}`, minScore: CFG.SCAN_MIN_SCORE });
+  }
+
+  _connectPump() {
+    let WS;
+    try { WS = require('ws'); } catch { log('warn', 'Module ws absent — scanner PUMP_NEW désactivé'); return; }
+    const connect = () => {
+      try {
+        const ws = new WS('wss://pumpportal.fun/api/data');
+        ws.on('open',  ()  => { ws.send(JSON.stringify({ method: 'subscribeNewToken' })); log('info', 'PumpPortal WS connecté'); });
+        ws.on('message', d => { try { const p = JSON.parse(d); if (p.mint) this._enqueue(p.mint, 'PUMP_NEW'); } catch {} });
+        ws.on('close', ()  => { log('warn', 'PumpPortal WS fermé — reconnexion 15s'); setTimeout(connect, 15_000); });
+        ws.on('error', err => log('warn', 'PumpPortal WS erreur', { err: err.message }));
+        this._ws = ws;
+      } catch (err) { log('warn', 'PumpPortal WS connect échoué', { err: err.message }); setTimeout(connect, 15_000); }
+    };
+    connect();
+  }
+
+  async _pollDexLatest() {
+    try {
+      const r = await fetch('https://api.dexscreener.com/token-profiles/latest/v1',
+        { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+      if (!r.ok) return;
+      const items = await r.json();
+      (Array.isArray(items) ? items : [])
+        .filter(i => i.chainId === 'solana' && i.tokenAddress)
+        .slice(0, 15)
+        .forEach(i => this._enqueue(i.tokenAddress, 'DEX_LATEST'));
+    } catch {}
+  }
+
+  _enqueue(mint, reason) {
+    if (this._seen.has(mint)) return;
+    if (this.bot.portfolio?.some(t => t.mintFull === mint)) return;
+    this._seen.add(mint);
+    if (this._seen.size > 20_000) { const arr = [...this._seen]; arr.slice(0, 10_000).forEach(m => this._seen.delete(m)); }
+    this._queue.set(mint, { ts: Date.now(), reason });
+    log('info', `🆕 Scanner détecté: ${mint.slice(0, 8)}… (${reason})`);
+  }
+
+  async _processQueue() {
+    const now   = Date.now();
+    const ready = [...this._queue.entries()].filter(([, v]) => now - v.ts >= CFG.SCAN_DELAY_MS);
+    if (!ready.length) return;
+
+    // single batch DexScreener call for ALL ready tokens
+    const mints = ready.map(([m]) => m);
+    ready.forEach(([m]) => this._queue.delete(m));
+    await prefetchPrices(mints);
+
+    for (const [mint, { reason }] of ready) {
+      const pd  = getPrice(mint);
+      const liq = pd?.liquidity || 0;
+      const pr  = pd?.price     || 0;
+      if (!pr) continue;
+
+      if (liq < CFG.SCAN_MIN_LIQ || liq > CFG.SCAN_MAX_LIQ) {
+        log('debug', `Scanner reject — liq $${liq.toFixed(0)} hors plage [$${CFG.SCAN_MIN_LIQ}-$${CFG.SCAN_MAX_LIQ}]`);
+        continue;
+      }
+      const score = this.bot.scorer.score(pd);
+      if (score < CFG.SCAN_MIN_SCORE) {
+        log('debug', `Scanner reject — score ${score} < ${CFG.SCAN_MIN_SCORE}`, { mint: mint.slice(0, 8), sym: pd.symbol });
+        continue;
+      }
+      if ((this.bot.portfolio?.length || 0) >= CFG.MAX_POSITIONS) {
+        log('warn', 'Scanner reject — max positions atteint'); break;
+      }
+      const sol = CFG.SCAN_SOL > 0 ? CFG.SCAN_SOL
+        : CFG.SMART_SIZE_ENABLED ? this.bot.calcSmartSize(score)
+        : CFG.SMART_SIZE_BASE;
+      log('info', `🟢 Scanner BUY — score:${score} liq:$${liq.toFixed(0)} sol:${sol.toFixed(3)}`,
+        { mint: mint.slice(0, 8), sym: pd.symbol, reason });
+      await this.bot._autoBuy(mint, sol, `SCANNER_${reason}`, pd, {
+        webhookTitle: `Scanner ${reason}`,
+        webhookDesc:  `${pd.symbol || mint.slice(0, 8)} — Score: ${score}/100 | Liq: $${(liq / 1000).toFixed(1)}k`,
+        webhookColor: 0x00ff88,
+      });
+    }
+  }
+}
+
 // §14  API
 function startApi(bot, wallet) {
   const app = express();
@@ -1665,7 +1769,9 @@ async function main() {
   log('info', 'STRATEGIE ACTIVE', { TP: CFG.TP_ENABLED ? `[${tpStr}]` : 'OFF', SL: CFG.SL_ENABLED ? `[${CFG.SL_PCT}%]` : 'OFF', BE: CFG.BE_ENABLED ? `[+${CFG.BE_BUFFER}%]` : 'OFF', TS: CFG.TS_ENABLED ? `[-${CFG.TS_PCT}%]` : 'OFF', AR: CFG.AR_ENABLED ? `[>${CFG.AR_PCT}%/cycle]` : 'OFF', LE: CFG.LE_ENABLED ? `[>${CFG.LE_PCT}% liq]` : 'OFF', PYRAMID: CFG.PYRAMID_ENABLED ? `[${CFG.PYRAMID_TIERS.length} paliers]` : 'OFF', DCA_DOWN: CFG.DCAD_ENABLED ? `[${CFG.DCAD_TIERS.length} paliers]` : 'OFF', REENTRY: CFG.REENTRY_ENABLED ? `[delai ${CFG.REENTRY_DELAY_MIN}min]` : 'OFF', SMART_SIZE: CFG.SMART_SIZE_ENABLED ? `[base ${CFG.SMART_SIZE_BASE}]` : 'OFF' });
 
   const wallet = loadWallet(), rpc = createRpc(), state = loadState(), bot = new BotLoop(wallet, rpc, state);
+  const scanner = new TokenScanner(bot);
   log('info', 'Premier tick...'); await bot.tick();
+  scanner.start();
 
   // Adaptive tick loop: backs off exponentially on consecutive RPC failures
   // 0 fails→30s, 1→30s, 2→60s, 3→120s, 4+→300s
