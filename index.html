@@ -40,13 +40,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .ts-val{font-family:var(--mono);font-size:13px;font-weight:700;white-space:nowrap}
 .ts-val.pos{color:var(--up)}.ts-val.neg{color:var(--dn)}.ts-val.gold{color:var(--gold)}
 .sep{width:1px;height:28px;background:var(--border);flex-shrink:0}
-.btn-refresh{background:none;border:1px solid var(--border2);border-radius:6px;color:var(--dim);padding:5px 8px;font-size:14px;cursor:pointer;flex-shrink:0;transition:color .15s}
+.btn-refresh{background:none;border:1px solid var(--border2);border-radius:6px;color:var(--dim);padding:5px 8px;font-size:14px;cursor:pointer;flex-shrink:0;transition:color .15s,transform .4s}
 .btn-refresh:active{color:var(--text);background:var(--bg3)}
 
 /* ── TABS ── */
-.tabs{flex-shrink:0;display:flex;background:var(--bg1);border-bottom:1px solid var(--border);overflow-x:auto}
-.tabs::-webkit-scrollbar{display:none}
-.tab{flex:1;min-width:80px;padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:.04em;
+.tabs{flex-shrink:0;display:flex;background:var(--bg1);border-bottom:1px solid var(--border)}
+.tab{flex:1;padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:.04em;
   color:var(--dim);text-align:center;cursor:pointer;border-bottom:2px solid transparent;
   transition:color .15s,border-color .15s;white-space:nowrap;text-transform:uppercase}
 .tab.active{color:var(--gold);border-bottom-color:var(--gold)}
@@ -72,13 +71,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .tok-list{padding:10px 12px;display:flex;flex-direction:column;gap:8px;padding-bottom:20px}
 .tok-card{
   background:var(--bg1);border:1px solid var(--border);border-radius:12px;
-  overflow:hidden;cursor:pointer;transition:border-color .15s;
+  overflow:hidden;transition:border-color .15s;
 }
-.tok-card:active{border-color:var(--border2)}
 .tok-card.sol-card{border-left:3px solid var(--purple)}
 .tok-card.usdc-card{border-left:3px solid var(--blue)}
 .tok-card.dead-card{opacity:.45}
-.tok-top{display:flex;align-items:center;gap:10px;padding:11px 12px 9px}
+
+/* Card header — clickable to open chart */
+.tok-top{display:flex;align-items:center;gap:10px;padding:11px 12px 9px;cursor:pointer}
+.tok-top:active{background:rgba(255,255,255,.02)}
 .tok-logo{width:38px;height:38px;border-radius:9px;background:var(--bg3);
   display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;overflow:hidden}
 .tok-logo img{width:100%;height:100%;object-fit:cover;border-radius:9px}
@@ -98,19 +99,79 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .tok-pnl.pos{background:rgba(0,217,126,.12);color:var(--up)}
 .tok-pnl.neg{background:rgba(255,56,96,.12);color:var(--dn)}
 .tok-pnl.dim{background:var(--bg3);color:var(--dim)}
-.tok-bottom{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)}
+
+/* ── STATS ROW (sous le header) ── */
+.tok-stats-row{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border)}
 .tok-stat{padding:7px 0;text-align:center;border-right:1px solid var(--border)}
 .tok-stat:last-child{border-right:none}
 .tok-stat-lbl{font-size:8px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
 .tok-stat-val{font-family:var(--mono);font-size:11px;font-weight:600}
 .tok-stat-val.pos{color:var(--up)}.tok-stat-val.neg{color:var(--dn)}
 
+/* ── ANALYTICS EXPAND SECTION (sous stats) ── */
+.tok-an-toggle{
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  padding:7px 12px;border-top:1px solid var(--border);
+  background:var(--bg2);cursor:pointer;
+  font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);
+  transition:color .15s,background .15s;
+  user-select:none;
+}
+.tok-an-toggle:active{background:var(--bg3)}
+.tok-an-toggle .arr{transition:transform .2s;display:inline-block;font-size:10px}
+.tok-an-toggle.open .arr{transform:rotate(180deg)}
+
+.tok-an-panel{
+  display:none;
+  border-top:1px solid var(--border);
+  background:rgba(11,17,30,.7);
+}
+.tok-an-panel.open{display:block}
+
+/* KPI grid inside panel */
+.an-kpi-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--border);
+}
+.an-kpi{
+  background:var(--bg1);padding:10px 8px;text-align:center;
+}
+.an-kpi-lbl{font-size:8px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.an-kpi-val{font-family:var(--mono);font-size:13px;font-weight:700}
+.an-kpi-val.pos{color:var(--up)}.an-kpi-val.neg{color:var(--dn)}.an-kpi-val.gold{color:var(--gold)}
+
+/* Trades mini-list inside panel */
+.an-trades-title{
+  font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dim);padding:8px 12px 4px;border-top:1px solid var(--border);
+}
+.an-trade{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:7px 12px;border-top:1px solid rgba(30,45,71,.5);
+}
+.an-trade-left .an-trade-type{font-size:10px;font-weight:600;letter-spacing:.04em}
+.an-trade-left .an-trade-date{font-size:8px;color:var(--dim);font-family:var(--mono);margin-top:1px}
+.an-trade-right{text-align:right}
+.an-trade-pnl{font-family:var(--mono);font-size:11px;font-weight:700}
+.an-trade-sol{font-size:8px;color:var(--dim);font-family:var(--mono);margin-top:1px}
+.an-empty{padding:12px;text-align:center;font-size:10px;color:var(--dim)}
+
+/* Chart quick link */
+.an-chart-btn{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin:10px 12px 12px;padding:9px;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+  color:var(--text);font-size:11px;font-weight:600;letter-spacing:.03em;text-decoration:none;
+  cursor:pointer;
+}
+.an-chart-btn:active{background:var(--bg3)}
+
 /* ── DEAD SEPARATOR ── */
 .dead-sep{padding:5px 12px;background:rgba(255,56,96,.05);border-top:1px solid rgba(255,56,96,.2);
   font-size:9px;color:rgba(255,56,96,.5);letter-spacing:.07em;text-transform:uppercase;font-weight:600}
 
-/* ── TOKEN DETAIL ── */
-.detail-view{display:none;height:100%;flex-direction:column}
+/* ── TOKEN DETAIL OVERLAY ── */
+.detail-view{display:none;height:100%;flex-direction:column;position:absolute;inset:0;z-index:20;background:var(--bg)}
 .detail-view.open{display:flex}
 .detail-header{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 14px;
   background:var(--bg1);border-bottom:1px solid var(--border)}
@@ -156,6 +217,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .cfg-field input,.cfg-field select{width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border2);
   border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono)}
 .cfg-field input:focus,.cfg-field select:focus{outline:none;border-color:var(--gold)}
+
+/* ── SAVE BAR ── */
 .save-bar{flex-shrink:0;padding:10px 12px;background:var(--bg1);border-top:1px solid var(--border);position:sticky;bottom:0}
 .btn-save{width:100%;padding:13px;background:var(--gold);color:#060910;font-weight:700;font-size:13px;
   border:none;border-radius:9px;cursor:pointer;letter-spacing:.05em;transition:opacity .15s}
@@ -170,7 +233,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .toast.ok{border-color:rgba(0,217,126,.4)}.toast.err{border-color:rgba(255,56,96,.4)}
 @keyframes tst{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
 
-/* ── EMPTY / LOADING ── */
+/* ── UTILS ── */
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;color:var(--dim);text-align:center;gap:10px}
 .empty-icon{font-size:40px;opacity:.35}
 .empty-txt{font-size:12px}
@@ -182,7 +245,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 <!-- TOPBAR -->
 <header class="topbar">
   <div class="pulse-dot"></div>
-  <div class="logo">SOL<span>BOT</span> <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:2px;">v5</span></div>
+  <div class="logo">SOL<span>BOT</span> <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:2px;">v6</span></div>
   <div class="topbar-stats">
     <div class="ts"><div class="ts-lbl">Portfolio</div><div class="ts-val gold" id="tvTotal">—</div></div>
     <div class="sep"></div>
@@ -190,11 +253,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
     <div class="sep"></div>
     <div class="ts"><div class="ts-lbl">Win%</div><div class="ts-val" id="tvWin">—</div></div>
     <div class="sep"></div>
-    <button class="btn-refresh" onclick="hardRefresh()" title="Refresh">↺</button>
+    <button class="btn-refresh" id="btnRefresh" onclick="hardRefresh()" title="Refresh">↺</button>
   </div>
 </header>
 
-<!-- TABS - Analytics removed -->
+<!-- TABS -->
 <div class="tabs">
   <div class="tab active" id="tab-portfolio" onclick="switchTab('portfolio',this)">◈ Portfolio</div>
   <div class="tab" id="tab-config" onclick="switchTab('config',this)">⚙ Config</div>
@@ -203,7 +266,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 <!-- CONTENT -->
 <div class="content">
 
-  <!-- TOKEN DETAIL (overlay inside content) -->
+  <!-- TOKEN DETAIL OVERLAY -->
   <div class="detail-view" id="detailView">
     <div class="detail-header">
       <button class="detail-back" onclick="closeDetail()">‹</button>
@@ -216,7 +279,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--gold)" id="dtScore">—</div>
       </div>
     </div>
-    <div class="detail-stats" id="dtStats">
+    <div class="detail-stats">
       <div class="detail-stat"><div class="detail-stat-lbl">Valeur</div><div class="detail-stat-val" id="dtVal">—</div></div>
       <div class="detail-stat"><div class="detail-stat-lbl">PnL</div><div class="detail-stat-val" id="dtPnl">—</div></div>
       <div class="detail-stat"><div class="detail-stat-lbl">Peak</div><div class="detail-stat-val pos" id="dtPeak">—</div></div>
@@ -239,7 +302,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
     </div>
   </div>
 
-  <!-- PORTFOLIO (with realized PnL per token) -->
+  <!-- PORTFOLIO -->
   <section class="section active" id="sec-portfolio">
     <div class="filter-bar">
       <div class="filter-count" id="filterCount">Chargement…</div>
@@ -254,7 +317,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   <section class="section" id="sec-config">
     <div class="cfg-list">
 
-      <!-- Take-Profit -->
       <div class="cfg-section">
         <div class="cfg-title">🎯 Take-Profit</div>
         <div class="cfg-row">
@@ -266,7 +328,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         </div>
       </div>
 
-      <!-- Break-Even -->
       <div class="cfg-section">
         <div class="cfg-title">⚖ Break-Even Stop</div>
         <div class="cfg-row">
@@ -278,7 +339,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         </div>
       </div>
 
-      <!-- Stop-Loss -->
       <div class="cfg-section">
         <div class="cfg-title">🛡 Stop-Loss</div>
         <div class="cfg-row">
@@ -290,7 +350,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         </div>
       </div>
 
-      <!-- Trailing -->
       <div class="cfg-section">
         <div class="cfg-title">📉 Trailing Stop</div>
         <div class="cfg-row">
@@ -302,7 +361,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         </div>
       </div>
 
-      <!-- Anti-Rug -->
       <div class="cfg-section">
         <div class="cfg-title">🚨 Anti-Rug</div>
         <div class="cfg-row">
@@ -314,7 +372,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         </div>
       </div>
 
-      <!-- Jito -->
       <div class="cfg-section">
         <div class="cfg-title">⚡ Jito Bundles</div>
         <div class="cfg-row">
@@ -326,7 +383,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         </div>
       </div>
 
-      <!-- Sortie USDC -->
       <div class="cfg-section" style="border-color:rgba(240,180,41,.2)">
         <div class="cfg-title" style="color:var(--gold);background:rgba(240,180,41,.06)">💰 Sortie des ventes</div>
         <div class="cfg-row">
@@ -338,7 +394,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         </div>
       </div>
 
-      <!-- Général -->
       <div class="cfg-section">
         <div class="cfg-title">⚙ Général</div>
         <div class="cfg-input-row">
@@ -354,26 +409,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
         </div>
       </div>
 
-      <!-- Circuit Breaker -->
       <div class="cfg-section">
         <div class="cfg-title">⚠ Circuit-Breaker</div>
         <div style="padding:14px;display:flex;align-items:center;justify-content:space-between">
           <div>
             <div style="font-size:11px;color:var(--dim)">Échecs sell consécutifs</div>
             <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--dn)" id="cbCount">—</div>
+            <div style="font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:2px" id="cbReset"></div>
           </div>
           <button onclick="resetCB()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 16px;color:var(--text);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.04em">🔄 RESET</button>
         </div>
       </div>
-
     </div>
-    <!-- sticky save bar inside config section scroll -->
     <div style="height:80px"></div>
   </section>
 
 </div>
 
-<!-- SAVE BAR (config only) -->
+<!-- SAVE BAR -->
 <div class="save-bar" id="saveBar" style="display:none">
   <button class="btn-save" onclick="saveConfig()">▸ SAUVEGARDER ◂</button>
   <div class="save-status" id="saveStatus"></div>
@@ -386,16 +439,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API = 'https://solana-sniper-7o8s.onrender.com';
 let _portfolio = [];
+let _trades    = [];
+let _analytics = {};
 let _showDead  = false;
+let _openPanels = new Set(); // mints dont le panel analytics est ouvert
 let _cfgData   = {};
 let _detailMint = null;
-let _ticker    = null;
-let _tradesByMint = {}; // mint → { realizedPnlSol, tradesCount }
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadAll();
-  _ticker = setInterval(loadAll, 30000);
+  setInterval(loadAll, 30000);
 });
 
 async function apiFetch(path, opts = {}) {
@@ -406,53 +460,40 @@ async function apiFetch(path, opts = {}) {
 }
 
 async function loadAll() {
-  await Promise.allSettled([loadPortfolio(), loadTradesByMint()]);
+  await Promise.allSettled([loadPortfolio()]);
 }
 
 async function hardRefresh() {
-  const btn = document.querySelector('.btn-refresh');
+  const btn = document.getElementById('btnRefresh');
   btn.style.color = 'var(--gold)';
   btn.style.transform = 'rotate(180deg)';
-  btn.style.transition = 'transform .4s';
   await loadAll();
   setTimeout(() => { btn.style.color = ''; btn.style.transform = ''; }, 500);
-}
-
-// ─── TRADES BY MINT (for realized PnL per token) ─────────────────────────────
-async function loadTradesByMint() {
-  try {
-    const trD = await apiFetch('/api/trades');
-    const trades = trD?.trades || [];
-    _tradesByMint = {};
-    for (const t of trades) {
-      if (t.type === 'sell' && t.mint && t.pnlSol != null) {
-        const mint = t.mintFull || t.mint;
-        if (!_tradesByMint[mint]) _tradesByMint[mint] = { realizedPnlSol: 0, tradesCount: 0 };
-        _tradesByMint[mint].realizedPnlSol += t.pnlSol;
-        _tradesByMint[mint].tradesCount += 1;
-      }
-    }
-  } catch (e) { console.error('loadTradesByMint', e); }
 }
 
 // ─── PORTFOLIO ───────────────────────────────────────────────────────────────
 async function loadPortfolio() {
   try {
-    const [statsD, portD, balD, anD] = await Promise.allSettled([
+    const [statsD, portD, anD, trD] = await Promise.allSettled([
       apiFetch('/api/stats'),
       apiFetch('/api/portfolio'),
-      apiFetch('/api/sol-balance'),
       apiFetch('/api/analytics'),
+      apiFetch('/api/trades'),
     ]);
+
     const stats = statsD.value || {};
     const toks  = portD.value?.tokens || [];
     const an    = anD.value || {};
+    const trades = trD.value?.trades || [];
 
     _portfolio = toks;
+    _analytics = an;
+    _trades    = trades;
 
     // Topbar
     const tv = document.getElementById('tvTotal');
     if (tv) tv.textContent = stats.totalValue != null ? '$' + stats.totalValue.toFixed(2) : '—';
+
     const pnlEl = document.getElementById('tvPnl');
     if (pnlEl) {
       const p = an.realizedPnlSol ?? null;
@@ -460,52 +501,82 @@ async function loadPortfolio() {
       pnlEl.className = 'ts-val ' + (p == null ? '' : p >= 0 ? 'pos' : 'neg');
     }
     const winEl = document.getElementById('tvWin');
-    if (winEl) { winEl.textContent = an.winRate != null ? an.winRate + '%' : '—'; winEl.className = 'ts-val ' + ((an.winRate||0) >= 50 ? 'pos' : 'neg'); }
+    if (winEl) {
+      winEl.textContent = an.winRate != null ? an.winRate + '%' : '—';
+      winEl.className = 'ts-val ' + ((an.winRate || 0) >= 50 ? 'pos' : 'neg');
+    }
 
+    // CB count in config tab
     const cb = document.getElementById('cbCount');
-    if (cb) { cb.textContent = stats.sellCircuitBreaker ?? '—'; }
+    if (cb) cb.textContent = stats.sellCircuitBreaker ?? '—';
+    const cbR = document.getElementById('cbReset');
+    if (cbR && stats.cbAutoResetIn != null) {
+      cbR.textContent = stats.cbAutoResetIn > 0 ? `reset dans ${stats.cbAutoResetIn}s` : '';
+    }
 
-    renderPortfolio(_portfolio);
+    renderPortfolio();
   } catch (e) { console.error('loadPortfolio', e); }
 }
 
 // ─── DEAD FILTER ─────────────────────────────────────────────────────────────
 function isDead(t) {
   if (t.isSol || t.isUsdc) return false;
-  const hasPrice  = (t.price != null && t.price > 0);
+  const hasPrice  = t.price != null && t.price > 0;
   const hasSymbol = t.symbol && /[a-zA-Z]{2,}/.test(t.symbol) && t.symbol.length <= 24;
   return !hasPrice && !hasSymbol;
 }
+
 function toggleDead() {
   _showDead = !_showDead;
   const btn = document.getElementById('btnDead');
   btn.textContent = '👁 Morts : ' + (_showDead ? 'visibles' : 'cachés');
   btn.classList.toggle('active-dead', _showDead);
-  renderPortfolio(_portfolio);
+  renderPortfolio();
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const fmt  = (n, d=2) => n != null ? n.toFixed(d) : '—';
+const fmtK = n => n > 0 ? '$' + (n/1000).toFixed(1) + 'k' : '—';
+const fmtM = n => {
+  if (!n || n <= 0) return '—';
+  if (n > 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+  if (n > 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+  return '$' + n.toFixed(0);
+};
+
+// Trades filtrés pour un mint donné
+function tradesForMint(mintFull) {
+  return _trades.filter(t => t.mint === mintFull || t.mint === mintFull?.slice(0,8));
+}
+
+// PnL réalisé sur un mint spécifique (somme des trades sell)
+function mintPnl(mintFull) {
+  const tr = tradesForMint(mintFull).filter(t => t.type === 'sell');
+  if (!tr.length) return null;
+  const totalSol = tr.reduce((s, t) => s + (t.solOut || 0), 0);
+  const pnls = tr.filter(t => t.pnlPct != null).map(t => t.pnlPct);
+  const avgPnlPct = pnls.length ? pnls.reduce((a,b)=>a+b,0)/pnls.length : null;
+  return { totalSol, avgPnlPct, count: tr.length };
 }
 
 // ─── RENDER PORTFOLIO ─────────────────────────────────────────────────────────
-function renderPortfolio(toks) {
-  const list  = document.getElementById('tokList');
-  const cnt   = document.getElementById('filterCount');
+function renderPortfolio() {
+  const list = document.getElementById('tokList');
+  const cnt  = document.getElementById('filterCount');
 
-  toks.forEach(t => { if (!t.mintFull) t.mintFull = t.mint; });
-  const live = toks.filter(t => !isDead(t));
-  const dead = toks.filter(t => isDead(t));
-  const show = _showDead ? toks : live;
+  _portfolio.forEach(t => { if (!t.mintFull) t.mintFull = t.mint; });
+  const live = _portfolio.filter(t => !isDead(t));
+  const dead = _portfolio.filter(t => isDead(t));
+  const show = _showDead ? _portfolio : live;
 
   if (cnt) cnt.textContent = dead.length > 0
-    ? live.length + ' actifs · ' + dead.length + ' morts ' + (_showDead ? 'visibles' : 'masqués')
-    : live.length + ' tokens';
+    ? `${live.length} actifs · ${dead.length} morts ` + (_showDead ? 'visibles' : 'masqués')
+    : `${live.length} tokens`;
 
   if (!show.length) {
     list.innerHTML = '<div class="empty"><div class="empty-icon">◈</div><div class="empty-txt">Portfolio vide</div></div>';
     return;
   }
-
-  const fmt  = (n, d=2) => n != null ? n.toFixed(d) : '—';
-  const fmtK = n => n > 0 ? '$' + (n/1000).toFixed(1) + 'k' : '—';
-  const fmtM = n => { if (!n) return '—'; if (n>1e6) return '$'+(n/1e6).toFixed(1)+'M'; if (n>1e3) return '$'+(n/1e3).toFixed(0)+'K'; return '$'+n.toFixed(0); };
 
   let html = '';
   let inDead = false;
@@ -514,46 +585,88 @@ function renderPortfolio(toks) {
     const dead = isDead(t);
     if (_showDead && !inDead && dead && live.length > 0) {
       inDead = true;
-      html += '<div class="dead-sep">▼ Tokens sans prix — ruggés ou abandonnés (' + dead + ')</div>';
+      html += `<div class="dead-sep">▼ Tokens sans prix — ruggés ou abandonnés</div>`;
     }
-    const pnl    = t.pnl ?? null;
-    const pCls   = pnl == null ? 'dim' : pnl >= 0 ? 'pos' : 'neg';
-    const pStr   = pnl == null ? '—' : (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
-    const val    = t.value ?? 0;
-    const logo   = t.logo
+
+    const pnl   = t.pnl ?? null;
+    const pCls  = pnl == null ? 'dim' : pnl >= 0 ? 'pos' : 'neg';
+    const pStr  = pnl == null ? '—' : (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
+    const val   = t.value ?? 0;
+    const logo  = t.logo
       ? `<img src="${t.logo}" onerror="this.parentElement.innerHTML='🪙'" loading="lazy">`
       : '🪙';
 
-    // Realized PnL for this token
-    const mintKey = t.mintFull || t.mint;
-    const tradeData = _tradesByMint[mintKey] || { realizedPnlSol: 0, tradesCount: 0 };
-    const realizedPnl = tradeData.realizedPnlSol;
-    const realizedStr = realizedPnl != null ? (realizedPnl >= 0 ? '+' : '') + realizedPnl.toFixed(4) + ' ◎' : '—';
-    const realizedCls = realizedPnl == null ? '' : realizedPnl >= 0 ? 'pos' : 'neg';
+    let cardCls = 'tok-card';
+    if (t.isSol)  cardCls += ' sol-card';
+    if (t.isUsdc) cardCls += ' usdc-card';
+    if (dead)     cardCls += ' dead-card';
 
-    let cardCls  = 'tok-card';
-    if (t.isSol)   cardCls += ' sol-card';
-    if (t.isUsdc)  cardCls += ' usdc-card';
-    if (dead)      cardCls += ' dead-card';
-
-    let symCls   = 'tok-sym';
-    if (t.isSol)   symCls += ' sol-sym';
-    if (t.isUsdc)  symCls += ' usdc-sym';
+    let symCls = 'tok-sym';
+    if (t.isSol)  symCls += ' sol-sym';
+    if (t.isUsdc) symCls += ' usdc-sym';
 
     let badges = '';
-    if (t.isSol)         badges += '<span class="badge badge-sol">SOL</span>';
-    else if (t.isUsdc)   badges += '<span class="badge badge-usdc">USDC</span>';
+    if (t.isSol)           badges += '<span class="badge badge-sol">SOL</span>';
+    else if (t.isUsdc)     badges += '<span class="badge badge-usdc">USDC</span>';
     else if (t.bootstrapped) badges += '<span class="badge badge-boot">BOOT</span>';
-    if (t.stopLossHit)   badges += '<span class="badge badge-sl">SL</span>';
-    if (t.breakEven)     badges += '<span class="badge badge-be">BE</span>';
+    if (t.stopLossHit)     badges += '<span class="badge badge-sl">SL</span>';
+    if (t.breakEven)       badges += '<span class="badge badge-be">BE</span>';
 
     const valStr = val > 0 ? '$' + val.toFixed(2) : '—';
-    const balStr = t.isSol ? fmt(t.balance, 4) + ' ◎' : t.isUsdc ? fmt(t.balance, 2) + ' $' : fmt(t.balance, 4);
+    const balStr = t.isSol  ? fmt(t.balance, 4) + ' ◎'
+                 : t.isUsdc ? fmt(t.balance, 2) + ' $'
+                             : fmt(t.balance, 4);
 
-    const safeT = encodeURIComponent(t.mintFull);
+    const safeT   = encodeURIComponent(t.mintFull);
+    const panelId = 'panel-' + t.mintFull.replace(/[^a-zA-Z0-9]/g,'');
+    const togId   = 'tog-' + t.mintFull.replace(/[^a-zA-Z0-9]/g,'');
+    const isPanelOpen = _openPanels.has(t.mintFull);
+
+    // Analytics panel content pour ce token
+    const mp = mintPnl(t.mintFull);
+    const tr = tradesForMint(t.mintFull);
+    const sells = tr.filter(x => x.type === 'sell');
+
+    // KPIs pour ce token
+    const realPnlStr  = mp ? (mp.totalSol >= 0 ? '+' : '') + mp.totalSol.toFixed(4) + ' ◎' : '—';
+    const realPnlCls  = mp ? (mp.totalSol >= 0 ? 'pos' : 'neg') : '';
+    const avgPctStr   = mp?.avgPnlPct != null ? (mp.avgPnlPct >= 0 ? '+' : '') + mp.avgPnlPct.toFixed(1) + '%' : '—';
+    const avgPctCls   = mp?.avgPnlPct != null ? (mp.avgPnlPct >= 0 ? 'pos' : 'neg') : '';
+    const tradesCount = sells.length || '0';
+    const scoreStr    = t.score != null ? t.score + '/100' : '—';
+    const entryStr    = t.entryPrice ? '$' + t.entryPrice.toPrecision(4) : '—';
+    const liqStr      = fmtK(t.liquidity);
+    const mcapStr     = fmtM(t.mcap);
+    const vol24hStr   = fmtM(t.volume24h);
+    const peakStr     = '+' + fmt(t.peakPnl, 1) + '%';
+
+    // Mini trades list (max 4 derniers pour ce token)
+    const recentTrades = sells.slice(-4).reverse();
+    let tradesHtml = '';
+    if (recentTrades.length === 0) {
+      tradesHtml = '<div class="an-empty">Aucune vente enregistrée</div>';
+    } else {
+      tradesHtml = recentTrades.map(tr => {
+        const p = tr.pnlPct ?? null;
+        const cls = p == null ? '' : p >= 0 ? 'pos' : 'neg';
+        const d = new Date(tr.ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        return `<div class="an-trade">
+          <div class="an-trade-left">
+            <div class="an-trade-type">${tr.reason || tr.type?.toUpperCase()}</div>
+            <div class="an-trade-date">${d}</div>
+          </div>
+          <div class="an-trade-right">
+            <div class="an-trade-pnl ${cls}">${p != null ? (p>=0?'+':'')+p.toFixed(2)+'%' : '—'}</div>
+            <div class="an-trade-sol">${tr.solOut != null ? tr.solOut.toFixed(4)+' ◎' : '—'}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
     html += `
-    <div class="${cardCls}" onclick="openDetail('${safeT}')">
-      <div class="tok-top">
+    <div class="${cardCls}" id="card-${panelId}">
+      <!-- Header → ouvre le chart DexScreener -->
+      <div class="tok-top" onclick="openDetail('${safeT}')">
         <div class="tok-logo">${logo}</div>
         <div class="tok-name">
           <div class="${symCls}">${t.symbol || t.mint.slice(0,8)}</div>
@@ -567,19 +680,108 @@ function renderPortfolio(toks) {
           <div class="tok-pnl ${pCls}">${pStr}</div>
         </div>
       </div>
-      <div class="tok-bottom">
-        <div class="tok-stat"><div class="tok-stat-lbl">Balance</div><div class="tok-stat-val">${balStr}</div></div>
-        <div class="tok-stat"><div class="tok-stat-lbl">Peak</div><div class="tok-stat-val pos">+${fmt(t.peakPnl,1)}%</div></div>
-        <div class="tok-stat"><div class="tok-stat-lbl">Liq.</div><div class="tok-stat-val">${fmtK(t.liquidity)}</div></div>
-        <div class="tok-stat"><div class="tok-stat-lbl">PnL réalisé</div><div class="tok-stat-val ${realizedCls}">${realizedStr}</div></div>
+
+      <!-- Stats rapides -->
+      <div class="tok-stats-row">
+        <div class="tok-stat">
+          <div class="tok-stat-lbl">Balance</div>
+          <div class="tok-stat-val">${balStr}</div>
+        </div>
+        <div class="tok-stat">
+          <div class="tok-stat-lbl">Peak</div>
+          <div class="tok-stat-val pos">${peakStr}</div>
+        </div>
+        <div class="tok-stat">
+          <div class="tok-stat-lbl">Liq.</div>
+          <div class="tok-stat-val">${liqStr}</div>
+        </div>
       </div>
+
+      ${t.isSol || t.isUsdc ? '' : `
+      <!-- Toggle analytics -->
+      <div class="tok-an-toggle ${isPanelOpen ? 'open' : ''}" id="${togId}" onclick="togglePanel('${t.mintFull}','${togId}','${panelId}')">
+        <span>Analytics</span>
+        <span class="arr">▾</span>
+      </div>
+
+      <!-- Analytics panel -->
+      <div class="tok-an-panel ${isPanelOpen ? 'open' : ''}" id="${panelId}">
+
+        <!-- KPI grid 3×2 -->
+        <div class="an-kpi-grid">
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">PnL réalisé</div>
+            <div class="an-kpi-val ${realPnlCls}">${realPnlStr}</div>
+          </div>
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">Avg sortie</div>
+            <div class="an-kpi-val ${avgPctCls}">${avgPctStr}</div>
+          </div>
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">Trades</div>
+            <div class="an-kpi-val gold">${tradesCount}</div>
+          </div>
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">Score</div>
+            <div class="an-kpi-val gold">${scoreStr}</div>
+          </div>
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">Entrée</div>
+            <div class="an-kpi-val" style="font-size:10px">${entryStr}</div>
+          </div>
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">MCap</div>
+            <div class="an-kpi-val">${mcapStr}</div>
+          </div>
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">Vol 24h</div>
+            <div class="an-kpi-val">${vol24hStr}</div>
+          </div>
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">Liq.</div>
+            <div class="an-kpi-val">${liqStr}</div>
+          </div>
+          <div class="an-kpi">
+            <div class="an-kpi-lbl">Peak PnL</div>
+            <div class="an-kpi-val pos">${peakStr}</div>
+          </div>
+        </div>
+
+        <!-- Derniers trades pour ce token -->
+        <div class="an-trades-title">Dernières ventes</div>
+        ${tradesHtml}
+
+        <!-- Lien chart -->
+        <a class="an-chart-btn" href="https://dexscreener.com/solana/${t.mintFull}" target="_blank">
+          🦎 Voir sur DexScreener ↗
+        </a>
+      </div>
+      `}
     </div>`;
   });
 
   list.innerHTML = html;
 }
 
-// ─── TOKEN DETAIL ─────────────────────────────────────────────────────────────
+// ─── TOGGLE ANALYTICS PANEL ───────────────────────────────────────────────────
+function togglePanel(mintFull, togId, panelId) {
+  const tog   = document.getElementById(togId);
+  const panel = document.getElementById(panelId);
+  if (!tog || !panel) return;
+
+  const isOpen = _openPanels.has(mintFull);
+  if (isOpen) {
+    _openPanels.delete(mintFull);
+    tog.classList.remove('open');
+    panel.classList.remove('open');
+  } else {
+    _openPanels.add(mintFull);
+    tog.classList.add('open');
+    panel.classList.add('open');
+  }
+}
+
+// ─── TOKEN DETAIL (chart overlay) ────────────────────────────────────────────
 function openDetail(enc) {
   const mint = decodeURIComponent(enc);
   const tok  = _portfolio.find(t => t.mintFull === mint);
@@ -599,27 +801,19 @@ function openDetail(enc) {
   dtPnl.textContent = pnl == null ? '—' : (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
   dtPnl.className = 'detail-stat-val ' + (pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg');
 
-  const fmt = (n, d=2) => n != null ? '$' + n.toFixed(d) : '—';
-  const fmtK = n => n > 0 ? '$' + (n/1000).toFixed(1) + 'k' : '—';
-  const fmtM = n => { if (!n) return '—'; if (n>1e6) return '$'+(n/1e6).toFixed(1)+'M'; if (n>1e3) return '$'+(n/1e3).toFixed(0)+'K'; return '$'+n.toFixed(0); };
-
   document.getElementById('dtVal').textContent   = tok.value > 0 ? '$' + tok.value.toFixed(2) : '—';
   document.getElementById('dtPeak').textContent  = '+' + (tok.peakPnl || 0).toFixed(2) + '%';
-  document.getElementById('dtEntry').textContent = tok.entryPrice ? '$' + tok.entryPrice.toFixed(8) : '—';
+  document.getElementById('dtEntry').textContent = tok.entryPrice ? '$' + tok.entryPrice.toPrecision(4) : '—';
   document.getElementById('dtLiq').textContent   = fmtK(tok.liquidity);
   document.getElementById('dtMcap').textContent  = fmtM(tok.mcap);
   document.getElementById('dtVol').textContent   = fmtM(tok.volume24h);
 
-  // DexScreener link
-  const btnDex = document.getElementById('btnDex');
-  btnDex.href = 'https://dexscreener.com/solana/' + mint;
+  document.getElementById('btnDex').href = 'https://dexscreener.com/solana/' + mint;
 
-  // Chart — embed mode avec theme dark
   const spinner = document.getElementById('chartSpinner');
   spinner.style.display = 'flex';
   const frame = document.getElementById('chartFrame');
   frame.src = 'about:blank';
-  // Petit délai pour laisser le repaint
   setTimeout(() => {
     frame.src = `https://dexscreener.com/solana/${mint}?embed=1&theme=dark&trades=0&info=0`;
   }, 80);
@@ -642,8 +836,14 @@ function onChartLoad() {
 
 function copyMint() {
   if (!_detailMint) return;
-  if (navigator.clipboard) navigator.clipboard.writeText(_detailMint).then(() => toast('📋 Adresse copiée', 'ok'));
-  else { const t = document.createElement('textarea'); t.value = _detailMint; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); toast('📋 Adresse copiée', 'ok'); }
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(_detailMint).then(() => toast('📋 Adresse copiée', 'ok'));
+  } else {
+    const t = document.createElement('textarea');
+    t.value = _detailMint;
+    document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
+    toast('📋 Adresse copiée', 'ok');
+  }
 }
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -708,7 +908,9 @@ async function saveConfig() {
       maxPositions:      getInt('maxPositions'),
       minScore:          getNum('minScore'),
     };
-    const r = await apiFetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const r = await apiFetch('/api/config', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
     if (r.success) {
       if (st) { st.textContent = '✓ Sauvegardé'; st.className = 'save-status ok'; }
       toast('✅ Config sauvegardée', 'ok');
@@ -725,7 +927,12 @@ async function saveConfig() {
 async function resetCB() {
   try {
     const r = await apiFetch('/api/reset-circuit-breaker', { method:'POST' });
-    if (r.success) { document.getElementById('cbCount').textContent = '0'; toast('✅ Circuit-breaker reset', 'ok'); }
+    if (r.success) {
+      document.getElementById('cbCount').textContent = '0';
+      const cbR = document.getElementById('cbReset');
+      if (cbR) cbR.textContent = '';
+      toast('✅ Circuit-breaker reset', 'ok');
+    }
   } catch(e) { toast('❌ ' + e.message, 'err'); }
 }
 
@@ -753,3 +960,4 @@ function toast(msg, type = '') {
 </script>
 </body>
 </html>
+
