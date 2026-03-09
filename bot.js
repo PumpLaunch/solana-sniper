@@ -115,6 +115,8 @@ async function withRetry(fn, { tries = 3, baseMs = 600, label = '' } = {}) {
     try { return await fn(i); }
     catch (err) {
       last = err;
+      // Network outage (DNS / TCP) — no point retrying immediately
+      if (err._network) throw err;
       if (i < tries - 1) {
         const w = baseMs * 2 ** i;
         log('warn', `${label} retry ${i + 1}/${tries - 1} in ${w}ms -- ${err.message}`);
@@ -200,10 +202,12 @@ function createRpc() {
 
   const conns = eps.map(e => new Connection(e, {
     commitment: 'confirmed',
-    disableRetryOnRateLimit: false,
+    disableRetryOnRateLimit: true,
     confirmTransactionInitialTimeout: 60000,
   }));
   let idx = 0;
+  const failedAt = new Array(eps.length).fill(0);
+  const COOLDOWN_MS = 60_000;
 
   return {
     get conn() { return conns[idx]; },
@@ -212,13 +216,23 @@ function createRpc() {
       for (let i = 0; i < conns.length; i++) {
         try {
           const slot = await conns[i].getSlot();
-          if (slot > 0) { idx = i; log('debug', 'RPC OK', { slot, ep: i }); return true; }
+          if (slot > 0) { idx = i; failedAt[i] = 0; log('debug', 'RPC OK', { slot, ep: i }); return true; }
         } catch { log('warn', 'RPC down', { ep: eps[i].slice(0, 45) }); }
       }
       log('error', 'Tous les endpoints RPC hors ligne'); return false;
     },
     failover() {
-      idx = (idx + 1) % conns.length;
+      failedAt[idx] = Date.now();
+      const now = Date.now();
+      // pick next endpoint not in cooldown; fall back to least-recently-failed
+      let best = -1, bestAge = -1;
+      for (let i = 1; i <= conns.length; i++) {
+        const j = (idx + i) % conns.length;
+        const age = now - failedAt[j];
+        if (age >= COOLDOWN_MS) { best = j; break; }
+        if (age > bestAge) { bestAge = age; best = j; }
+      }
+      idx = best;
       log('warn', 'RPC failover', { ep: eps[idx].slice(0, 45) });
     },
   };
@@ -806,15 +820,23 @@ class SwapEngine {
   async getQuote({ inputMint, outputMint, amountRaw, slippageBps }) {
     const qs = `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
     let last;
+    let dnsFailures = 0;
     for (const ep of QUOTE_EPS) {
       try {
-        const r = await fetch(`${ep}?${qs}`, { headers: { 'User-Agent': `SolBot/${VERSION}`, Accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
+        const r = await fetch(`${ep}?${qs}`, { headers: { 'User-Agent': `SolBot/${VERSION}`, Accept: 'application/json' }, signal: AbortSignal.timeout(12000) });
         if (!r.ok) { last = new Error(`Quote HTTP ${r.status}`); continue; }
         const q = await r.json();
         if (q.error) { last = new Error(q.error); continue; }
         if (!q.outAmount) { last = new Error('No outAmount'); continue; }
         return q;
-      } catch (err) { last = err; }
+      } catch (err) {
+        last = err;
+        // DNS failures across all endpoints = network outage; don't delay, fail fast
+        if (err.message?.includes('ENOTFOUND') || err.message?.includes('getaddrinfo')) {
+          dnsFailures++;
+          if (dnsFailures >= QUOTE_EPS.length) throw Object.assign(err, { _network: true });
+        }
+      }
     }
     throw last || new Error('Tous les endpoints Jupiter quote ont echoue');
   }
