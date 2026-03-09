@@ -90,17 +90,17 @@ const CFG = {
   DASHBOARD_URL: process.env.DASHBOARD_URL               || null,
 
   // ── Take-profit paliers (défaut ON) ───────────────────────────────────────
-  TP_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'false',
+  TP_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'true',
   TP_TIERS:      safeJson(process.env.TAKE_PROFIT_TIERS,
     [{ pnl: 20, sell: 20 }, { pnl: 50, sell: 25 }, { pnl: 100, sell: 25 }, { pnl: 200, sell: 25 }]),
   TP_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
 
   // ── Break-even stop : SL → entry+buffer après TP1 ────────────────────────
-  BE_ENABLED:    process.env.BREAK_EVEN_ENABLED !== 'false',
+  BE_ENABLED:    process.env.BREAK_EVEN_ENABLED !== 'true',
   BE_BUFFER:     parseFloat(process.env.BREAK_EVEN_BUFFER || '2'),  // +2% au-dessus entry
 
   // ── Stop-Loss fixe (défaut ON) ────────────────────────────────────────────
-  SL_ENABLED:    process.env.STOP_LOSS_ENABLED !== 'false',
+  SL_ENABLED:    process.env.STOP_LOSS_ENABLED !== 'true',
   SL_PCT:        parseFloat(process.env.STOP_LOSS_PCT    || '-50'),
 
   // ── Trailing stop (défaut OFF — opt-in) ───────────────────────────────────
@@ -110,11 +110,11 @@ const CFG = {
   TS_VOL_MULT:   parseFloat(process.env.TRAILING_VOL_MULT      || '2.5'),
 
   // ── Anti-rug prix (défaut ON) ─────────────────────────────────────────────
-  AR_ENABLED:    process.env.ANTI_RUG_ENABLED !== 'false',
+  AR_ENABLED:    process.env.ANTI_RUG_ENABLED !== 'true',
   AR_PCT:        parseFloat(process.env.ANTI_RUG_PCT     || '60'),
 
   // ── Liquidity exit (défaut ON) ────────────────────────────────────────────
-  LE_ENABLED:    process.env.LIQ_EXIT_ENABLED !== 'false',
+  LE_ENABLED:    process.env.LIQ_EXIT_ENABLED !== 'true',
   LE_PCT:        parseFloat(process.env.LIQ_EXIT_PCT     || '70'),
 
   // ── Time-based stop (défaut OFF) ─────────────────────────────────────────
@@ -133,7 +133,7 @@ const CFG = {
   JITO_URL:      process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
 
   // ── Position sizing & risque ──────────────────────────────────────────────
-  MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '10'),
+  MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '100'),
   MIN_SCORE:     parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),   // 0 = désactivé
 
   // ── Exécution ─────────────────────────────────────────────────────────────
