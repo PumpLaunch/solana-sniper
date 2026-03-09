@@ -946,7 +946,7 @@ class PositionManager {
     const e    = this.entries.get(mint);
     const trig = this.triggered.get(mint);
     const pnl  = this.getPnl(mint, price);
-    if (!e || !trig || pnl === null || e.bootstrapped) return [];
+    if (!e || !trig || pnl === null || !(e.price > 0)) return [];
 
     const hits = [];
     for (let i = 0; i < this.tiers.length; i++) {
@@ -1025,7 +1025,7 @@ class PositionManager {
   checkTT(mint, pnl) {
     if (!CFG.TT_ENABLED || this.isLiquidated(mint)) return null;
     const e = this.entries.get(mint);
-    if (!e || e.bootstrapped) return null;
+    if (!e || !(e.price > 0)) return null;
     const holdH = (Date.now() - e.ts) / 3_600_000;
     if (holdH < CFG.TT_HOURS) return null;
     if (pnl !== null && pnl > CFG.TT_MIN_PNL) return null;
@@ -2484,8 +2484,26 @@ class BotLoop {
       .map(([m]) => m);
 
     if (!booted.length) return;
+
+    // Throttle : max 10 par cycle, priorise les moins tentés
+    const batch = booted
+      .sort((a, b) => (this.positions.entries.get(a)?.bootAttempts || 0)
+                    - (this.positions.entries.get(b)?.bootAttempts || 0))
+      .slice(0, 10);
+
     if (!CFG.HELIUS_KEY) {
-      log('warn', `⚠️  ${booted.length} positions bootstrappées — HELIUS_API_KEY manquant, correction impossible`);
+      // Sans Helius : forcer immédiatement le prix courant → PnL = 0% au démarrage, TP/SL actifs
+      log('warn', `⚠️  ${booted.length} positions bootstrappées — pas de HELIUS_KEY, forçage prix courant`);
+      let forced = 0;
+      for (const mint of batch) {
+        const currentPrice = getPrice(mint)?.price || 0;
+        if (currentPrice > 0) {
+          this.positions.setEntryPrice(mint, currentPrice);
+          log('info', `📌 Bootstrap forcé (sans Helius) ${mint.slice(0, 8)} @ ${currentPrice.toPrecision(4)}`);
+          forced++;
+        }
+      }
+      if (forced > 0) this.persist();
       return;
     }
 
