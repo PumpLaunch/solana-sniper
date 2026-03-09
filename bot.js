@@ -1305,7 +1305,12 @@ class BotLoop {
       const tv = tokens.reduce((s, t) => s + (t.value || 0), 0);
       log('debug', 'Cycle done', { tokens: tokens.length, total: `$${tv.toFixed(2)}`, cycle: this.cycle });
       if (this.cycle % 10 === 0) this.persist();
-    } catch (err) { log('error', 'Tick error', { err: err.message }); this.rpc.failover(); }
+      this.tickErrors = 0;
+    } catch (err) {
+      this.tickErrors = (this.tickErrors || 0) + 1;
+      log('error', 'Tick error', { err: err.message });
+      this.rpc.failover();
+    }
   }
 
   getStats() {
@@ -1659,7 +1664,23 @@ async function main() {
 
   const wallet = loadWallet(), rpc = createRpc(), state = loadState(), bot = new BotLoop(wallet, rpc, state);
   log('info', 'Premier tick...'); await bot.tick();
-  setInterval(() => bot.tick().catch(err => log('error', 'Loop error', { err: err.message })), CFG.INTERVAL_SEC * 1000);
+
+  // Adaptive tick loop: backs off exponentially on consecutive RPC failures
+  // 0 fails→30s, 1→30s, 2→60s, 3→120s, 4+→300s
+  const MAX_BACKOFF_MS = 300_000;
+  const scheduleNext = () => {
+    const fails = bot.tickErrors || 0;
+    const delay = fails <= 1
+      ? CFG.INTERVAL_SEC * 1000
+      : Math.min(CFG.INTERVAL_SEC * 1000 * Math.pow(2, fails - 1), MAX_BACKOFF_MS);
+    if (fails > 1) log('warn', `RPC backoff: prochain tick dans ${Math.round(delay / 1000)}s`, { consecutiveFails: fails });
+    setTimeout(async () => {
+      try { await bot.tick(); } catch (err) { log('error', 'Loop error', { err: err.message }); }
+      scheduleNext();
+    }, delay);
+  };
+  scheduleNext();
+
   startApi(bot, wallet);
   log('success', 'Bot operationnel', { address: wallet.publicKey.toString().slice(0, 8) + '...', interval: CFG.INTERVAL_SEC + 's', reserve: CFG.MIN_SOL_RESERVE + ' SOL', webhook: CFG.WEBHOOK_URL ? CFG.WEBHOOK_TYPE : 'off' });
 
