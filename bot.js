@@ -219,7 +219,7 @@ function createRpc() {
   const COOLDOWN_MS = 60_000;
 
   return {
-    get conn() { return conns[idx]; },
+    get conn()     { return conns[idx]; },
     get endpoint() { return eps[idx]; },
     async healthCheck() {
       for (let i = 0; i < conns.length; i++) {
@@ -389,7 +389,9 @@ async function _fetchDexBatch(mints) {
 
 async function _fetchDexSingle(mint) {
   try {
-    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(
+      `https://api.dexscreener.com/latest/dex/tokens/${mint}`,
+      { signal: AbortSignal.timeout(8_000) });
     if (!r.ok) return null;
     const d    = await r.json();
     const best = (d?.pairs || []).filter(p => p.chainId === 'solana').sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
@@ -410,17 +412,25 @@ async function _fetchDexSingle(mint) {
 
 async function _fetchPumpFun(mint) {
   try {
-    const r = await fetch(`https://frontend-api.pump.fun/coins/${mint}`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(
+      `https://frontend-api.pump.fun/coins/${mint}`,
+      { signal: AbortSignal.timeout(8_000) });
     if (!r.ok) return null;
     const c = await r.json();
     if (!c?.usd_market_cap || !c?.total_supply) return null;
     const price = c.usd_market_cap / c.total_supply;
     if (!(price > 0)) return null;
     return {
-      price, liquidity: c.virtual_sol_reserves ? c.virtual_sol_reserves / 1e9 * 150 : 0,
-      volume24h: 0, volume6h: 0, volume1h: 0, change24h: 0, change6h: 0, change1h: 0,
-      fdv: c.usd_market_cap || 0, mcap: c.usd_market_cap || 0, buys24h: 0, sells24h: 0, txns24h: 0,
-      logo: c.image_uri || null, symbol: c.symbol || null, name: c.name || null,
+      price,
+      liquidity: c.virtual_sol_reserves ? c.virtual_sol_reserves / 1e9 * 150 : 0,
+      volume24h: 0, volume6h: 0, volume1h: 0,
+      change24h: 0, change6h: 0, change1h: 0,
+      fdv:    c.usd_market_cap || 0,
+      mcap:   c.usd_market_cap || 0,
+      buys24h: 0, sells24h: 0, txns24h: 0,
+      logo:   c.image_uri || null,
+      symbol: c.symbol    || null,
+      name:   c.name      || null,
       pairAddr: null, dex: 'pumpfun', createdAt: null,
       pumpfun: {
         progress: c.virtual_sol_reserves ? Math.min(100, c.virtual_sol_reserves / 1e9 / 85 * 100) : 0,
@@ -458,17 +468,29 @@ async function prefetchPrices(mints) {
   const lim5 = pLimit(5), lim4 = pLimit(4);
 
   const miss1 = toFetch.filter(m => !found[m]);
-  if (miss1.length) await Promise.all(miss1.map(m => lim5(async () => { const d = await _fetchDexSingle(m); if (d) found[m] = d; })));
+  if (miss1.length) await Promise.all(miss1.map(m => lim5(async () => {
+    const d = await _fetchDexSingle(m); if (d) found[m] = d;
+  })));
+
   const miss2 = toFetch.filter(m => !found[m]);
-  if (miss2.length) await Promise.all(miss2.map(m => lim5(async () => { const d = await _fetchPumpFun(m); if (d) found[m] = d; })));
+  if (miss2.length) await Promise.all(miss2.map(m => lim5(async () => {
+    const d = await _fetchPumpFun(m); if (d) found[m] = d;
+  })));
+
   const miss3 = toFetch.filter(m => !found[m]);
   if (miss3.length) await Promise.all(miss3.map(m => lim4(async () => { const d = await _fetchBirdeye(m); if (d) found[m] = d; })));
 
   const ts = Date.now(), srcs = {};
   for (const m of toFetch) {
     const d = found[m];
-    if (d?.price > 0) { priceCache.set(m, { data: d, ts }); trackLiq(m, d.liquidity); recordPriceSuccess(m); srcs[d.source] = (srcs[d.source] || 0) + 1; }
-    else recordPriceFail(m);
+    if (d?.price > 0) {
+      priceCache.set(m, { data: d, ts });
+      trackLiq(m, d.liquidity);
+      recordPriceSuccess(m);
+      srcs[d.source] = (srcs[d.source] || 0) + 1;
+    } else {
+      recordPriceFail(m);
+    }
   }
   const ok = toFetch.filter(m => priceCache.get(m)?.data?.price > 0).length;
   log('debug', 'Prices done', { ok, total: toFetch.length, missing: toFetch.length - ok, negCached: mints.filter(m => isNegCached(m)).length });
@@ -488,15 +510,31 @@ class ScoreEngine {
     else if (liq >= 5000)                    s += 7;
     else if (liq >= 1000)                    s += 2;
     const mc = pd.mcap || pd.fdv || 0;
-    if (mc > 0) { const r = (pd.volume24h || 0) / mc; if (r >= 0.5) s += 25; else if (r >= 0.2) s += 20; else if (r >= 0.1) s += 14; else if (r >= 0.05) s += 8; else if (r >= 0.02) s += 3; }
+    if (mc > 0) {
+      const r = (pd.volume24h || 0) / mc;
+      if      (r >= 0.5)  s += 25;
+      else if (r >= 0.2)  s += 20;
+      else if (r >= 0.1)  s += 14;
+      else if (r >= 0.05) s += 8;
+      else if (r >= 0.02) s += 3;
+    }
+
     const b = pd.buys24h || 0, sv = pd.sells24h || 0;
-    if (b + sv > 0) { const r = b / (b + sv); if (r >= 0.70) s += 15; else if (r >= 0.60) s += 11; else if (r >= 0.50) s += 7; else if (r >= 0.40) s += 3; }
+    if (b + sv > 0) {
+      const r = b / (b + sv);
+      if      (r >= 0.70) s += 15;
+      else if (r >= 0.60) s += 11;
+      else if (r >= 0.50) s += 7;
+      else if (r >= 0.40) s += 3;
+    }
+
     const c1 = pd.change1h || 0;
     if (c1 >= 10) s += 15; else if (c1 >= 5) s += 12; else if (c1 >= 2) s += 8; else if (c1 >= 0) s += 4; else if (c1 >= -5) s += 1;
     if (pd.createdAt) { const ageH = (Date.now() - pd.createdAt) / 3600000; if (ageH <= 1) s += 10; else if (ageH <= 6) s += 8; else if (ageH <= 24) s += 5; else if (ageH <= 72) s += 2; }
     if (pd.pumpfun?.progress >= 80 && !pd.pumpfun.complete) s += 5; else if (pd.pumpfun?.progress >= 50) s += 2;
     return Math.min(100, Math.round(s));
   }
+
   slippage(liq, urgency = 'normal') {
     const base = urgency === 'emergency' ? 2000 : urgency === 'high' ? 1000 : CFG.DEFAULT_SLIPPAGE;
     if (!liq || liq > 100000) return base;
@@ -510,6 +548,7 @@ class ScoreEngine {
 // §9  MOMENTUM TRACKER
 class MomentumTracker {
   constructor() { this._hist = new Map(); }
+
   addPrice(mint, price) {
     if (!(price > 0)) return;
     const h = this._hist.get(mint) || [];
@@ -520,27 +559,37 @@ class MomentumTracker {
   getTrend(mint, window = CFG.ME_WINDOW) {
     const h = this._hist.get(mint) || [];
     if (h.length < 3) return { trend: 'flat', changePct: 0, velocity: 0, accel: 0 };
-    const pts = h.slice(-Math.min(window + 1, h.length));
+    const pts   = h.slice(-Math.min(window + 1, h.length));
     const first = pts[0].price, last = pts[pts.length - 1].price;
-    const chg = first > 0 ? ((last - first) / first) * 100 : 0;
-    const vel = chg / (pts.length - 1);
-    const mid = Math.floor(pts.length / 2);
-    const v1 = pts[0].price > 0 ? ((pts[mid].price - pts[0].price) / pts[0].price * 100) / (mid || 1) : 0;
-    const v2 = pts[mid].price > 0 ? ((last - pts[mid].price) / pts[mid].price * 100) / (pts.length - 1 - mid || 1) : 0;
-    return { trend: chg > 1 ? 'up' : chg < -1 ? 'down' : 'flat', changePct: +chg.toFixed(3), velocity: +vel.toFixed(3), accel: +(v2 - v1).toFixed(3) };
+    const chg   = first > 0 ? ((last - first) / first) * 100 : 0;
+    const vel   = chg / (pts.length - 1);
+    const mid   = Math.floor(pts.length / 2);
+    const v1    = pts[0].price > 0 ? ((pts[mid].price - pts[0].price) / pts[0].price * 100) / (mid || 1) : 0;
+    const v2    = pts[mid].price > 0 ? ((last - pts[mid].price) / pts[mid].price * 100) / (pts.length - 1 - mid || 1) : 0;
+    return {
+      trend:     chg > 1 ? 'up' : chg < -1 ? 'down' : 'flat',
+      changePct: +chg.toFixed(3),
+      velocity:  +vel.toFixed(3),
+      accel:     +(v2 - v1).toFixed(3),
+    };
   }
+
   isMomentumExit(mint, pnl) {
     if (!CFG.ME_ENABLED || pnl === null || pnl < 5) return false;
     const { trend, velocity, accel } = this.getTrend(mint);
     return trend === 'down' && velocity < CFG.ME_THRESHOLD && accel < -1;
   }
+
   getVolatility(mint) {
     const h = this._hist.get(mint) || [];
     if (h.length < 4) return null;
     const rets = [];
-    for (let i = 1; i < h.length; i++) if (h[i-1].price > 0) rets.push(Math.log(h[i].price / h[i-1].price) * 100);
+    for (let i = 1; i < h.length; i++) {
+      if (h[i - 1].price > 0) rets.push(Math.log(h[i].price / h[i - 1].price) * 100);
+    }
     return rets.length >= 3 ? stddev(rets) : null;
   }
+
   volTrailingPct(mint) {
     const sigma = this.getVolatility(mint);
     if (!sigma) return CFG.TS_PCT;
@@ -583,7 +632,7 @@ class PositionManager {
 
   trackEntry(mint, marketPrice, balance, forcedPrice = null) {
     if (this.entries.has(mint)) return false;
-    const price = forcedPrice > 0 ? forcedPrice : marketPrice;
+    const price        = forcedPrice > 0 ? forcedPrice : marketPrice;
     const bootstrapped = !(forcedPrice > 0);
     if (!(price > 0) || !(balance > 0)) return false;
     this.entries.set(mint, { price, bootstrapped, ts: Date.now(), originalBalance: balance, triggeredTiers: [], soldAmount: 0, peakPnl: 0 });
@@ -593,9 +642,13 @@ class PositionManager {
   }
 
   setEntryPrice(mint, newPrice, newBalance = null) {
-    const e = this.entries.get(mint); if (!e) return false;
-    e.price = newPrice; e.bootstrapped = false;
-    this.triggered.set(mint, new Set()); e.triggeredTiers = []; this.breakEven.delete(mint);
+    const e = this.entries.get(mint);
+    if (!e) return false;
+    e.price        = newPrice;
+    e.bootstrapped = false;
+    this.triggered.set(mint, new Set());
+    e.triggeredTiers = [];
+    this.breakEven.delete(mint);
     if (newBalance > 0) { e.originalBalance = newBalance; this.sold.set(mint, 0); e.soldAmount = 0; }
     log('info', 'Prix entree corrige', { mint: mint.slice(0, 8), price: newPrice.toPrecision(6) }); return true;
   }
@@ -638,7 +691,8 @@ class PositionManager {
     if (pnl === null || peak < 10) return null;
     const trailingPct = (CFG.TS_VOL && momentum) ? momentum.volTrailingPct(mint) : CFG.TS_PCT;
     if (pnl >= peak - trailingPct) return null;
-    const rem = this.getRemaining(mint); if (rem <= 0) return null;
+    const rem = this.getRemaining(mint);
+    if (rem <= 0) return null;
     return { type: 'trailing-stop', pnl: pnl.toFixed(2), peak: peak.toFixed(2), trailingPct, sellAmount: rem };
   }
 
@@ -670,7 +724,8 @@ class PositionManager {
     if (!momentum || this.isLiquidated(mint)) return null;
     const pnl = this.getPnl(mint, price);
     if (!momentum.isMomentumExit(mint, pnl)) return null;
-    const rem = this.getRemaining(mint); if (rem <= 0) return null;
+    const rem = this.getRemaining(mint);
+    if (rem <= 0) return null;
     return { type: 'momentum-exit', pnl: pnl?.toFixed(2), trend: momentum.getTrend(mint), sellAmount: rem };
   }
 
@@ -737,7 +792,9 @@ class PositionManager {
 
   resetTiersIfNeeded(mint, pnl) {
     if (pnl === null) return;
-    const trig = this.triggered.get(mint), e = this.entries.get(mint); if (!trig || !e) return;
+    const trig = this.triggered.get(mint);
+    const e    = this.entries.get(mint);
+    if (!trig || !e) return;
     for (let i = 0; i < this.tiers.length; i++) {
       if (trig.has(i) && pnl < this.tiers[i].pnl - this.hysteresis) { trig.delete(i); e.triggeredTiers = Array.from(trig); }
     }
@@ -866,14 +923,26 @@ class SwapEngine {
   async _buildAndSendTx({ inputMint, outputMint, amountRaw, slippageBps, priorityMode = 'auto' }) {
     return withRetry(async () => {
       const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
-      const priLamports = priorityMode === 'turbo' ? 500000 : priorityMode === 'high' ? 200000 : priorityMode === 'medium' ? 100000 : 'auto';
-      const body = JSON.stringify({ quoteResponse: quote, userPublicKey: this.wallet.publicKey.toString(), wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: priLamports });
+      const priLamports = priorityMode === 'turbo'  ? 500_000
+                        : priorityMode === 'high'   ? 200_000
+                        : priorityMode === 'medium' ? 100_000
+                        : 'auto';
+      const body = JSON.stringify({
+        quoteResponse: quote,
+        userPublicKey: this.wallet.publicKey.toString(),
+        wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true,
+        prioritizationFeeLamports: priLamports,
+      });
       let swapData = null, swapErr;
       for (const ep of SWAP_EPS) {
         try {
-          const r = await fetch(ep, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` }, body, signal: AbortSignal.timeout(30000) });
+          const r = await fetch(ep, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
+            body, signal: AbortSignal.timeout(30_000),
+          });
           if (!r.ok) { swapErr = new Error(`Swap HTTP ${r.status}`); continue; }
-          const d = await r.json(); if (d?.swapTransaction) { swapData = d; break; }
+          const d = await r.json();
+          if (d?.swapTransaction) { swapData = d; break; }
           swapErr = new Error('swapTransaction absent');
         } catch (err) { swapErr = err; }
       }
@@ -998,13 +1067,25 @@ class SwapEngine {
 class Analytics {
   constructor(state = {}) {
     const a = state.analytics || {};
-    this.realizedPnlSol = a.realizedPnlSol || 0; this.totalBoughtSol = a.totalBoughtSol || 0; this.totalSoldSol = a.totalSoldSol || 0;
-    this.winCount = a.winCount || 0; this.lossCount = a.lossCount || 0; this.totalTrades = a.totalTrades || 0;
-    this.bestTradePct = a.bestTradePct ?? null; this.worstTradePct = a.worstTradePct ?? null;
-    this.bestTradeSymbol = a.bestTradeSymbol || null; this.worstTradeSymbol = a.worstTradeSymbol || null;
-    this.avgHoldMs = a.avgHoldMs || 0; this.tradePnls = a.tradePnls || []; this.dailyPnl = a.dailyPnl || []; this.pnlHistory = a.pnlHistory || [];
-    this.hourly = a.hourly || Array.from({ length: 24 }, () => ({ trades: 0, pnlSol: 0, wins: 0 }));
-    this.winStreak = a.winStreak || 0; this.lossStreak = a.lossStreak || 0; this.maxWinStreak = a.maxWinStreak || 0; this.maxLossStreak = a.maxLossStreak || 0;
+    this.realizedPnlSol   = a.realizedPnlSol   || 0;
+    this.totalBoughtSol   = a.totalBoughtSol   || 0;
+    this.totalSoldSol     = a.totalSoldSol     || 0;
+    this.winCount         = a.winCount         || 0;
+    this.lossCount        = a.lossCount        || 0;
+    this.totalTrades      = a.totalTrades      || 0;
+    this.bestTradePct     = a.bestTradePct     ?? null;
+    this.worstTradePct    = a.worstTradePct    ?? null;
+    this.bestTradeSymbol  = a.bestTradeSymbol  || null;
+    this.worstTradeSymbol = a.worstTradeSymbol || null;
+    this.avgHoldMs        = a.avgHoldMs        || 0;
+    this.tradePnls        = a.tradePnls        || [];
+    this.dailyPnl         = a.dailyPnl         || [];
+    this.pnlHistory       = a.pnlHistory       || [];
+    this.hourly           = a.hourly           || Array.from({ length: 24 }, () => ({ trades: 0, pnlSol: 0, wins: 0 }));
+    this.winStreak        = a.winStreak        || 0;
+    this.lossStreak       = a.lossStreak       || 0;
+    this.maxWinStreak     = a.maxWinStreak     || 0;
+    this.maxLossStreak    = a.maxLossStreak    || 0;
   }
 
   record({ pnlSol, pnlPct, holdMs, symbol, solOut }) {
@@ -1024,7 +1105,7 @@ class Analytics {
     this.avgHoldMs = Math.round((this.avgHoldMs * (this.totalTrades - 1) + holdMs) / this.totalTrades);
     const today = new Date().toISOString().slice(0, 10), day = this.dailyPnl.find(d => d.date === today);
     if (day) { day.pnlSol = +(day.pnlSol + pnlSol).toFixed(6); day.trades++; day.wins += pnlSol >= 0 ? 1 : 0; }
-    else { this.dailyPnl.push({ date: today, pnlSol: +pnlSol.toFixed(6), trades: 1, wins: pnlSol >= 0 ? 1 : 0 }); }
+    else      this.dailyPnl.push({ date: today, pnlSol: +pnlSol.toFixed(6), trades: 1, wins: pnlSol >= 0 ? 1 : 0 });
     if (this.dailyPnl.length > 90) this.dailyPnl.shift();
     this.pnlHistory.push({ ts: Date.now(), cumul: +this.realizedPnlSol.toFixed(6) }); if (this.pnlHistory.length > 500) this.pnlHistory.shift();
     const hr = new Date().getHours(); this.hourly[hr].trades++; this.hourly[hr].pnlSol = +(this.hourly[hr].pnlSol + pnlSol).toFixed(6); if (pnlSol >= 0) this.hourly[hr].wins++;
@@ -1079,6 +1160,30 @@ class BotLoop {
     this.momentum  = new MomentumTracker();
     this.analytics = new Analytics(state);
     this.costBasis = new Map(Object.entries(state.costBasis || {}));
+
+    this.dailyLoss = {
+      date:        this._today(),
+      realizedSol: state.dailyLoss?.date === this._today() ? (state.dailyLoss?.realizedSol || 0) : 0,
+      paused:      false,
+    };
+    this.valueHistory = state.valueHistory || [];
+  }
+
+  _today() { return new Date().toISOString().slice(0, 10); }
+
+  persist() {
+    saveState({
+      entryPrices:  this.positions.serialize(),
+      trades:       this.history.slice(0, 500),
+      stopLossHit:  Array.from(this.positions.slHit),
+      slPending:    Array.from(this.positions.slPending),
+      breakEven:    Array.from(this.positions.breakEven),
+      analytics:    this.analytics.serialize(),
+      costBasis:    Object.fromEntries(this.costBasis),
+      slExits:      this.positions.serializeSlExits(),
+      dailyLoss:    { date: this.dailyLoss.date, realizedSol: this.dailyLoss.realizedSol },
+      valueHistory: this.valueHistory.slice(-CFG.HISTORY_MAX_POINTS),
+    });
   }
 
   persist() {
@@ -1105,7 +1210,8 @@ class BotLoop {
   }
 
   recordSell(mint, solOut, amountSold, symbol) {
-    const cb = this.costBasis.get(mint); let pnlSol = null, pnlPct = null, holdMs = 0;
+    const cb = this.costBasis.get(mint);
+    let pnlSol = null, pnlPct = null, holdMs = 0;
     if (cb?.solSpent > 0 && cb?.tokBought > 0) {
       const pct = Math.min(amountSold / cb.tokBought, 1), cost = cb.solSpent * pct;
       pnlSol = +(solOut - cost).toFixed(6); pnlPct = cost > 0 ? +((pnlSol / cost) * 100).toFixed(2) : null;
@@ -1150,8 +1256,7 @@ class BotLoop {
     const { useJito = false, slippage = null, pendingFirst = false, markSLDone = false, onSuccess = null,
       webhookTitle = null, webhookDesc = null, webhookColor = 0x3b7eff, webhookFields = [] } = opts;
     if (pendingFirst) this.positions.markSLPending(mint);
-    const urgency = useJito ? 'emergency' : pendingFirst ? 'high' : 'normal';
-    const bps = slippage ?? this.scorer.slippage(priceData?.liquidity, urgency);
+    const bps = slippage ?? this.scorer.slippage(priceData?.liquidity, useJito ? 'emergency' : pendingFirst ? 'high' : 'normal');
     const res = await this.swap.sell(mint, sellAmount, reason, bps, useJito);
     if (res.success) {
       const symbol = priceData?.symbol || mint.slice(0, 8);
@@ -1166,10 +1271,11 @@ class BotLoop {
       }
       return true;
     }
-    if (pendingFirst) this.positions.clearSLPending(mint);
+    if (pendingFirst && !res.cbBlocked) this.positions.clearSLPending(mint);
     return false;
   }
 
+  // ── Tick principal ────────────────────────────────────────────────────────
   async tick() {
     try {
       if (this.cycle % 10 === 0) await this.rpc.healthCheck();
@@ -1187,11 +1293,15 @@ class BotLoop {
       await prefetchPrices(accounts.map(a => a.account.data.parsed.info.mint));
 
       const tokens = [];
+
       for (const acc of accounts) {
         const info = acc.account.data.parsed.info, mint = info.mint, ta = info.tokenAmount;
         const bal = parseFloat(ta.uiAmount ?? ta.uiAmountString ?? '0');
         if (!(bal > 0)) continue;
-        const pd = getPrice(mint), price = pd?.price || 0;
+
+        const pd    = getPrice(mint);
+        const price = pd?.price || 0;
+
         this.positions.trackEntry(mint, price, bal);
         const pnl = this.positions.getPnl(mint, price);
         if (pnl !== null) this.positions.updatePeak(mint, pnl);
@@ -1333,6 +1443,17 @@ class BotLoop {
 
       const tv = tokens.reduce((s, t) => s + (t.value || 0), 0);
       log('debug', 'Cycle done', { tokens: tokens.length, total: `$${tv.toFixed(2)}`, cycle: this.cycle });
+
+      if (this.cycle % 10 === 0) {
+        const solPrice = getPrice(SOL_MINT)?.price || 0;
+        this.valueHistory.push({ ts: Date.now(), valueSol: +tv.toFixed(4), solPriceUsd: +solPrice.toFixed(2) });
+        if (this.valueHistory.length > CFG.HISTORY_MAX_POINTS) this.valueHistory.shift();
+      }
+
+      if (this.cycle === 1 || this.cycle % 20 === 0) {
+        const bootedCount = [...this.positions.entries.values()].filter(e => e.bootstrapped).length;
+        if (bootedCount > 0) this.autoScanBootstrapped().catch(err => log('warn', 'autoScanBootstrapped error', { err: err.message }));
+      }
       if (this.cycle % 10 === 0) this.persist();
       this.tickErrors = 0;
     } catch (err) {
