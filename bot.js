@@ -388,7 +388,9 @@ async function _fetchDexBatch(mints) {
           };
         }
       }
-    } catch {}
+    } catch (err) {
+      log('debug', 'DexBatch error', { err: err.message?.slice(0, 80) });
+    }
     if (i + 30 < mints.length) await sleep(350);
   }
   return out;
@@ -465,6 +467,10 @@ async function _fetchPumpFun(mint) {
         price = parseFloat(c.usd_market_cap) / parseFloat(c.total_supply);
       }
       if (!(price > 0)) continue;
+
+      // Token gradué vers Raydium → réserves bonding curve vides, prix invalide
+      // Laisser DexScreener gérer ces tokens
+      if (c.complete === true) continue;
 
       // Liquidité = pool SOL virtuel × 2 × prix SOL/USD
       const solUsd = getPrice(SOL_MINT)?.price || 150;
