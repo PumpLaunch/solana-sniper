@@ -9,6 +9,7 @@
  *  [P5] tick()   — catch 429/fetch-failed → sleep 5s, PAS de backoff 300s
  *  [P6] SCANNER_DELAY_MS 15s → 45s
  *  [P7] _evaluate — fallback PumpFun si liq=0
+ *  [P8] _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
  */
 'use strict';
 
@@ -429,37 +430,69 @@ async function _fetchDexSingle(mint) {
   } catch { return null; }
 }
 
+// [P8] _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
+// Les nouveaux tokens PumpFun ont toujours virtual_sol_reserves/virtual_token_reserves
+// dès la création, mais usd_market_cap peut être 0 (falsy) pendant les premières secondes.
+// Prix via réserves AMM virtuelles = fiable depuis le bloc 0.
 async function _fetchPumpFun(mint) {
-  try {
-    const r = await fetch(
-      `https://frontend-api.pump.fun/coins/${mint}`,
-      { signal: AbortSignal.timeout(8_000) });
-    if (!r.ok) return null;
-    const c = await r.json();
-    if (!c?.usd_market_cap || !c?.total_supply) return null;
-    const price = c.usd_market_cap / c.total_supply;
-    if (!(price > 0)) return null;
-    return {
-      price,
-      liquidity: c.virtual_sol_reserves ? c.virtual_sol_reserves / 1e9 * 150 : 0,
-      volume24h: 0, volume6h: 0, volume1h: 0,
-      change24h: 0, change6h: 0, change1h: 0,
-      fdv:    c.usd_market_cap || 0,
-      mcap:   c.usd_market_cap || 0,
-      buys24h: 0, sells24h: 0, txns24h: 0,
-      logo:   c.image_uri || null,
-      symbol: c.symbol    || null,
-      name:   c.name      || null,
-      pairAddr: null, dex: 'pumpfun', createdAt: null,
-      pumpfun: {
-        progress:   c.virtual_sol_reserves ? Math.min(100, c.virtual_sol_reserves / 1e9 / 85 * 100) : 0,
-        complete:   !!c.complete,
-        kingOfHill: !!c.king_of_the_hill_timestamp,
-        creator:    c.creator || null,
-      },
-      source: 'pumpfun',
-    };
-  } catch { return null; }
+  const ENDPOINTS = [
+    `https://frontend-api.pump.fun/coins/${mint}`,
+    `https://frontend-api-v3.pump.fun/coins/${mint}`,
+  ];
+  for (const url of ENDPOINTS) {
+    try {
+      const r = await fetch(url, {
+        headers: { Accept: 'application/json', 'User-Agent': `SolBot/${VERSION}` },
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!r.ok) continue;
+      const c = await r.json();
+      if (!c || typeof c !== 'object') continue;
+
+      // Prix via réserves AMM virtuelles (disponibles depuis le bloc 0)
+      // virtual_sol_reserves   : lamports (1e9 = 1 SOL)
+      // virtual_token_reserves : raw units (1e6 = 1 token, 6 décimales)
+      let price = 0;
+      const vsol = parseFloat(c.virtual_sol_reserves  || 0);
+      const vtok = parseFloat(c.virtual_token_reserves || 0);
+      if (vsol > 0 && vtok > 0) {
+        const priceSol = (vsol / 1e9) / (vtok / 1e6);   // SOL par token
+        const solUsd   = getPrice(SOL_MINT)?.price || 0;
+        if (solUsd > 0) price = priceSol * solUsd;
+      }
+      // Fallback mcap/supply — != null car mcap peut légitimement valoir 0 (falsy)
+      if (!(price > 0) && c.usd_market_cap != null && parseFloat(c.total_supply) > 0) {
+        price = parseFloat(c.usd_market_cap) / parseFloat(c.total_supply);
+      }
+      if (!(price > 0)) continue;
+
+      // Liquidité = pool SOL virtuel × 2 × prix SOL/USD
+      const solUsd = getPrice(SOL_MINT)?.price || 150;
+      const liq    = vsol > 0 ? (vsol / 1e9) * solUsd * 2 : 0;
+
+      return {
+        price, liquidity: liq,
+        volume24h: 0, volume6h: 0, volume1h: 0,
+        change24h: 0, change6h: 0, change1h: 0,
+        fdv:  parseFloat(c.usd_market_cap || 0) || price * parseFloat(c.total_supply || 1e9),
+        mcap: parseFloat(c.usd_market_cap || 0),
+        buys24h: 0, sells24h: 0, txns24h: 0,
+        logo:   c.image_uri || null,
+        symbol: c.symbol    || null,
+        name:   c.name      || null,
+        pairAddr: null, dex: 'pumpfun',
+        createdAt: c.created_timestamp ? c.created_timestamp * 1000 : null,
+        pumpfun: {
+          progress:   vsol > 0 ? Math.min(100, vsol / 1e9 / 85 * 100) : 0,
+          complete:   !!c.complete,
+          kingOfHill: !!c.king_of_the_hill_timestamp,
+          creator:    c.creator || null,
+        },
+        source: 'pumpfun',
+      };
+    } catch { continue; }
+  }
+  return null;
 }
 
 async function _fetchBirdeye(mint) {
@@ -525,6 +558,7 @@ async function prefetchPrices(mints) {
   log('debug', 'Prices done', {
     ok, total: toFetch.length, missing: toFetch.length - ok,
     negCached: mints.filter(m => isNegCached(m)).length,
+    sources: Object.keys(srcs).length ? srcs : undefined,
   });
 }
 
