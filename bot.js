@@ -1527,7 +1527,14 @@ class BotLoop {
 
     const sym           = priceData?.symbol || mint.slice(0, 8);
     const tokBought     = result.outAmount || 0;
-    const exactEntryPrice = tokBought > 0 ? solAmount / tokBought : (priceData?.price || 0);
+    // Prix d'entrée doit être en USD (même unité que priceCache)
+    // solAmount/tokBought = SOL/token → multiplier par SOL/USD pour avoir USD/token
+    const solUsdRate    = getPrice(SOL_MINT)?.price || 0;
+    const exactEntryPrice = priceData?.price > 0
+      ? priceData.price  // prix USD déjà disponible au moment de l'achat
+      : (tokBought > 0 && solUsdRate > 0
+          ? (solAmount / tokBought) * solUsdRate
+          : (tokBought > 0 ? solAmount / tokBought : 0));
     this.recordBuy(mint, solAmount, tokBought);
 
     if (!this.positions.entries.has(mint)) {
@@ -2339,7 +2346,10 @@ function startApi(bot, wallet, scanner) {
     try {
       const result = await bot.swap.buy(mint, sol, parseInt(slippageBps) || CFG.DEFAULT_SLIPPAGE);
       if (result.success) {
-        const ep = result.outAmount > 0 ? sol / result.outAmount : (pd?.price || 0);
+        const solUsd = getPrice(SOL_MINT)?.price || 0;
+        const ep = pd?.price > 0 ? pd.price
+          : (result.outAmount > 0 && solUsd > 0 ? (sol / result.outAmount) * solUsd
+          : (result.outAmount > 0 ? sol / result.outAmount : 0));
         bot.positions.trackEntry(mint, ep, result.outAmount, ep);
         bot.recordBuy(mint, sol, result.outAmount || 0);
         bot.recordTrade({ type: 'buy', mint, symbol: pd?.symbol || mint.slice(0,8),
@@ -2651,3 +2661,4 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
+
