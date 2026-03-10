@@ -795,6 +795,12 @@ class PositionManager {
     const trig = this.triggered.get(mint);
     const pnl  = this.getPnl(mint, price);
     if (!e || !trig || pnl === null || !(e.price > 0)) return [];
+    // Garde-fou: PnL > 100 000% = prix d'entrée corrompu (SOL/token au lieu de USD/token)
+    if (pnl > 100_000) {
+      log('warn', `Prix d'entrée corrompu détecté — reset au prix courant`, { mint: mint.slice(0,8), pnl: pnl.toFixed(0) });
+      this.setEntryPrice(mint, price);
+      return [];
+    }
 
     const hits = [];
     for (let i = 0; i < this.tiers.length; i++) {
@@ -816,6 +822,7 @@ class PositionManager {
     if (!e || !(e.price > 0)) return null;
     const pnl = this.getPnl(mint, price);
     if (pnl === null) return null;
+    if (pnl > 100_000) return null; // entrée corrompue — checkTP s'en occupe
     const rem = this.getRemaining(mint);
     if (rem <= 0) return null;
 
@@ -834,6 +841,7 @@ class PositionManager {
     const pnl  = this.getPnl(mint, price);
     const peak = this.peak.get(mint) || 0;
     if (pnl === null || peak < 10) return null;
+    if (pnl > 100_000) return null; // entrée corrompue
     const trailingPct = (CFG.TS_VOL && momentum) ? momentum.volTrailingPct(mint) : CFG.TS_PCT;
     if (pnl >= peak - trailingPct) return null;
     const rem = this.getRemaining(mint);
