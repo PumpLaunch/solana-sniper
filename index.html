@@ -139,6 +139,78 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex
 .empty-icon{font-size:40px;opacity:.35}
 .empty-txt{font-size:12px}
 .load-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;color:var(--dim);font-size:12px}
+
+  /* ── Sell panel ── */
+  .sell-panel {
+    margin: 8px 12px;
+    background: rgba(255,56,96,.06);
+    border: 1px solid rgba(255,56,96,.2);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .sell-title {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--dn);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .sell-pct-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .sell-pct {
+    background: rgba(255,56,96,.12);
+    border: 1px solid rgba(255,56,96,.3);
+    color: var(--dn);
+    border-radius: 6px;
+    padding: 7px 0;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .sell-pct:active { background: rgba(255,56,96,.3); }
+  .sell-pct-all {
+    background: rgba(255,56,96,.22);
+    border-color: var(--dn);
+  }
+  .sell-custom-row {
+    display: flex;
+    gap: 6px;
+  }
+  .sell-custom-row input {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    font-size: 13px;
+    padding: 6px 10px;
+    outline: none;
+  }
+  .sell-custom-btn {
+    background: var(--dn);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .sell-status {
+    margin-top: 7px;
+    font-size: 11px;
+    min-height: 16px;
+    font-family: var(--mono);
+  }
+  .sell-status.ok  { color: var(--up); }
+  .sell-status.err { color: var(--dn); }
+  .sell-status.loading { color: var(--dim); }
 </style>
 </head>
 <body>
@@ -191,6 +263,20 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex
     <div class="chart-wrap">
       <div class="chart-spinner" id="chartSpinner"><div class="spinner"></div><div>Chargement...</div></div>
       <iframe id="chartFrame" src="about:blank"></iframe>
+    </div>
+    <div class="sell-panel">
+      <div class="sell-title">&#9660; Vente manuelle</div>
+      <div class="sell-pct-row">
+        <button class="sell-pct" onclick="sellPct(25)">25%</button>
+        <button class="sell-pct" onclick="sellPct(50)">50%</button>
+        <button class="sell-pct" onclick="sellPct(75)">75%</button>
+        <button class="sell-pct sell-pct-all" onclick="sellPct(100)">100%</button>
+      </div>
+      <div class="sell-custom-row">
+        <input type="number" id="sellCustomPct" min="1" max="100" step="1" placeholder="% personnalisé">
+        <button class="sell-custom-btn" onclick="sellCustom()">Vendre</button>
+      </div>
+      <div id="sellStatus" class="sell-status"></div>
     </div>
     <div class="detail-footer">
       <a class="btn-dex" id="btnDex" href="#" target="_blank">DexScreener</a>
@@ -362,7 +448,17 @@ function apiFetch(path, opts) {
   opts = opts || {};
   var controller = new AbortController();
   var timer = setTimeout(function() { controller.abort(); }, 12000);
-  return fetch(API + path, Object.assign({}, opts, { signal: controller.signal }))
+  // Construire fetchOpts sans exposer signal dans opts (AbortSignal non-clonable)
+  var fetchOpts = {
+    method:  opts.method  || 'GET',
+    headers: opts.headers || {},
+    signal:  controller.signal
+  };
+  if (opts.body !== undefined) fetchOpts.body = opts.body;
+  // Ajouter Content-Type JSON si body présent et header absent
+  if (fetchOpts.body && !fetchOpts.headers['Content-Type'])
+    fetchOpts.headers['Content-Type'] = 'application/json';
+  return fetch(API + path, fetchOpts)
     .then(function(r) {
       clearTimeout(timer);
       if (!(r.headers.get('content-type') || '').includes('application/json'))
@@ -551,6 +647,38 @@ function copyMint() {
     t.value = _detailMint; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
     toast('Adresse copiee', 'ok');
   }
+}
+
+function sellPct(pct) {
+  if (!_detailMint) return;
+  var tok = null;
+  for (var i = 0; i < _portfolio.length; i++) { if (_portfolio[i].mintFull === _detailMint) { tok = _portfolio[i]; break; } }
+  if (tok && (tok.isSol || tok.isUsdc)) { toast('Impossible de vendre SOL/USDC ici', 'err'); return; }
+  var st = document.getElementById('sellStatus');
+  st.textContent = 'Vente ' + pct + '% en cours...'; st.className = 'sell-status loading';
+  apiFetch('/api/sell', {
+    method: 'POST',
+    body: JSON.stringify({ mint: _detailMint, percent: pct, reason: 'MANUAL_' + pct + 'PCT' })
+  }).then(function(r) {
+    if (r && r.success) {
+      var solStr = r.solOut ? ' → ' + r.solOut.toFixed(4) + ' SOL' : '';
+      st.textContent = '✓ Vendu ' + pct + '%' + solStr; st.className = 'sell-status ok';
+      toast('Vente ' + pct + '% confirmée' + solStr, 'ok');
+      setTimeout(function() { loadPortfolio(); }, 3000);
+      if (pct === 100) setTimeout(closeDetail, 2000);
+    } else {
+      st.textContent = '✗ ' + (r && r.error ? r.error.slice(0,60) : 'Erreur'); st.className = 'sell-status err';
+    }
+  }).catch(function(e) {
+    st.textContent = '✗ ' + e.message.slice(0,60); st.className = 'sell-status err';
+  });
+}
+
+function sellCustom() {
+  var inp = document.getElementById('sellCustomPct');
+  var pct = parseFloat(inp.value);
+  if (isNaN(pct) || pct <= 0 || pct > 100) { toast('Pourcentage invalide (1-100)', 'err'); return; }
+  sellPct(Math.round(pct));
 }
 
 function loadScanner() {
