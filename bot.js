@@ -2,14 +2,20 @@
  * SolBot v6.0 — Production Build (All Patches Applied)
  *
  * PATCHES:
- *  [P1] checkTP  — guard bootstrapped supprimé
- *  [P2] checkSL  — guard bootstrapped supprimé
- *  [P3] autoScanBootstrapped — forçage immédiat sans Helius
- *  [P4] autoScanBootstrapped — batch 10, trié par bootAttempts
- *  [P5] tick()   — catch 429/fetch-failed → sleep 5s, PAS de backoff 300s
- *  [P6] SCANNER_DELAY_MS 15s → 45s
- *  [P7] _evaluate — fallback PumpFun si liq=0
- *  [P8] _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
+ *  [P1]  checkTP  — guard bootstrapped supprimé
+ *  [P2]  checkSL  — guard bootstrapped supprimé
+ *  [P3]  autoScanBootstrapped — forçage immédiat sans Helius
+ *  [P4]  autoScanBootstrapped — batch 10, trié par bootAttempts
+ *  [P5]  tick()   — catch 429/fetch-failed → sleep 5s, PAS de backoff 300s
+ *  [P6]  SCANNER_DELAY_MS 15s → 45s
+ *  [P7]  _evaluate — fallback PumpFun si liq=0
+ *  [P8]  _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
+ *  [P9]  checkTP/SL/TS — garde-fou PnL > 100 000% = entrée corrompue → reset
+ *  [P10] _connectWs — removeAllListeners() + close() avant reconnexion (fix détections dupliquées)
+ *  [P11] _evaluate — requeue dans 30s si achat raté pour raison réseau
+ *  [P12] setEntryPrice + checkTS — reset peak corrompu (trailing stop fantôme)
+ *  [P13] _isValidMint — blacklist Memo v1/v2, Metaplex, Jupiter v6, Whirlpool, Serum
+ *  [P14] _loop — batch prefetch prix avant évaluation + dedup WS 2s (_recentWs)
  */
 'use strict';
 
@@ -25,12 +31,12 @@ const CFG = {
   PRIVATE_KEY:   process.env.PRIVATE_KEY,
   HELIUS_KEY:    process.env.HELIUS_API_KEY    || null,
   PORT:          parseInt(process.env.PORT)             || 10000,
-  INTERVAL_SEC:  parseInt(process.env.INTERVAL_SEC)     || 60,
+  INTERVAL_SEC:  parseInt(process.env.INTERVAL_SEC)     || 30,
   NODE_ENV:      process.env.NODE_ENV                    || 'production',
   DATA_FILE:     process.env.DATA_FILE                   || './bot_state.json',
   DASHBOARD_URL: process.env.DASHBOARD_URL               || null,
 
-  TP_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'true',
+  TP_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'false',
   TP_TIERS:      safeJson(process.env.TAKE_PROFIT_TIERS,
     [{ pnl: 20, sell: 20 }, { pnl: 50, sell: 25 }, { pnl: 100, sell: 25 }, { pnl: 200, sell: 25 }]),
   TP_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
@@ -57,7 +63,7 @@ const CFG = {
   JITO_URL:      process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
   MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '10'),
   MIN_SCORE:     parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
-  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.01'),
+  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.05'),
   MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES     || '3'),
   DEFAULT_SLIPPAGE: parseInt(process.env.DEFAULT_SLIPPAGE     || '500'),
   PRICE_TTL_MS:     parseInt(process.env.PRICE_TTL_MS         || '55000'),
@@ -68,7 +74,7 @@ const CFG = {
   PYRAMID_ENABLED:    process.env.PYRAMID_ENABLED === 'true',
   PYRAMID_TIERS:      safeJson(process.env.PYRAMID_TIERS,
     [{ pnl: 30, addSol: 0.05 }, { pnl: 75, addSol: 0.05 }]),
-  PYRAMID_MAX_SOL:    parseFloat(process.env.PYRAMID_MAX_SOL || '0.005'),
+  PYRAMID_MAX_SOL:    parseFloat(process.env.PYRAMID_MAX_SOL || '0.5'),
   PYRAMID_HYSTERESIS: parseFloat(process.env.PYRAMID_HYSTERESIS || '5'),
   DCAD_ENABLED:          process.env.DCA_DOWN_ENABLED === 'true',
   DCAD_TIERS:            safeJson(process.env.DCA_DOWN_TIERS,
@@ -91,7 +97,7 @@ const CFG = {
   SCANNER_MIN_SCORE:   parseFloat(process.env.SCANNER_MIN_SCORE   || '60'),
   SCANNER_MIN_LIQ:     parseFloat(process.env.SCANNER_MIN_LIQ     || '5000'),
   SCANNER_MAX_LIQ:     parseFloat(process.env.SCANNER_MAX_LIQ     || '300000'),
-  SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.01'),
+  SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.05'),
   SCANNER_COOLDOWN_MS: parseInt(process.env.SCANNER_COOLDOWN_MS   || '300000'),
   SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '45000'), // [P6] 15→45s
   SCANNER_POLL_SEC:    parseInt(process.env.SCANNER_POLL_SEC      || '30'),
@@ -2715,4 +2721,3 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
-
