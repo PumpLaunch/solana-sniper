@@ -2,14 +2,20 @@
  * SolBot v6.0 — Production Build (All Patches Applied)
  *
  * PATCHES:
- *  [P1] checkTP  — guard bootstrapped supprimé
- *  [P2] checkSL  — guard bootstrapped supprimé
- *  [P3] autoScanBootstrapped — forçage immédiat sans Helius
- *  [P4] autoScanBootstrapped — batch 10, trié par bootAttempts
- *  [P5] tick()   — catch 429/fetch-failed → sleep 5s, PAS de backoff 300s
- *  [P6] SCANNER_DELAY_MS 15s → 45s
- *  [P7] _evaluate — fallback PumpFun si liq=0
- *  [P8] _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
+ *  [P1]  checkTP  — guard bootstrapped supprimé
+ *  [P2]  checkSL  — guard bootstrapped supprimé
+ *  [P3]  autoScanBootstrapped — forçage immédiat sans Helius
+ *  [P4]  autoScanBootstrapped — batch 10, trié par bootAttempts
+ *  [P5]  tick()   — catch 429/fetch-failed → sleep 5s, PAS de backoff 300s
+ *  [P6]  SCANNER_DELAY_MS 15s → 45s
+ *  [P7]  _evaluate — fallback PumpFun si liq=0
+ *  [P8]  _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
+ *  [P9]  checkTP/SL/TS — garde-fou PnL > 100 000% = entrée corrompue → reset
+ *  [P10] _connectWs — removeAllListeners() + close() avant reconnexion (fix détections dupliquées)
+ *  [P11] _evaluate — requeue dans 30s si achat raté pour raison réseau
+ *  [P12] setEntryPrice + checkTS — reset peak corrompu (trailing stop fantôme)
+ *  [P13] _isValidMint — blacklist Memo v1/v2, Metaplex, Jupiter v6, Whirlpool, Serum
+ *  [P14] _loop — batch prefetch prix avant évaluation + dedup WS 2s (_recentWs)
  */
 'use strict';
 
@@ -48,7 +54,7 @@ const CFG = {
   LE_PCT:        parseFloat(process.env.LIQ_EXIT_PCT     || '70'),
   TT_ENABLED:    process.env.TIME_STOP_ENABLED === 'true',
   TT_HOURS:      parseFloat(process.env.TIME_STOP_HOURS  || '24'),
-  TT_MIN_PNL:    parseFloat(process.env.TIME_STOP_MIN_PNL|| '50'),
+  TT_MIN_PNL:    parseFloat(process.env.TIME_STOP_MIN_PNL|| '0'),
   ME_ENABLED:    process.env.MOMENTUM_EXIT_ENABLED === 'true',
   ME_WINDOW:     parseInt(process.env.MOMENTUM_WINDOW    || '5'),
   ME_THRESHOLD:  parseFloat(process.env.MOMENTUM_THRESHOLD || '-3'),
@@ -57,7 +63,7 @@ const CFG = {
   JITO_URL:      process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
   MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '10'),
   MIN_SCORE:     parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
-  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.01'),
+  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.05'),
   MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES     || '3'),
   DEFAULT_SLIPPAGE: parseInt(process.env.DEFAULT_SLIPPAGE     || '500'),
   PRICE_TTL_MS:     parseInt(process.env.PRICE_TTL_MS         || '55000'),
