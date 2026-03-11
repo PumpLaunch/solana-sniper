@@ -57,7 +57,7 @@ const CFG = {
   JITO_URL:      process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
   MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '10'),
   MIN_SCORE:     parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
-  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.01'),
+  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.05'),
   MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES     || '3'),
   DEFAULT_SLIPPAGE: parseInt(process.env.DEFAULT_SLIPPAGE     || '500'),
   PRICE_TTL_MS:     parseInt(process.env.PRICE_TTL_MS         || '55000'),
@@ -1987,6 +1987,7 @@ class TokenScanner {
   constructor(bot) {
     this.bot        = bot;
     this.seen       = new Set();
+    this._recentWs  = new Map(); // [P14b] dedup WS events: mint → ts
     this.pending    = new Set();
     this.cooldowns  = new Map();
     this.queue      = [];
@@ -2111,10 +2112,14 @@ class TokenScanner {
       const now   = Date.now();
       const ready = this.queue.filter(e => e.ts <= now);
       this.queue  = this.queue.filter(e => e.ts > now);
+      // [P14a] Précharger tous les prix en une seule requête DexScreener batch
+      if (ready.length > 0) {
+        await prefetchPrices(ready.map(e => e.mint)).catch(() => {});
+      }
       for (const entry of ready) {
         try { await this._evaluate(entry.mint, entry.reason); }
         catch (err) { this.stats.errors++; log('warn', `Scanner eval error: ${err.message}`); }
-        await sleep(400);
+        await sleep(200);
       }
     }
   }
@@ -2123,6 +2128,14 @@ class TokenScanner {
     if (!this._isValidMint(mint)) return;
     if (this.seen.has(mint) || this.pending.has(mint) || _negCache.has(mint)) return;
     if (Date.now() - (this.cooldowns.get(mint) || 0) < CFG.SCANNER_COOLDOWN_MS) return;
+    // [P14b] Dedup WS: même mint depuis 2 programmes différents dans la même fenêtre 2s
+    const rwTs = this._recentWs.get(mint) || 0;
+    if (Date.now() - rwTs < 2000) return;
+    this._recentWs.set(mint, Date.now());
+    if (this._recentWs.size > 500) { // nettoyage mémoire
+      const old = Date.now() - 10_000;
+      for (const [m, t] of this._recentWs) if (t < old) this._recentWs.delete(m);
+    }
     this.seen.add(mint); this.pending.add(mint); this.stats.detected++;
     log('info', `Scanner détecté: ${mint.slice(0, 8)}... (${reason})`);
     // [P6] délai 45s pour indexation DexScreener
@@ -2142,8 +2155,10 @@ class TokenScanner {
 
     if (this.bot.isDailyLossPaused()) { this.stats.rejected++; return; }
 
-    await prefetchPrices([mint]);
+    // Prix déjà préchargé en batch dans _loop (P14a) — refetch seulement si absent
     let pd = getPrice(mint);
+    if (!pd) await prefetchPrices([mint]).catch(() => {});
+    pd = getPrice(mint);
 
     // [P7b] Si DexScreener n'a pas encore indexé le token (pd null ou liq=0),
     // essayer PumpFun directement — disponible dès le bloc 0
