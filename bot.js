@@ -775,6 +775,8 @@ class PositionManager {
     this.triggered.set(mint, new Set());
     e.triggeredTiers = [];
     this.breakEven.delete(mint);
+    // Reset peak pour éviter trailing stop fantôme sur pic corrompu
+    this.peak.set(mint, 0); e.peakPnl = 0;
     if (newBalance > 0) { e.originalBalance = newBalance; this.sold.set(mint, 0); e.soldAmount = 0; }
     log('info', 'Prix entrée corrigé', { mint: mint.slice(0, 8), price: newPrice.toPrecision(6) });
     return true;
@@ -842,6 +844,8 @@ class PositionManager {
     const peak = this.peak.get(mint) || 0;
     if (pnl === null || peak < 10) return null;
     if (pnl > 100_000) return null; // entrée corrompue
+    // Pic corrompu (entrée SOL/token) → reset et ignorer
+    if (peak > 100_000) { this.peak.set(mint, Math.max(0, pnl || 0)); const e = this.entries.get(mint); if (e) e.peakPnl = 0; return null; }
     const trailingPct = (CFG.TS_VOL && momentum) ? momentum.volTrailingPct(mint) : CFG.TS_PCT;
     if (pnl >= peak - trailingPct) return null;
     const rem = this.getRemaining(mint);
@@ -1261,6 +1265,7 @@ class SwapEngine {
       this.sellFailures = 0;
       return { success: true, sig: res.sig, txUrl: res.txUrl, solOut, usdcOut, amountSold: amount };
     } catch (err) {
+      this._lastBuyErr = err.message || '';
       const isNetwork = (
         err.message?.includes('fetch failed') ||
         err.message?.includes('ENOTFOUND')    ||
@@ -2004,6 +2009,11 @@ class TokenScanner {
 
   _connectWs() {
     if (!this.running) return;
+    // Fermer l'ancienne connexion avant d'en créer une nouvelle
+    if (this.ws) {
+      try { this.ws.removeAllListeners(); this.ws.close(); } catch {}
+      this.ws = null;
+    }
     log('info', `Scanner WS connexion (tentative ${this.reconnects + 1})`);
     let WebSocket;
     try { WebSocket = require('ws'); }
@@ -2171,7 +2181,18 @@ class TokenScanner {
       ],
     });
     if (ok) { this.stats.bought++; log('success', `Scanner acheté ${pd.symbol || mint.slice(0,8)} (${score}/100)`); }
-    else this.stats.errors++;
+    else {
+      // Si échec réseau (pas solde insuffisant), re-queuer dans 30s pour retenter
+      const lastErr = this.bot.swap._lastBuyErr || '';
+      const isNetwork = lastErr.includes('ENOTFOUND') || lastErr.includes('fetch failed') || lastErr.includes('ETIMEDOUT');
+      if (isNetwork) {
+        this.seen.delete(mint);
+        this.cooldowns.delete(mint);
+        this.queue.push({ mint, reason, ts: Date.now() + 30_000 });
+        log('warn', `Scanner buy réseau raté — requeue dans 30s`, { mint: mint.slice(0,8) });
+      }
+      this.stats.errors++;
+    }
   }
 
   getStatus() {
@@ -2672,4 +2693,3 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
-
