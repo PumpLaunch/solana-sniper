@@ -57,7 +57,7 @@ const CFG = {
   JITO_URL:      process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
   MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '10'),
   MIN_SCORE:     parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
-  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.05'),
+  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.01'),
   MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES     || '3'),
   DEFAULT_SLIPPAGE: parseInt(process.env.DEFAULT_SLIPPAGE     || '500'),
   PRICE_TTL_MS:     parseInt(process.env.PRICE_TTL_MS         || '55000'),
