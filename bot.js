@@ -25,12 +25,12 @@ const CFG = {
   PRIVATE_KEY:   process.env.PRIVATE_KEY,
   HELIUS_KEY:    process.env.HELIUS_API_KEY    || null,
   PORT:          parseInt(process.env.PORT)             || 10000,
-  INTERVAL_SEC:  parseInt(process.env.INTERVAL_SEC)     || 30,
+  INTERVAL_SEC:  parseInt(process.env.INTERVAL_SEC)     || 60,
   NODE_ENV:      process.env.NODE_ENV                    || 'production',
   DATA_FILE:     process.env.DATA_FILE                   || './bot_state.json',
   DASHBOARD_URL: process.env.DASHBOARD_URL               || null,
 
-  TP_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'false',
+  TP_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'true',
   TP_TIERS:      safeJson(process.env.TAKE_PROFIT_TIERS,
     [{ pnl: 20, sell: 20 }, { pnl: 50, sell: 25 }, { pnl: 100, sell: 25 }, { pnl: 200, sell: 25 }]),
   TP_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
@@ -91,7 +91,7 @@ const CFG = {
   SCANNER_MIN_SCORE:   parseFloat(process.env.SCANNER_MIN_SCORE   || '60'),
   SCANNER_MIN_LIQ:     parseFloat(process.env.SCANNER_MIN_LIQ     || '5000'),
   SCANNER_MAX_LIQ:     parseFloat(process.env.SCANNER_MAX_LIQ     || '300000'),
-  SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.05'),
+  SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.01'),
   SCANNER_COOLDOWN_MS: parseInt(process.env.SCANNER_COOLDOWN_MS   || '300000'),
   SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '45000'), // [P6] 15→45s
   SCANNER_POLL_SEC:    parseInt(process.env.SCANNER_POLL_SEC      || '30'),
