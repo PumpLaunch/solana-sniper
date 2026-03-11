@@ -74,7 +74,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex
 .tok-stat-lbl{font-size:8px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
 .tok-stat-val{font-family:var(--mono);font-size:11px;font-weight:600}
 .dead-sep{padding:5px 12px;background:rgba(255,56,96,.05);border-top:1px solid rgba(255,56,96,.2);font-size:9px;color:rgba(255,56,96,.5);letter-spacing:.07em;text-transform:uppercase;font-weight:600}
-.detail-view{display:none;position:absolute;inset:0;z-index:50;flex-direction:column;background:var(--bg)}
+.detail-view{display:none;position:absolute;inset:0;z-index:50;flex-direction:column;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .detail-view.open{display:flex}
 .detail-header{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg1);border-bottom:1px solid var(--border)}
 .detail-back{background:none;border:none;color:var(--dim);font-size:22px;cursor:pointer;line-height:1}
@@ -82,12 +82,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex
 .detail-stat{background:var(--bg1);padding:9px 8px;text-align:center}
 .detail-stat-lbl{font-size:8px;color:var(--dim);letter-spacing:.05em;text-transform:uppercase;margin-bottom:3px}
 .detail-stat-val{font-family:var(--mono);font-size:12px;font-weight:700}
-.chart-wrap{flex:1;position:relative;background:#0a0e1a;overflow:hidden;min-height:0}
+.chart-wrap{flex-shrink:0;height:220px;position:relative;background:#0a0e1a;overflow:hidden}
 .chart-spinner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--dim);font-size:11px}
 .spinner{width:22px;height:22px;border:2px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #chartFrame{width:100%;height:100%;border:none;position:relative;z-index:1}
-.detail-footer{flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px;background:var(--bg1);border-top:1px solid var(--border)}
+.detail-footer{flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px;background:var(--bg1);border-top:1px solid var(--border);position:sticky;bottom:0}
 .btn-dex{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:11px;font-weight:600;text-decoration:none}
 .btn-copy{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:11px;font-weight:600;cursor:pointer}
 .an-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:12px}
@@ -285,6 +285,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex
   </div>
 
   <section class="section active" id="sec-portfolio">
+    <div style="margin:10px 12px 0;background:rgba(255,56,96,.07);border:1px solid rgba(255,56,96,.2);border-radius:10px;padding:10px 12px">
+      <div style="font-size:9px;color:var(--dn);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:7px">&#9660; Vente rapide</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input type="text" id="quickMint" placeholder="Adresse mint complète" style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-size:11px;padding:6px 8px;outline:none;font-family:var(--mono)">
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:6px">
+        <button onclick="quickSell(25)" style="background:rgba(255,56,96,.12);border:1px solid rgba(255,56,96,.3);color:var(--dn);border-radius:6px;padding:7px 0;font-size:12px;font-weight:700;cursor:pointer">25%</button>
+        <button onclick="quickSell(50)" style="background:rgba(255,56,96,.12);border:1px solid rgba(255,56,96,.3);color:var(--dn);border-radius:6px;padding:7px 0;font-size:12px;font-weight:700;cursor:pointer">50%</button>
+        <button onclick="quickSell(75)" style="background:rgba(255,56,96,.12);border:1px solid rgba(255,56,96,.3);color:var(--dn);border-radius:6px;padding:7px 0;font-size:12px;font-weight:700;cursor:pointer">75%</button>
+        <button onclick="quickSell(100)" style="background:rgba(255,56,96,.22);border:1px solid var(--dn);color:var(--dn);border-radius:6px;padding:7px 0;font-size:12px;font-weight:700;cursor:pointer">100%</button>
+      </div>
+      <div id="quickSellStatus" style="font-size:11px;font-family:var(--mono);min-height:14px"></div>
+    </div>
     <div class="filter-bar">
       <div class="filter-count" id="filterCount">Chargement...</div>
       <button class="btn-filter" id="btnDead" onclick="toggleDead()">Morts : caches</button>
@@ -446,26 +459,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function apiFetch(path, opts) {
   opts = opts || {};
-  var controller = new AbortController();
-  var timer = setTimeout(function() { controller.abort(); }, 12000);
-  // Construire fetchOpts sans exposer signal dans opts (AbortSignal non-clonable)
-  var fetchOpts = {
-    method:  opts.method  || 'GET',
-    headers: opts.headers || {},
-    signal:  controller.signal
-  };
+  var fetchOpts = { method: opts.method || 'GET', headers: opts.headers || {} };
   if (opts.body !== undefined) fetchOpts.body = opts.body;
-  // Ajouter Content-Type JSON si body présent et header absent
   if (fetchOpts.body && !fetchOpts.headers['Content-Type'])
     fetchOpts.headers['Content-Type'] = 'application/json';
-  return fetch(API + path, fetchOpts)
+  var timeout = new Promise(function(_, rej) {
+    setTimeout(function() { rej(new Error('timeout')); }, 12000);
+  });
+  return Promise.race([fetch(API + path, fetchOpts), timeout])
     .then(function(r) {
-      clearTimeout(timer);
       if (!(r.headers.get('content-type') || '').includes('application/json'))
         throw new Error('HTTP ' + r.status);
       return r.json();
-    })
-    .catch(function(e) { clearTimeout(timer); throw e; });
+    });
 }
 
 function loadAll() { return Promise.allSettled([loadPortfolio(), loadAnalytics()]); }
@@ -647,6 +653,27 @@ function copyMint() {
     t.value = _detailMint; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
     toast('Adresse copiee', 'ok');
   }
+}
+
+function quickSell(pct) {
+  var mint = (document.getElementById('quickMint').value || '').trim();
+  if (!mint || mint.length < 30) { toast('Adresse mint invalide', 'err'); return; }
+  var st = document.getElementById('quickSellStatus');
+  st.style.color = 'var(--dim)'; st.textContent = 'Vente ' + pct + '%...';
+  apiFetch('/api/sell', {
+    method: 'POST',
+    body: JSON.stringify({ mint: mint, percent: pct, reason: 'MANUAL_QUICK_' + pct })
+  }).then(function(r) {
+    if (r && r.success) {
+      var sol = r.solOut ? ' → ' + r.solOut.toFixed(4) + ' SOL' : '';
+      st.style.color = 'var(--up)'; st.textContent = '✓ Vendu ' + pct + '%' + sol;
+      toast('Vente confirmée' + sol, 'ok');
+      if (pct === 100) document.getElementById('quickMint').value = '';
+      setTimeout(loadPortfolio, 3000);
+    } else {
+      st.style.color = 'var(--dn)'; st.textContent = '✗ ' + (r && r.error ? r.error.slice(0,60) : 'Erreur');
+    }
+  }).catch(function(e) { st.style.color = 'var(--dn)'; st.textContent = '✗ ' + e.message; });
 }
 
 function sellPct(pct) {
@@ -893,3 +920,4 @@ function toast(msg, type) {
 </script>
 </body>
 </html>
+
