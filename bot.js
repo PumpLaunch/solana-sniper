@@ -99,7 +99,7 @@ const CFG = {
   SCANNER_MAX_LIQ:     parseFloat(process.env.SCANNER_MAX_LIQ     || '300000'),
   SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.005'),
   SCANNER_COOLDOWN_MS: parseInt(process.env.SCANNER_COOLDOWN_MS   || '300000'),
-  SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '45000'), // [P6] 15→45s
+  SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '120000'), // [P6] 15→45s
   SCANNER_POLL_SEC:    parseInt(process.env.SCANNER_POLL_SEC      || '30'),
   SCANNER_PROGRAMS: [
     '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
