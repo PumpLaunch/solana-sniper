@@ -55,7 +55,7 @@ const CFG = {
   JITO_ENABLED:  process.env.JITO_ENABLED === 'true',
   JITO_TIP_SOL:  parseFloat(process.env.JITO_TIP_SOL     || '0.0001'),
   JITO_URL:      process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
-  MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '15'),
+  MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '10'),
   MIN_SCORE:     parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
   MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.05'),
   MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES     || '3'),
@@ -68,11 +68,11 @@ const CFG = {
   PYRAMID_ENABLED:    process.env.PYRAMID_ENABLED === 'true',
   PYRAMID_TIERS:      safeJson(process.env.PYRAMID_TIERS,
     [{ pnl: 30, addSol: 0.05 }, { pnl: 75, addSol: 0.05 }]),
-  PYRAMID_MAX_SOL:    parseFloat(process.env.PYRAMID_MAX_SOL || '0.01'),
+  PYRAMID_MAX_SOL:    parseFloat(process.env.PYRAMID_MAX_SOL || '0.5'),
   PYRAMID_HYSTERESIS: parseFloat(process.env.PYRAMID_HYSTERESIS || '5'),
   DCAD_ENABLED:          process.env.DCA_DOWN_ENABLED === 'true',
   DCAD_TIERS:            safeJson(process.env.DCA_DOWN_TIERS,
-    [{ pnl: -20, addSol: 0.005 }, { pnl: -35, addSol: 0.005 }]),
+    [{ pnl: -20, addSol: 0.05 }, { pnl: -35, addSol: 0.05 }]),
   DCAD_MAX_ADDS:         parseInt(process.env.DCA_DOWN_MAX_ADDS || '2'),
   DCAD_REQUIRE_MOMENTUM: process.env.DCA_DOWN_REQUIRE_MOMENTUM !== 'false',
   DCAD_MIN_VELOCITY:     parseFloat(process.env.DCA_DOWN_MIN_VEL || '-1'),
@@ -88,10 +88,10 @@ const CFG = {
   SMART_SIZE_MAX:     parseFloat(process.env.SMART_SIZE_MAX   || '0.5'),
   SELL_TO_USDC: process.env.SELL_TO_USDC === 'true',
   SCANNER_ENABLED:     process.env.SCANNER_ENABLED === 'true',
-  SCANNER_MIN_SCORE:   parseFloat(process.env.SCANNER_MIN_SCORE   || '70'),
+  SCANNER_MIN_SCORE:   parseFloat(process.env.SCANNER_MIN_SCORE   || '60'),
   SCANNER_MIN_LIQ:     parseFloat(process.env.SCANNER_MIN_LIQ     || '5000'),
   SCANNER_MAX_LIQ:     parseFloat(process.env.SCANNER_MAX_LIQ     || '300000'),
-  SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.005'),
+  SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.05'),
   SCANNER_COOLDOWN_MS: parseInt(process.env.SCANNER_COOLDOWN_MS   || '300000'),
   SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '45000'), // [P6] 15→45s
   SCANNER_POLL_SEC:    parseInt(process.env.SCANNER_POLL_SEC      || '30'),
@@ -2126,19 +2126,22 @@ class TokenScanner {
     if (this.bot.isDailyLossPaused()) { this.stats.rejected++; return; }
 
     await prefetchPrices([mint]);
-    const pd = getPrice(mint);
-    if (!pd || !pd.price || pd.price <= 0) { this.stats.rejected++; return; }
+    let pd = getPrice(mint);
 
-    // [P7] Fallback PumpFun si liq=0 (token pas encore indexé par DexScreener)
-    let liq = pd.liquidity || 0;
-    if (liq === 0 && pd.source !== 'pumpfun') {
+    // [P7b] Si DexScreener n'a pas encore indexé le token (pd null ou liq=0),
+    // essayer PumpFun directement — disponible dès le bloc 0
+    if (!pd || !pd.price || pd.price <= 0 || (pd.liquidity || 0) === 0) {
       const pf = await _fetchPumpFun(mint);
       if (pf?.price > 0) {
-        liq = pf.liquidity || 0;
-        priceCache.set(mint, { data: { ...pd, ...pf }, ts: Date.now() });
-        log('debug', `Scanner fallback PumpFun — liq $${liq.toFixed(0)}`, { mint: mint.slice(0,8) });
+        priceCache.set(mint, { data: pf, ts: Date.now() });
+        pd = pf;
+        log('debug', `Scanner PumpFun direct — liq $${(pf.liquidity||0).toFixed(0)}`, { mint: mint.slice(0,8) });
       }
     }
+
+    if (!pd || !pd.price || pd.price <= 0) { this.stats.rejected++; return; }
+
+    let liq = pd.liquidity || 0;
 
     if (liq < CFG.SCANNER_MIN_LIQ || liq > CFG.SCANNER_MAX_LIQ) {
       log('debug', `Scanner reject — liq $${liq.toFixed(0)} hors plage [$${CFG.SCANNER_MIN_LIQ}-$${CFG.SCANNER_MAX_LIQ}]`);
