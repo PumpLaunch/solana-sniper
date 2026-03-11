@@ -57,7 +57,7 @@ const CFG = {
   JITO_URL:      process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
   MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '10'),
   MIN_SCORE:     parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
-  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.01'),
+  MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.05'),
   MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES     || '3'),
   DEFAULT_SLIPPAGE: parseInt(process.env.DEFAULT_SLIPPAGE     || '500'),
   PRICE_TTL_MS:     parseInt(process.env.PRICE_TTL_MS         || '55000'),
@@ -68,7 +68,7 @@ const CFG = {
   PYRAMID_ENABLED:    process.env.PYRAMID_ENABLED === 'true',
   PYRAMID_TIERS:      safeJson(process.env.PYRAMID_TIERS,
     [{ pnl: 30, addSol: 0.05 }, { pnl: 75, addSol: 0.05 }]),
-  PYRAMID_MAX_SOL:    parseFloat(process.env.PYRAMID_MAX_SOL || '0.01'),
+  PYRAMID_MAX_SOL:    parseFloat(process.env.PYRAMID_MAX_SOL || '0.5'),
   PYRAMID_HYSTERESIS: parseFloat(process.env.PYRAMID_HYSTERESIS || '5'),
   DCAD_ENABLED:          process.env.DCA_DOWN_ENABLED === 'true',
   DCAD_TIERS:            safeJson(process.env.DCA_DOWN_TIERS,
@@ -79,7 +79,7 @@ const CFG = {
   REENTRY_ENABLED:   process.env.REENTRY_ENABLED === 'true',
   REENTRY_DELAY_MIN: parseFloat(process.env.REENTRY_DELAY_MIN || '30'),
   REENTRY_MIN_SCORE: parseFloat(process.env.REENTRY_MIN_SCORE || '60'),
-  REENTRY_SOL:       parseFloat(process.env.REENTRY_SOL       || '0.01'),
+  REENTRY_SOL:       parseFloat(process.env.REENTRY_SOL       || '0.05'),
   REENTRY_MIN_GAIN:  parseFloat(process.env.REENTRY_MIN_GAIN  || '15'),
   SMART_SIZE_ENABLED: process.env.SMART_SIZE_ENABLED === 'true',
   SMART_SIZE_BASE:    parseFloat(process.env.SMART_SIZE_BASE  || '0.05'),
@@ -2126,19 +2126,22 @@ class TokenScanner {
     if (this.bot.isDailyLossPaused()) { this.stats.rejected++; return; }
 
     await prefetchPrices([mint]);
-    const pd = getPrice(mint);
-    if (!pd || !pd.price || pd.price <= 0) { this.stats.rejected++; return; }
+    let pd = getPrice(mint);
 
-    // [P7] Fallback PumpFun si liq=0 (token pas encore indexé par DexScreener)
-    let liq = pd.liquidity || 0;
-    if (liq === 0 && pd.source !== 'pumpfun') {
+    // [P7b] Si DexScreener n'a pas encore indexé le token (pd null ou liq=0),
+    // essayer PumpFun directement — disponible dès le bloc 0
+    if (!pd || !pd.price || pd.price <= 0 || (pd.liquidity || 0) === 0) {
       const pf = await _fetchPumpFun(mint);
       if (pf?.price > 0) {
-        liq = pf.liquidity || 0;
-        priceCache.set(mint, { data: { ...pd, ...pf }, ts: Date.now() });
-        log('debug', `Scanner fallback PumpFun — liq $${liq.toFixed(0)}`, { mint: mint.slice(0,8) });
+        priceCache.set(mint, { data: pf, ts: Date.now() });
+        pd = pf;
+        log('debug', `Scanner PumpFun direct — liq $${(pf.liquidity||0).toFixed(0)}`, { mint: mint.slice(0,8) });
       }
     }
+
+    if (!pd || !pd.price || pd.price <= 0) { this.stats.rejected++; return; }
+
+    let liq = pd.liquidity || 0;
 
     if (liq < CFG.SCANNER_MIN_LIQ || liq > CFG.SCANNER_MAX_LIQ) {
       log('debug', `Scanner reject — liq $${liq.toFixed(0)} hors plage [$${CFG.SCANNER_MIN_LIQ}-$${CFG.SCANNER_MAX_LIQ}]`);
@@ -2669,4 +2672,3 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
-
