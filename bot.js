@@ -2059,6 +2059,13 @@ class TokenScanner {
       'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe8bv',
       'ComputeBudget111111111111111111111111111111',
       'Sysvar1nstructions1111111111111111111111111',
+      'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', // Memo v1
+      'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo',  // Memo v2
+      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s',  // Metaplex
+      'TokenRouterProgram111111111111111111111111111',
+      'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4', // Jupiter v6
+      'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc',  // Whirlpool
+      'srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX',  // Serum
       ...CFG.SCANNER_PROGRAMS]);
     return !SYSTEM.has(addr);
   }
@@ -2693,3 +2700,4 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
+
