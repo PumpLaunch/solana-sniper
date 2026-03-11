@@ -25,7 +25,7 @@
             padding-top: var(--safe-top); padding-bottom: var(--safe-bot);
         }
 
-        /* ── TOPBAR (Stats uniquement, PAS de tabs) ───────────────────────── */
+        /* ── TOPBAR ────────────────────────────────────────────────────────── */
         .topbar {
             flex-shrink: 0; background: var(--bg1); border-bottom: 1px solid var(--border);
             padding: 10px 14px; display: flex; align-items: center; gap: 10px;
@@ -43,6 +43,20 @@
         .sep { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
         .btn-refresh { background: none; border: 1px solid var(--border2); border-radius: 6px; color: var(--dim); padding: 5px 8px; font-size: 14px; cursor: pointer; flex-shrink: 0; transition: color .15s; }
         .btn-refresh:active { color: var(--text); background: var(--bg3); }
+
+        /* ── TABS (NAVIGATION PRINCIPALE) ─────────────────────────────────── */
+        .tabs {
+            flex-shrink: 0; display: flex; background: var(--bg1); border-bottom: 1px solid var(--border);
+            overflow-x: auto; padding: 0 10px;
+        }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab {
+            flex: 1; min-width: 70px; padding: 12px 8px; font-size: 11px; font-weight: 600;
+            letter-spacing: .04em; color: var(--dim); text-align: center; cursor: pointer;
+            border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+            white-space: nowrap; text-transform: uppercase;
+        }
+        .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
 
         /* ── CONTENT ───────────────────────────────────────────────────────── */
         .content { flex: 1; overflow: hidden; position: relative; }
@@ -165,15 +179,8 @@
         .quick-btn { padding: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--dim); font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; }
         .quick-btn.active { background: var(--gold); color: #0a0e1a; border-color: var(--gold); }
 
-        /* ── BOTTOM NAV (UNIQUE NAVIGATION) ───────────────────────────────── */
-        .bottom-nav { flex-shrink: 0; height: calc(60px + var(--safe-bot)); background: var(--bg1); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: flex-start; padding-top: 8px; padding-bottom: var(--safe-bot); }
-        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 12px; color: var(--dim); cursor: pointer; flex: 1; }
-        .nav-item.active { color: var(--gold); }
-        .nav-icon { font-size: 20px; }
-        .nav-label { font-size: 10px; font-weight: 600; }
-
-        /* ── FAB ───────────────────────────────────────────────────────────── */
-        .fab { position: fixed; bottom: calc(80px + var(--safe-bot)); right: 16px; width: 56px; height: 56px; background: linear-gradient(135deg, var(--gold), var(--blue)); border: none; border-radius: 50%; color: #0a0e1a; font-size: 28px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(245,158,11,.4); z-index: 90; display: flex; align-items: center; justify-content: center; }
+        /* ── FAB (BUY BUTTON) ─────────────────────────────────────────────── */
+        .fab { position: fixed; bottom: calc(20px + var(--safe-bot)); right: 16px; width: 56px; height: 56px; background: linear-gradient(135deg, var(--gold), var(--blue)); border: none; border-radius: 50%; color: #0a0e1a; font-size: 28px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(245,158,11,.4); z-index: 90; display: flex; align-items: center; justify-content: center; }
         .fab:active { transform: scale(0.95); }
 
         /* ── TOAST ─────────────────────────────────────────────────────────── */
@@ -200,7 +207,7 @@
 </head>
 <body>
 
-<!-- TOPBAR (Stats uniquement, PAS de tabs) -->
+<!-- TOPBAR -->
 <header class="topbar">
     <div class="pulse-dot"></div>
     <div class="logo">SOL<span>BOT</span> <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:2px;">v6</span></div>
@@ -214,6 +221,14 @@
         <button class="btn-refresh" onclick="hardRefresh()" title="Refresh">↺</button>
     </div>
 </header>
+
+<!-- TABS (NAVIGATION UNIQUE) -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('portfolio',this)">◈ Portfolio</div>
+    <div class="tab" onclick="switchTab('analytics',this)">⌇ Analytics</div>
+    <div class="tab" onclick="switchTab('scanner',this)">🔍 Scanner</div>
+    <div class="tab" onclick="switchTab('config',this)">⚙ Config</div>
+</div>
 
 <!-- CONTENT -->
 <div class="content">
@@ -240,7 +255,28 @@
             <div class="kpi"><div class="kpi-lbl">Drawdown max</div><div class="kpi-val neg" id="anDD">—</div></div>
         </div>
 
-        <!-- SCANNER STATS -->
+        <div class="streak-box">
+            <div class="streak-item">
+                <div class="streak-icon">🔥</div>
+                <div class="streak-lbl">Win</div>
+                <div class="streak-val pos" id="winStreak">0</div>
+                <div class="streak-lbl">(Max: <span id="maxWinStreak">0</span>)</div>
+            </div>
+            <div class="streak-item">
+                <div class="streak-icon">❄️</div>
+                <div class="streak-lbl">Loss</div>
+                <div class="streak-val neg" id="lossStreak">0</div>
+                <div class="streak-lbl">(Max: <span id="maxLossStreak">0</span>)</div>
+            </div>
+        </div>
+
+        <div class="trades-list" id="tradesList">
+            <div class="load-wrap"><div class="spinner"></div><span>Chargement…</span></div>
+        </div>
+    </section>
+
+    <!-- SCANNER -->
+    <section class="section" id="sec-scanner">
         <div class="scanner-section">
             <div class="cfg-title" style="margin-bottom:12px;">🔍 Scanner — Tokens Détectés (24h)</div>
             <div class="scanner-grid">
@@ -281,25 +317,6 @@
                     <div class="load-wrap"><div class="spinner"></div><span>Chargement…</span></div>
                 </div>
             </div>
-        </div>
-
-        <div class="streak-box">
-            <div class="streak-item">
-                <div class="streak-icon">🔥</div>
-                <div class="streak-lbl">Win</div>
-                <div class="streak-val pos" id="winStreak">0</div>
-                <div class="streak-lbl">(Max: <span id="maxWinStreak">0</span>)</div>
-            </div>
-            <div class="streak-item">
-                <div class="streak-icon">❄️</div>
-                <div class="streak-lbl">Loss</div>
-                <div class="streak-val neg" id="lossStreak">0</div>
-                <div class="streak-lbl">(Max: <span id="maxLossStreak">0</span>)</div>
-            </div>
-        </div>
-
-        <div class="trades-list" id="tradesList">
-            <div class="load-wrap"><div class="spinner"></div><span>Chargement…</span></div>
         </div>
     </section>
 
@@ -550,23 +567,7 @@
     <div class="save-status" id="saveStatus"></div>
 </div>
 
-<!-- BOTTOM NAV (UNIQUE NAVIGATION) -->
-<nav class="bottom-nav">
-    <div class="nav-item active" onclick="switchTab('portfolio',this)">
-        <div class="nav-icon">◈</div>
-        <div class="nav-label">Portfolio</div>
-    </div>
-    <div class="nav-item" onclick="switchTab('analytics',this)">
-        <div class="nav-icon">⌇</div>
-        <div class="nav-label">Analytics</div>
-    </div>
-    <div class="nav-item" onclick="switchTab('config',this)">
-        <div class="nav-icon">⚙</div>
-        <div class="nav-label">Config</div>
-    </div>
-</nav>
-
-<!-- FAB -->
+<!-- FAB (BUY BUTTON) -->
 <button class="fab" onclick="openBuyModal()">+</button>
 
 <!-- BUY MODAL -->
@@ -872,14 +873,12 @@ async function loadScannerStats() {
         const seen = seenRes.value || { count: 0, mints: [] };
         const autoBuys = autoBuysRes.value || { positions: [] };
 
-        // Stats globales
         const stats = status.stats || {};
         document.getElementById('scanDetected').textContent = stats.detected || 0;
         document.getElementById('scanEvaluated').textContent = stats.evaluated || 0;
         document.getElementById('scanBought').textContent = stats.bought || 0;
         document.getElementById('scanRejected').textContent = stats.rejected || 0;
 
-        // Tokens achetés (depuis auto-buys)
         const boughtContainer = document.getElementById('boughtTokens');
         const boughtPositions = autoBuys.positions?.filter(p => p.addedSol > 0 || (p.pyramidDone && p.pyramidDone.length > 0)) || [];
         if (boughtPositions.length === 0) {
@@ -904,7 +903,6 @@ async function loadScannerStats() {
             }).join('');
         }
 
-        // Tokens vus/réjetés (depuis scanner/seen)
         const rejectedContainer = document.getElementById('rejectedTokens');
         const seenMints = seen.mints || [];
         if (seenMints.length === 0) {
@@ -1101,9 +1099,9 @@ async function resetCB() {
     } catch(e) { toast('❌ ' + e.message, 'err'); }
 }
 
-// ─── TABS (UNIQUE NAVIGATION) ────────────────────────────────────────────────
+// ─── TABS (NAVIGATION UNIQUE) ────────────────────────────────────────────────
 function switchTab(name, el) {
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     if (el) el.classList.add('active');
     const sec = document.getElementById('sec-' + name);
@@ -1111,7 +1109,8 @@ function switchTab(name, el) {
     const sb = document.getElementById('saveBar');
     if (sb) sb.style.display = name === 'config' ? 'block' : 'none';
     if (name === 'config') loadConfig();
-    if (name === 'analytics') { loadAnalytics(); loadScannerStats(); }
+    if (name === 'analytics') loadAnalytics();
+    if (name === 'scanner') loadScannerStats();
 }
 
 // ─── MODALS ──────────────────────────────────────────────────────────────────
@@ -1208,7 +1207,10 @@ function toast(msg, type = '') {
     el.className = 'toast ' + type;
     el.textContent = msg;
     w.appendChild(el);
-    setTimeout(() => el.remove(), 3000);
+    setTimeout(() => {
+        el.style.animation = 'tst .25s ease reverse';
+        setTimeout(() => el.remove(), 300);
+    }, 3000);
 }
 
 // ─── CLOSE MODALS ON OUTSIDE CLICK ───────────────────────────────────────────
