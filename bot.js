@@ -1,28 +1,26 @@
 /**
- * SolBot v6.0 — Production Build (All Patches Applied)
- *
- * PATCHES:
- *  [P1]  checkTP  — guard bootstrapped supprimé
- *  [P2]  checkSL  — guard bootstrapped supprimé
- *  [P3]  autoScanBootstrapped — forçage immédiat sans Helius
- *  [P4]  autoScanBootstrapped — batch 10, trié par bootAttempts
- *  [P5]  tick()   — catch 429/fetch-failed → sleep 5s, PAS de backoff 300s
- *  [P6]  SCANNER_DELAY_MS 15s → 45s
- *  [P7]  _evaluate — fallback PumpFun si liq=0
- *  [P8]  _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
- *  [P9]  checkTP/SL/TS — garde-fou PnL > 100 000% = entrée corrompue → reset
- *  [P10] _connectWs — removeAllListeners() + close() avant reconnexion (fix détections dupliquées)
- *  [P11] _evaluate — requeue dans 30s si achat raté pour raison réseau
- *  [P12] setEntryPrice + checkTS — reset peak corrompu (trailing stop fantôme)
- *  [P13] _isValidMint — blacklist Memo v1/v2, Metaplex, Jupiter v6, Whirlpool, Serum
- *  [P14] _loop — batch prefetch prix avant évaluation + dedup WS 2s (_recentWs)
- */
+SolBot v6.0 — Production Build (All Patches Applied)
+PATCHES:
+[P1]  checkTP  — guard bootstrapped supprimé
+[P2]  checkSL  — guard bootstrapped supprimé
+[P3]  autoScanBootstrapped — forçage immédiat sans Helius
+[P4]  autoScanBootstrapped — batch 10, trié par bootAttempts
+[P5]  tick()   — catch 429/fetch-failed → sleep 5s, PAS de backoff 300s
+[P6]  SCANNER_DELAY_MS 15s → 45s
+[P7]  _evaluate — fallback PumpFun si liq=0
+[P8]  _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
+[P9]  checkTP/SL/TS — garde-fou PnL > 100 000% = entrée corrompue → reset
+[P10] _connectWs — removeAllListeners() + close() avant reconnexion (fix détections dupliquées)
+[P11] _evaluate — requeue dans 30s si achat raté pour raison réseau
+[P12] setEntryPrice + checkTS — reset peak corrompu (trailing stop fantôme)
+[P13] _isValidMint — blacklist Memo v1/v2, Metaplex, Jupiter v6, Whirlpool, Serum
+[P14] _loop — batch prefetch prix avant évaluation + dedup WS 2s (_recentWs)
+*/
 'use strict';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // §1  CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
-
 function safeJson(raw, fallback) {
   try { return JSON.parse(raw); } catch { return fallback; }
 }
@@ -36,77 +34,116 @@ const CFG = {
   DATA_FILE:     process.env.DATA_FILE                   || './bot_state.json',
   DASHBOARD_URL: process.env.DASHBOARD_URL               || null,
 
-  TP_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'true',
+  // Take-profit
+  TP_ENABLED:    process.env.TAKE_PROFIT_ENABLED !== 'false',
   TP_TIERS:      safeJson(process.env.TAKE_PROFIT_TIERS,
     [{ pnl: 20, sell: 20 }, { pnl: 50, sell: 25 }, { pnl: 100, sell: 25 }, { pnl: 200, sell: 25 }]),
   TP_HYSTERESIS: parseFloat(process.env.TAKE_PROFIT_HYSTERESIS || '5'),
+
+  // Break-even
   BE_ENABLED:    process.env.BREAK_EVEN_ENABLED !== 'false',
   BE_BUFFER:     parseFloat(process.env.BREAK_EVEN_BUFFER || '2'),
-  SL_ENABLED:    process.env.STOP_LOSS_ENABLED !== 'true',
+
+  // Stop-loss
+  SL_ENABLED:    process.env.STOP_LOSS_ENABLED !== 'false',
   SL_PCT:        parseFloat(process.env.STOP_LOSS_PCT    || '-50'),
+
+  // Trailing
   TS_ENABLED:    process.env.TRAILING_STOP_ENABLED === 'true',
   TS_PCT:        parseFloat(process.env.TRAILING_STOP_PCT      || '20'),
   TS_VOL:        process.env.TRAILING_VOL_ENABLED === 'true',
   TS_VOL_MULT:   parseFloat(process.env.TRAILING_VOL_MULT      || '2.5'),
+
+  // Anti-rug
   AR_ENABLED:    process.env.ANTI_RUG_ENABLED !== 'false',
   AR_PCT:        parseFloat(process.env.ANTI_RUG_PCT     || '60'),
+
+  // Liquidity exit
   LE_ENABLED:    process.env.LIQ_EXIT_ENABLED !== 'false',
   LE_PCT:        parseFloat(process.env.LIQ_EXIT_PCT     || '70'),
-  TT_ENABLED:    process.env.TIME_STOP_ENABLED === 'true',
+
+  // Time stop
+  TT_ENABLED:    process.env.TIME_STOP_ENABLED  === 'true',
   TT_HOURS:      parseFloat(process.env.TIME_STOP_HOURS  || '24'),
   TT_MIN_PNL:    parseFloat(process.env.TIME_STOP_MIN_PNL|| '0'),
+
+  // Momentum exit
   ME_ENABLED:    process.env.MOMENTUM_EXIT_ENABLED === 'true',
   ME_WINDOW:     parseInt(process.env.MOMENTUM_WINDOW    || '5'),
   ME_THRESHOLD:  parseFloat(process.env.MOMENTUM_THRESHOLD || '-3'),
+
+  // Jito
   JITO_ENABLED:  process.env.JITO_ENABLED === 'true',
   JITO_TIP_SOL:  parseFloat(process.env.JITO_TIP_SOL     || '0.0001'),
   JITO_URL:      process.env.JITO_URL || 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
+
+  // Sizing
   MAX_POSITIONS: parseInt(process.env.MAX_OPEN_POSITIONS || '10'),
   MIN_SCORE:     parseFloat(process.env.MIN_SCORE_TO_BUY || '0'),
+
+  // Execution
   MIN_SOL_RESERVE:  parseFloat(process.env.MIN_SOL_RESERVE   || '0.01'),
   MAX_SELL_RETRIES: parseInt(process.env.MAX_SELL_RETRIES     || '3'),
   DEFAULT_SLIPPAGE: parseInt(process.env.DEFAULT_SLIPPAGE     || '500'),
   PRICE_TTL_MS:     parseInt(process.env.PRICE_TTL_MS         || '55000'),
   BUY_COOLDOWN_MS:  parseInt(process.env.BUY_COOLDOWN_MS      || '5000'),
-  WEBHOOK_URL:      process.env.WEBHOOK_URL       || null,
+
+  // Webhook
+  WEBHOOK_URL:      process.env.WEBHOOK_URL        || null,
   WEBHOOK_TYPE:     process.env.WEBHOOK_TYPE      || 'discord',
   TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID  || null,
+
+  // Pyramid In
   PYRAMID_ENABLED:    process.env.PYRAMID_ENABLED === 'true',
   PYRAMID_TIERS:      safeJson(process.env.PYRAMID_TIERS,
     [{ pnl: 30, addSol: 0.005 }, { pnl: 75, addSol: 0.005 }]),
   PYRAMID_MAX_SOL:    parseFloat(process.env.PYRAMID_MAX_SOL || '0.001'),
   PYRAMID_HYSTERESIS: parseFloat(process.env.PYRAMID_HYSTERESIS || '5'),
+
+  // DCA-Down
   DCAD_ENABLED:          process.env.DCA_DOWN_ENABLED === 'true',
   DCAD_TIERS:            safeJson(process.env.DCA_DOWN_TIERS,
     [{ pnl: -20, addSol: 0.005 }, { pnl: -35, addSol: 0.005 }]),
   DCAD_MAX_ADDS:         parseInt(process.env.DCA_DOWN_MAX_ADDS || '2'),
   DCAD_REQUIRE_MOMENTUM: process.env.DCA_DOWN_REQUIRE_MOMENTUM !== 'false',
   DCAD_MIN_VELOCITY:     parseFloat(process.env.DCA_DOWN_MIN_VEL || '-1'),
+
+  // Re-entry
   REENTRY_ENABLED:   process.env.REENTRY_ENABLED === 'true',
   REENTRY_DELAY_MIN: parseFloat(process.env.REENTRY_DELAY_MIN || '30'),
   REENTRY_MIN_SCORE: parseFloat(process.env.REENTRY_MIN_SCORE || '60'),
   REENTRY_SOL:       parseFloat(process.env.REENTRY_SOL       || '0.005'),
   REENTRY_MIN_GAIN:  parseFloat(process.env.REENTRY_MIN_GAIN  || '15'),
+
+  // Smart Sizing
   SMART_SIZE_ENABLED: process.env.SMART_SIZE_ENABLED === 'true',
   SMART_SIZE_BASE:    parseFloat(process.env.SMART_SIZE_BASE  || '0.05'),
   SMART_SIZE_MULT:    parseFloat(process.env.SMART_SIZE_MULT  || '2.0'),
   SMART_SIZE_MIN:     parseFloat(process.env.SMART_SIZE_MIN   || '0.02'),
   SMART_SIZE_MAX:     parseFloat(process.env.SMART_SIZE_MAX   || '0.5'),
+
+  // Sell to USDC
   SELL_TO_USDC: process.env.SELL_TO_USDC === 'true',
+
+  // Scanner
   SCANNER_ENABLED:     process.env.SCANNER_ENABLED === 'true',
   SCANNER_MIN_SCORE:   parseFloat(process.env.SCANNER_MIN_SCORE   || '60'),
   SCANNER_MIN_LIQ:     parseFloat(process.env.SCANNER_MIN_LIQ     || '5000'),
   SCANNER_MAX_LIQ:     parseFloat(process.env.SCANNER_MAX_LIQ     || '300000'),
   SCANNER_SOL_AMOUNT:  parseFloat(process.env.SCANNER_SOL_AMOUNT  || '0.005'),
   SCANNER_COOLDOWN_MS: parseInt(process.env.SCANNER_COOLDOWN_MS   || '300000'),
-  SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '120000'), // [P6] 15→45s
+  SCANNER_DELAY_MS:    parseInt(process.env.SCANNER_DELAY_MS      || '120000'), // [P6] 15s → 120s
   SCANNER_POLL_SEC:    parseInt(process.env.SCANNER_POLL_SEC      || '30'),
   SCANNER_PROGRAMS: [
     '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
     '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
   ],
+
+  // Daily Loss
   DAILY_LOSS_ENABLED: process.env.DAILY_LOSS_ENABLED === 'true',
   DAILY_LOSS_LIMIT:   parseFloat(process.env.DAILY_LOSS_LIMIT || '-2.0'),
+
+  // History
   HISTORY_MAX_POINTS: parseInt(process.env.HISTORY_MAX_POINTS || '288'),
 };
 
@@ -115,7 +152,6 @@ if (!CFG.PRIVATE_KEY) { console.error('❌ PRIVATE_KEY manquante'); process.exit
 // ─────────────────────────────────────────────────────────────────────────────
 // §2  DEPS & CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-
 const {
   Connection, Keypair, PublicKey, VersionedTransaction,
   TransactionMessage, SystemProgram, LAMPORTS_PER_SOL,
@@ -136,7 +172,6 @@ const VERSION         = '6.0.0';
 // ─────────────────────────────────────────────────────────────────────────────
 // §3  UTILS
 // ─────────────────────────────────────────────────────────────────────────────
-
 const ICONS = { info: 'i ', warn: '! ', error: 'X', debug: '?', success: '✅' };
 
 function log(level, msg, data = null) {
@@ -200,7 +235,6 @@ function stddev(arr) {
 // ─────────────────────────────────────────────────────────────────────────────
 // §4  WEBHOOK
 // ─────────────────────────────────────────────────────────────────────────────
-
 async function webhook(title, desc, color = 0x3b7eff, fields = []) {
   if (!CFG.WEBHOOK_URL) return;
   try {
@@ -225,7 +259,6 @@ async function webhook(title, desc, color = 0x3b7eff, fields = []) {
 // ─────────────────────────────────────────────────────────────────────────────
 // §5  WALLET & RPC
 // ─────────────────────────────────────────────────────────────────────────────
-
 function loadWallet() {
   try {
     const raw = CFG.PRIVATE_KEY.startsWith('[')
@@ -271,7 +304,6 @@ function createRpc() {
 // ─────────────────────────────────────────────────────────────────────────────
 // §6  PERSISTENCE
 // ─────────────────────────────────────────────────────────────────────────────
-
 function loadState() {
   try {
     if (fs.existsSync(CFG.DATA_FILE)) {
@@ -294,7 +326,6 @@ function saveState(data) {
 // ─────────────────────────────────────────────────────────────────────────────
 // §7  PRICE ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
-
 const priceCache    = new Map();
 const decimalsCache = new Map();
 const liqHistory    = new Map();
@@ -439,9 +470,6 @@ async function _fetchDexSingle(mint) {
 }
 
 // [P8] _fetchPumpFun — virtual reserves price + backup endpoint + fix falsy mcap=0
-// Les nouveaux tokens PumpFun ont toujours virtual_sol_reserves/virtual_token_reserves
-// dès la création, mais usd_market_cap peut être 0 (falsy) pendant les premières secondes.
-// Prix via réserves AMM virtuelles = fiable depuis le bloc 0.
 async function _fetchPumpFun(mint) {
   const ENDPOINTS = [
     `https://frontend-api.pump.fun/coins/${mint}`,
@@ -457,28 +485,22 @@ async function _fetchPumpFun(mint) {
       const c = await r.json();
       if (!c || typeof c !== 'object') continue;
 
-      // Prix via réserves AMM virtuelles (disponibles depuis le bloc 0)
-      // virtual_sol_reserves   : lamports (1e9 = 1 SOL)
-      // virtual_token_reserves : raw units (1e6 = 1 token, 6 décimales)
+      // Prix via réserves AMM virtuelles
       let price = 0;
       const vsol = parseFloat(c.virtual_sol_reserves  || 0);
       const vtok = parseFloat(c.virtual_token_reserves || 0);
       if (vsol > 0 && vtok > 0) {
-        const priceSol = (vsol / 1e9) / (vtok / 1e6);   // SOL par token
+        const priceSol = (vsol / 1e9) / (vtok / 1e6);
         const solUsd   = getPrice(SOL_MINT)?.price || 0;
         if (solUsd > 0) price = priceSol * solUsd;
       }
-      // Fallback mcap/supply — != null car mcap peut légitimement valoir 0 (falsy)
+      // Fallback mcap/supply
       if (!(price > 0) && c.usd_market_cap != null && parseFloat(c.total_supply) > 0) {
         price = parseFloat(c.usd_market_cap) / parseFloat(c.total_supply);
       }
       if (!(price > 0)) continue;
-
-      // Token gradué vers Raydium → réserves bonding curve vides, prix invalide
-      // Laisser DexScreener gérer ces tokens
       if (c.complete === true) continue;
 
-      // Liquidité = pool SOL virtuel × 2 × prix SOL/USD
       const solUsd = getPrice(SOL_MINT)?.price || 150;
       const liq    = vsol > 0 ? (vsol / 1e9) * solUsd * 2 : 0;
 
@@ -533,6 +555,7 @@ async function prefetchPrices(mints) {
     return !c || now - c.ts > CFG.PRICE_TTL_MS;
   });
   if (!toFetch.length) return;
+
   log('debug', 'Price fetch', { count: toFetch.length, negSkipped: mints.length - toFetch.length });
 
   const found = await _fetchDexBatch(toFetch);
@@ -558,7 +581,7 @@ async function prefetchPrices(mints) {
   for (const m of toFetch) {
     const d = found[m];
     if (d?.price > 0) {
-      priceCache.set(m, { data: d, ts });
+      priceCache.set(m, {  d, ts });
       trackLiq(m, d.liquidity);
       recordPriceSuccess(m);
       srcs[d.source] = (srcs[d.source] || 0) + 1;
@@ -566,6 +589,7 @@ async function prefetchPrices(mints) {
       recordPriceFail(m);
     }
   }
+
   const ok = toFetch.filter(m => priceCache.get(m)?.data?.price > 0).length;
   log('debug', 'Prices done', {
     ok, total: toFetch.length, missing: toFetch.length - ok,
@@ -579,11 +603,11 @@ function getPrice(mint) { return priceCache.get(mint)?.data ?? null; }
 // ─────────────────────────────────────────────────────────────────────────────
 // §8  SCORE ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
-
 class ScoreEngine {
   score(pd) {
     if (!pd) return 0;
     let s = 0;
+
     const liq = pd.liquidity || 0;
     if      (liq >= 50_000  && liq <= 300_000) s += 30;
     else if (liq >= 20_000  && liq <= 500_000) s += 22;
@@ -644,7 +668,6 @@ class ScoreEngine {
 // ─────────────────────────────────────────────────────────────────────────────
 // §9  MOMENTUM TRACKER
 // ─────────────────────────────────────────────────────────────────────────────
-
 class MomentumTracker {
   constructor() { this._hist = new Map(); }
 
@@ -700,12 +723,10 @@ class MomentumTracker {
 // ─────────────────────────────────────────────────────────────────────────────
 // §10  POSITION MANAGER
 // ─────────────────────────────────────────────────────────────────────────────
-
 class PositionManager {
   constructor(tiers, hysteresis, state = {}) {
     this.tiers      = [...tiers].sort((a, b) => a.pnl - b.pnl);
     this.hysteresis = hysteresis;
-
     this.entries   = new Map();
     this.triggered = new Map();
     this.sold      = new Map();
@@ -773,6 +794,7 @@ class PositionManager {
     return true;
   }
 
+  // [P12] reset peak corrompu
   setEntryPrice(mint, newPrice, newBalance = null) {
     const e = this.entries.get(mint);
     if (!e) return false;
@@ -781,8 +803,8 @@ class PositionManager {
     this.triggered.set(mint, new Set());
     e.triggeredTiers = [];
     this.breakEven.delete(mint);
-    // Reset peak pour éviter trailing stop fantôme sur pic corrompu
-    this.peak.set(mint, 0); e.peakPnl = 0;
+    // [P12] Reset peak pour éviter trailing stop fantôme
+    this.peak.set(mint, 0); if (e) e.peakPnl = 0;
     if (newBalance > 0) { e.originalBalance = newBalance; this.sold.set(mint, 0); e.soldAmount = 0; }
     log('info', 'Prix entrée corrigé', { mint: mint.slice(0, 8), price: newPrice.toPrecision(6) });
     return true;
@@ -796,14 +818,15 @@ class PositionManager {
 
   updatePrevPrice(mint, price) { if (price > 0) this.prevPrice.set(mint, price); }
 
-  // [P1] guard bootstrapped supprimé — TP actif dès que entryPrice > 0
+  // [P1] guard bootstrapped supprimé
   checkTP(mint, price) {
     if (this.isLiquidated(mint)) return [];
     const e   = this.entries.get(mint);
     const trig = this.triggered.get(mint);
     const pnl  = this.getPnl(mint, price);
     if (!e || !trig || pnl === null || !(e.price > 0)) return [];
-    // Garde-fou: PnL > 100 000% = prix d'entrée corrompu (SOL/token au lieu de USD/token)
+
+    // [P9] Garde-fou: PnL > 100 000% = prix d'entrée corrompu
     if (pnl > 100_000) {
       log('warn', `Prix d'entrée corrompu détecté — reset au prix courant`, { mint: mint.slice(0,8), pnl: pnl.toFixed(0) });
       this.setEntryPrice(mint, price);
@@ -823,14 +846,17 @@ class PositionManager {
     return hits;
   }
 
-  // [P2] guard bootstrapped supprimé — SL actif dès que entryPrice > 0
+  // [P2] guard bootstrapped supprimé
   checkSL(mint, price) {
     if (!CFG.SL_ENABLED || this.isLiquidated(mint)) return null;
     const e = this.entries.get(mint);
     if (!e || !(e.price > 0)) return null;
     const pnl = this.getPnl(mint, price);
     if (pnl === null) return null;
-    if (pnl > 100_000) return null; // entrée corrompue — checkTP s'en occupe
+
+    // [P9] entrée corrompue
+    if (pnl > 100_000) return null;
+
     const rem = this.getRemaining(mint);
     if (rem <= 0) return null;
 
@@ -844,14 +870,18 @@ class PositionManager {
     return null;
   }
 
+  // [P12] reset peak corrompu
   checkTS(mint, price, momentum = null) {
     if (!CFG.TS_ENABLED || this.isLiquidated(mint)) return null;
     const pnl  = this.getPnl(mint, price);
     const peak = this.peak.get(mint) || 0;
     if (pnl === null || peak < 10) return null;
-    if (pnl > 100_000) return null; // entrée corrompue
-    // Pic corrompu (entrée SOL/token) → reset et ignorer
+
+    // [P9] entrée corrompue
+    if (pnl > 100_000) return null;
+    // [P12] Pic corrompu → reset
     if (peak > 100_000) { this.peak.set(mint, Math.max(0, pnl || 0)); const e = this.entries.get(mint); if (e) e.peakPnl = 0; return null; }
+
     const trailingPct = (CFG.TS_VOL && momentum) ? momentum.volTrailingPct(mint) : CFG.TS_PCT;
     if (pnl >= peak - trailingPct) return null;
     const rem = this.getRemaining(mint);
@@ -1018,7 +1048,7 @@ class PositionManager {
   clearForReentry(mint) {
     for (const s of [this.slHit, this.slPending, this.breakEven]) s.delete(mint);
     for (const m of [this.pyramidDone, this.dcadDone, this.addedSol,
-                     this.entries, this.triggered, this.sold, this.peak]) m.delete(mint);
+      this.entries, this.triggered, this.sold, this.peak]) m.delete(mint);
     log('info', 'Re-entry: position réinitialisée', { mint: mint.slice(0,8) });
   }
 
@@ -1083,7 +1113,6 @@ class PositionManager {
 // ─────────────────────────────────────────────────────────────────────────────
 // §11  SWAP ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
-
 const QUOTE_EPS = [
   'https://lite-api.jup.ag/swap/v1/quote',
   'https://api.jup.ag/swap/v1/quote',
@@ -1103,6 +1132,7 @@ class SwapEngine {
     this.sellFailures = 0;
     this._cbTrippedAt = null;
     this.lastBuyTs    = 0;
+    this._lastBuyErr  = '';
   }
 
   async getQuote({ inputMint, outputMint, amountRaw, slippageBps }) {
@@ -1127,9 +1157,9 @@ class SwapEngine {
     return withRetry(async () => {
       const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
       const priLamports = priorityMode === 'turbo'  ? 500_000
-                        : priorityMode === 'high'   ? 200_000
-                        : priorityMode === 'medium' ? 100_000
-                        : 'auto';
+        : priorityMode === 'high'   ? 200_000
+        : priorityMode === 'medium' ? 100_000
+        : 'auto';
       const body = JSON.stringify({
         quoteResponse: quote,
         userPublicKey: this.wallet.publicKey.toString(),
@@ -1140,7 +1170,7 @@ class SwapEngine {
       for (const ep of SWAP_EPS) {
         try {
           const r = await fetch(ep, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
+            method: 'POST',  headers: { 'Content-Type': 'application/json', 'User-Agent':  `SolBot/${VERSION}`  },
             body, signal: AbortSignal.timeout(30_000),
           });
           if (!r.ok) { swapErr = new Error(`Swap HTTP ${r.status}`); continue; }
@@ -1153,11 +1183,11 @@ class SwapEngine {
       const tx  = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
       const lbh = await this.rpc.conn.getLatestBlockhash('confirmed');
       tx.sign([this.wallet]);
-      const sig  = await this.rpc.conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3, preflightCommitment: 'confirmed' });
+      const sig  = await this.rpc.conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries:  3, preflightCommitment: 'confirmed' });
       const conf = await this.rpc.conn.confirmTransaction({ signature: sig, blockhash: lbh.blockhash, lastValidBlockHeight: lbh.lastValidBlockHeight }, 'confirmed');
       if (conf.value.err) throw new Error(`Tx rejetée: ${JSON.stringify(conf.value.err)}`);
-      return { sig, txUrl: `https://solscan.io/tx/${sig}`, quote };
-    }, { tries: 3, baseMs: 800, label: `swap(${inputMint.slice(0, 8)})` });
+      return { sig, txUrl:  `https://solscan.io/tx/${sig}` , quote };
+    }, { tries: 3, baseMs: 800, label:  `swap(${inputMint.slice(0, 8)})`  });
   }
 
   async _buildAndSendJito({ inputMint, outputMint, amountRaw, slippageBps }) {
@@ -1257,7 +1287,6 @@ class SwapEngine {
       const res = useJito
         ? await this._buildAndSendJito({ inputMint: mint, outputMint: outMint, amountRaw: raw, slippageBps })
         : await this._buildAndSendTx({ inputMint: mint, outputMint: outMint, amountRaw: raw, slippageBps, priorityMode: 'high' });
-
       let solOut, usdcOut = null;
       if (CFG.SELL_TO_USDC) {
         usdcOut = Number(res.quote.outAmount) / 1e6;
@@ -1315,7 +1344,6 @@ class SwapEngine {
 // ─────────────────────────────────────────────────────────────────────────────
 // §12  ANALYTICS
 // ─────────────────────────────────────────────────────────────────────────────
-
 class Analytics {
   constructor(state = {}) {
     const a = state.analytics || {};
@@ -1343,41 +1371,41 @@ class Analytics {
   record({ pnlSol, pnlPct, holdMs, symbol, solOut }) {
     this.totalTrades++;
     this.totalSoldSol   = +(this.totalSoldSol + solOut).toFixed(6);
-    this.realizedPnlSol = +(this.realizedPnlSol + pnlSol).toFixed(6);
+    this.realizedPnlSol = +(this.realizedPnlSol  + pnlSol).toFixed(6);
     this.tradePnls.push(pnlPct ?? 0);
-    if (this.tradePnls.length > 500) this.tradePnls.shift();
-    if (pnlSol >= 0) {
+    if (this.tradePnls.length  > 500) this.tradePnls.shift();
+    if (pnlSol  >= 0) {
       this.winCount++; this.winStreak++; this.lossStreak = 0;
       this.maxWinStreak = Math.max(this.maxWinStreak, this.winStreak);
-      if (pnlPct !== null && (this.bestTradePct === null || pnlPct > this.bestTradePct))
+      if (pnlPct !== null  && (this.bestTradePct === null || pnlPct  > this.bestTradePct))
         { this.bestTradePct = pnlPct; this.bestTradeSymbol = symbol; }
     } else {
       this.lossCount++; this.lossStreak++; this.winStreak = 0;
-      this.maxLossStreak = Math.max(this.maxLossStreak, this.lossStreak);
-      if (pnlPct !== null && (this.worstTradePct === null || pnlPct < this.worstTradePct))
+      this.maxLossStreak = Math.max (this.maxLossStreak, this.lossStreak);
+      if (pnlPct !== null  && (this.worstTradePct === null || pnlPct  < this.worstTradePct))
         { this.worstTradePct = pnlPct; this.worstTradeSymbol = symbol; }
     }
     this.avgHoldMs = Math.round((this.avgHoldMs * (this.totalTrades - 1) + holdMs) / this.totalTrades);
     const today = new Date().toISOString().slice(0, 10);
     const day   = this.dailyPnl.find(d => d.date === today);
-    if (day) { day.pnlSol = +(day.pnlSol + pnlSol).toFixed(6); day.trades++; day.wins += pnlSol >= 0 ? 1 : 0; }
-    else      this.dailyPnl.push({ date: today, pnlSol: +pnlSol.toFixed(6), trades: 1, wins: pnlSol >= 0 ? 1 : 0 });
-    if (this.dailyPnl.length > 90) this.dailyPnl.shift();
+    if (day) { day.pnlSol = +(day.pnlSol + pnlSol).toFixed(6); day.trades++; day.wins += pnlSol  >= 0 ? 1 : 0; }
+    else      this.dailyPnl.push({ date: today, pnlSol: +pnlSol.toFixed(6), trades: 1, wins: pnlSol  >= 0 ? 1 : 0 });
+    if (this.dailyPnl.length  > 90) this.dailyPnl.shift();
     this.pnlHistory.push({ ts: Date.now(), cumul: +this.realizedPnlSol.toFixed(6) });
-    if (this.pnlHistory.length > 500) this.pnlHistory.shift();
+    if (this.pnlHistory.length  > 500) this.pnlHistory.shift();
     const hr = new Date().getHours();
     this.hourly[hr].trades++;
     this.hourly[hr].pnlSol = +(this.hourly[hr].pnlSol + pnlSol).toFixed(6);
-    if (pnlSol >= 0) this.hourly[hr].wins++;
+    if (pnlSol  >= 0) this.hourly[hr].wins++;
   }
 
-  sharpe()  { if (this.tradePnls.length < 5) return null; const s = stddev(this.tradePnls); return s > 0 ? +(mean(this.tradePnls) / s).toFixed(3) : null; }
-  sortino() { if (this.tradePnls.length < 5) return null; const l = this.tradePnls.filter(p => p < 0); if (!l.length) return null; const ds = stddev(l); return ds > 0 ? +(mean(this.tradePnls) / ds).toFixed(3) : null; }
-  maxDrawdown() { let peak = 0, dd = 0; for (const { cumul } of this.pnlHistory) { if (cumul > peak) peak = cumul; if (peak - cumul > dd) dd = peak - cumul; } return +dd.toFixed(6); }
-  profitFactor() { const g = this.tradePnls.filter(p => p > 0).reduce((a, b) => a + b, 0); const l = Math.abs(this.tradePnls.filter(p => p < 0).reduce((a, b) => a + b, 0)); return l > 0 ? +(g / l).toFixed(3) : null; }
-  bestDay()  { return this.dailyPnl.reduce((b, d) => d.pnlSol > (b?.pnlSol ?? -Infinity) ? d : b, null); }
-  worstDay() { return this.dailyPnl.reduce((w, d) => d.pnlSol < (w?.pnlSol ??  Infinity) ? d : w, null); }
-  bestHour() { return this.hourly.map((h, i) => ({ hour: i, ...h })).filter(h => h.trades >= 2).sort((a, b) => b.pnlSol - a.pnlSol)[0] ?? null; }
+  sharpe()  { if (this.tradePnls.length  < 5) return null; const s = stddev(this.tradePnls); return s  > 0 ? +(mean(this.tradePnls) / s).toFixed(3) : null; }
+  sortino() { if (this.tradePnls.length  < 5) return null; const l = this.tradePnls.filter(p => p  < 0); if (!l.length) return null; const ds = stddev(l); return ds  > 0 ? +(mean(this.tradePnls) / ds).toFixed(3) : null; }
+  maxDrawdown() { let peak = 0, dd = 0; for (const { cumul } of this.pnlHistory) { if (cumul  > peak) peak = cumul; if (peak - cumul  > dd) dd = peak - cumul; } return +dd.toFixed(6); }
+  profitFactor() { const g = this.tradePnls.filter(p => p  > 0).reduce((a, b) => a + b, 0); const l = Math.abs(this.tradePnls.filter(p => p  < 0).reduce((a, b) => a + b, 0)); return l  > 0 ? +(g / l).toFixed(3) : null; }
+  bestDay()  { return this.dailyPnl.reduce((b, d) => d.pnlSol  > (b?.pnlSol ?? -Infinity) ? d : b, null); }
+  worstDay() { return this.dailyPnl.reduce((w, d) => d.pnlSol  < (w?.pnlSol ??  Infinity) ? d : w, null); }
+  bestHour() { return this.hourly.map((h, i) => ({ hour: i, ...h })).filter(h => h.trades  >= 2).sort((a, b) => b.pnlSol - a.pnlSol)[0] ?? null; }
 
   serialize() {
     return {
@@ -1394,23 +1422,23 @@ class Analytics {
 
   toApi(history) {
     const n     = this.winCount + this.lossCount;
-    const sells = history.filter(t => t.type === 'sell' && t.pnlPct != null);
-    const wins  = sells.filter(t => t.pnlPct >= 0);
-    const loses = sells.filter(t => t.pnlPct <  0);
+    const sells = history.filter(t => t.type === 'sell'  && t.pnlPct != null);
+    const wins  = sells.filter(t => t.pnlPct  >= 0);
+    const loses = sells.filter(t => t.pnlPct  <  0);
     const h     = Math.floor(this.avgHoldMs / 3_600_000);
     const m     = Math.floor((this.avgHoldMs % 3_600_000) / 60_000);
     return {
-      realizedPnlSol: +this.realizedPnlSol.toFixed(4),
+      realizedPnlSol: +this.realizedPnlSol.toFixed( 4),
       totalBoughtSol: +this.totalBoughtSol.toFixed(4),
       totalSoldSol:   +this.totalSoldSol.toFixed(4),
-      roi: this.totalBoughtSol > 0 ? +((this.realizedPnlSol / this.totalBoughtSol) * 100).toFixed(2) : null,
+      roi: this.totalBoughtSol  > 0 ? +((this.realizedPnlSol / this.totalBoughtSol) * 100).toFixed(2) : null,
       winCount: this.winCount, lossCount: this.lossCount, totalTrades: this.totalTrades,
-      wins: this.winCount, losses: this.lossCount,
+      wins: this.winCount , losses: this.lossCount,
       buys: history.filter(t => t.type === 'buy').length, sells: sells.length,
-      winRate:  n > 0         ? +((this.winCount / n) * 100).toFixed(1) : null,
+      winRate:  n  > 0         ? +((this.winCount / n) * 100).toFixed(1) : null,
       avgWin:   wins.length   ? +(wins.reduce((s, t)  => s + t.pnlPct, 0) / wins.length).toFixed(1)  : null,
       avgLoss:  loses.length  ? +(loses.reduce((s, t) => s + t.pnlPct, 0) / loses.length).toFixed(1) : null,
-      avgHold:  this.avgHoldMs > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : null,
+      avgHold:  this.avgHoldMs  > 0 ?  `${h}h ${String(m).padStart(2,'0')}m`  : null,
       bestTradePct: this.bestTradePct, bestTradeSymbol: this.bestTradeSymbol,
       worstTradePct: this.worstTradePct, worstTradeSymbol: this.worstTradeSymbol,
       sharpeRatio: this.sharpe(), sortinoRatio: this.sortino(),
@@ -1427,7 +1455,6 @@ class Analytics {
 // ─────────────────────────────────────────────────────────────────────────────
 // §13  BOT LOOP
 // ─────────────────────────────────────────────────────────────────────────────
-
 class BotLoop {
   constructor(wallet, rpc, state) {
     this.wallet    = wallet;
@@ -1436,7 +1463,6 @@ class BotLoop {
     this.startTime = Date.now();
     this.cycle     = 0;
     this.history   = state.trades || [];
-
     this.positions = new PositionManager(CFG.TP_TIERS, CFG.TP_HYSTERESIS, state);
     this.swap      = new SwapEngine(wallet, rpc);
     this.scorer    = new ScoreEngine();
@@ -1543,19 +1569,15 @@ class BotLoop {
     try { result = await this.swap.buy(mint, solAmount, bps); }
     catch (err) { log('error', `_autoBuy échoué (${reason})`, { err: err.message }); return false; }
     if (!result.success) { log('warn', `_autoBuy refusé (${reason})`, { err: result.error }); return false; }
-
     const sym           = priceData?.symbol || mint.slice(0, 8);
     const tokBought     = result.outAmount || 0;
-    // Prix d'entrée doit être en USD (même unité que priceCache)
-    // solAmount/tokBought = SOL/token → multiplier par SOL/USD pour avoir USD/token
     const solUsdRate    = getPrice(SOL_MINT)?.price || 0;
     const exactEntryPrice = priceData?.price > 0
-      ? priceData.price  // prix USD déjà disponible au moment de l'achat
+      ? priceData.price
       : (tokBought > 0 && solUsdRate > 0
           ? (solAmount / tokBought) * solUsdRate
           : (tokBought > 0 ? solAmount / tokBought : 0));
     this.recordBuy(mint, solAmount, tokBought);
-
     if (!this.positions.entries.has(mint)) {
       this.positions.trackEntry(mint, exactEntryPrice, tokBought, exactEntryPrice);
     } else {
@@ -1582,25 +1604,25 @@ class BotLoop {
 
   async _sell(mint, sellAmount, reason, priceData, opts = {}) {
     const { useJito = false, slippage, pendingFirst = false, markSLDone: msl = false,
-            onSuccess, webhookTitle, webhookDesc, webhookColor = 0x3b7eff, webhookFields = [] } = opts;
+      onSuccess, webhookTitle, webhookDesc, webhookColor = 0x3b7eff, webhookFields = [] } = opts;
     if (pendingFirst) this.positions.markSLPending(mint);
     const bps = slippage ?? this.scorer.slippage(priceData?.liquidity, useJito ? 'emergency' : pendingFirst ? 'high' : 'normal');
     const res = await this.swap.sell(mint, sellAmount, reason, bps, useJito);
     if (res.success) {
       const symbol = priceData?.symbol || mint.slice(0, 8);
       const { pnlSol, pnlPct } = this.recordSell(mint, res.solOut, sellAmount, symbol);
-      this.recordTrade({ type: 'sell', mint, symbol, amount: sellAmount, solOut: res.solOut,
+      this.recordTrade({ type: 'sell', mint, symbol, amount: sellAmount, solOut:  res.solOut,
         reason, txId: res.sig, txUrl: res.txUrl, pnlSol, pnlPct });
-      if (msl) { this.positions.markExitForReentry(mint, priceData?.price || 0); this.positions.markSLDone(mint); }
+      if (msl) { this.positions.markExitForReentry(mint, priceData?.price || 0); this.positions.markSLDone(mint);  }
       if (onSuccess)     onSuccess(res);
       if (webhookTitle) {
         const ok = pnlSol !== null && pnlSol >= 0;
-        const pnlStr = pnlPct !== null ? ` | ${pnlPct >= 0 ? '+' : ''}${pnlPct}%` : '';
+        const pnlStr = pnlPct !== null ?  `| ${pnlPct >= 0 ? '+' : ''}${pnlPct}%`  : '';
         await webhook(`${ok ? '✅' : '🔴'} ${webhookTitle}`,
           `${webhookDesc || ''}${pnlStr}`, ok ? 0x05d488 : webhookColor,
           [...webhookFields,
             { name: 'SOL reçu', value: res.solOut?.toFixed(6) || '?', inline: true },
-            { name: 'Raison',   value: reason,                        inline: true },
+            { name: 'Raison',   value: reason,                         inline: true },
           ]);
       }
       return true;
@@ -1627,17 +1649,18 @@ class BotLoop {
         const isNet = rpcErr.message?.includes('fetch failed') || rpcErr.message?.includes('ENOTFOUND') || rpcErr.message?.includes('ETIMEDOUT');
         log('warn', `Tick RPC ${is429 ? '429' : isNet ? 'network' : 'error'} — failover + skip cycle`, { err: rpcErr.message?.slice(0, 80) });
         this.rpc.failover();
-        await sleep(5000); // 5s max, pas de backoff progressif
+        await sleep(5000); // [P5] 5s max, pas de backoff progressif
         return;
       }
 
-      const accounts = [...r1.value, ...r2.value].filter(acc => {
+      const accounts =  [...r1.value, ...r2.value].filter(acc => {
         const info = acc.account.data.parsed.info;
         if (info.mint === SOL_MINT || info.mint === USDC_MINT) return false;
         const ta = info.tokenAmount;
         return parseFloat(ta.uiAmount ?? ta.uiAmountString ?? '0') > 0;
       });
 
+      // [P14a] Précharger tous les prix en batch avant évaluation
       await prefetchPrices(accounts.map(a => a.account.data.parsed.info.mint));
 
       const tokens = [];
@@ -1654,7 +1677,7 @@ class BotLoop {
 
         this.positions.trackEntry(mint, price, bal);
 
-        const pnl = this.positions.getPnl(mint, price);
+        const pnl = this.positions.getPnl(mint,  price);
         if (pnl !== null) this.positions.updatePeak(mint, pnl);
         if (price > 0)    this.momentum.addPrice(mint, price);
 
@@ -1663,7 +1686,7 @@ class BotLoop {
 
           const ar = this.positions.checkAR(mint, price);
           if (ar) {
-            log('error', `ANTI-RUG -${ar.drop}%`, { mint: mint.slice(0, 8) });
+            log('error', `ANTI-RUG -${ar.drop}%`, { mint : mint.slice(0, 8) });
             await this._sell(mint, ar.sellAmount, 'ANTI_RUG', pd, {
               useJito: true, pendingFirst: true, markSLDone: true,
               webhookTitle: 'Anti-Rug', webhookDesc: `Chute -${ar.drop}% sur **${sym}**`, webhookColor: 0xff2d55 });
@@ -1698,7 +1721,7 @@ class BotLoop {
           const ts = this.positions.checkTS(mint, price, this.momentum);
           if (ts) {
             log('warn', `TRAILING pic:+${ts.peak}% actuel:${ts.pnl}%`, { mint: mint.slice(0, 8) });
-            await this._sell(mint, ts.sellAmount, 'TRAILING_STOP', pd, {
+            await this._sell(mint,  ts.sellAmount, 'TRAILING_STOP', pd, {
               pendingFirst: true, markSLDone: true,
               webhookTitle: 'Trailing Stop', webhookDesc: `**${sym}** pic:+${ts.peak}% actuel:${ts.pnl}%`, webhookColor: 0xff9800 });
           }
@@ -1745,7 +1768,7 @@ class BotLoop {
         }
 
         tokens.push({
-          mint:             mint.slice(0,8)+'...'+mint.slice(-4),
+          mint:              mint.slice(0,8)+'...'+mint.slice(-4),
           mintFull:         mint,
           balance:          parseFloat(bal.toFixed(6)),
           price:            price > 0 ? price : null,
@@ -1787,7 +1810,7 @@ class BotLoop {
             balance: parseFloat(solBal.toFixed(6)), price: solPrice,
             value: solPrice ? parseFloat((solBal * solPrice).toFixed(4)) : null,
             symbol: 'SOL', name: 'Solana', isSol: true,
-            logo: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png',
+            logo: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So111111111111111111111111111111111111111112/logo.png',
             pnl: null, entryPrice: null, bootstrapped: false,
           });
         }
@@ -1799,7 +1822,7 @@ class BotLoop {
         if (usdcBal !== null && usdcBal > 0.01) {
           tokens.push({
             mint: USDC_MINT.slice(0,8)+'...'+USDC_MINT.slice(-4), mintFull: USDC_MINT,
-            balance: parseFloat(usdcBal.toFixed(4)), price: 1.0, value: parseFloat(usdcBal.toFixed(4)),
+            balance: parseFloat(usdcBal.toFixed(4)), price: 1.0, value:  parseFloat(usdcBal.toFixed(4)),
             symbol: 'USDC', name: 'USD Coin', isUsdc: true,
             logo: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png',
             pnl: null, entryPrice: null, bootstrapped: false,
@@ -1887,6 +1910,7 @@ class BotLoop {
     return null;
   }
 
+  // [P3][P4] autoScanBootstrapped — batch 10, forçage sans Helius
   async autoScanBootstrapped() {
     const walletStr = this.wallet.publicKey.toString();
     const booted = [...this.positions.entries.entries()]
@@ -1912,7 +1936,7 @@ class BotLoop {
     // [P4] Batch 10, priorisé par bootAttempts
     const batch = booted
       .sort((a, b) => (this.positions.entries.get(a)?.bootAttempts || 0)
-                    - (this.positions.entries.get(b)?.bootAttempts || 0))
+                - (this.positions.entries.get(b)?.bootAttempts || 0))
       .slice(0, 10);
 
     log('info', `Auto-scan Helius — ${batch.length}/${booted.length} bootstrappées`);
@@ -1973,13 +1997,13 @@ class BotLoop {
       },
       scannerEnabled: CFG.SCANNER_ENABLED,
       strategy: {
-        tp: CFG.TP_ENABLED ? `${CFG.TP_TIERS.length} paliers` : 'OFF',
-        sl: CFG.SL_ENABLED ? `${CFG.SL_PCT}%` : 'OFF',
-        breakEven: CFG.BE_ENABLED ? `+${CFG.BE_BUFFER}%` : 'OFF',
-        trailing: CFG.TS_ENABLED ? `${CFG.TS_PCT}%` : 'OFF',
-        antiRug: CFG.AR_ENABLED ? `>${CFG.AR_PCT}%` : 'OFF',
-        liqExit: CFG.LE_ENABLED ? `>${CFG.LE_PCT}%` : 'OFF',
-        jito: CFG.JITO_ENABLED ? `${CFG.JITO_TIP_SOL} SOL` : 'OFF',
+        tp: CFG.TP_ENABLED ?  `${CFG.TP_TIERS.length} paliers`  : 'OFF',
+        sl: CFG.SL_ENABLED ?  `${CFG.SL_PCT}%`  : 'OFF',
+        breakEven: CFG.BE_ENABLED ?  `+${CFG.BE_BUFFER}%`  : 'OFF',
+        trailing: CFG.TS_ENABLED ?  `${CFG.TS_PCT}%`  : 'OFF',
+        antiRug: CFG.AR_ENABLED ?  `>${CFG.AR_PCT}%`  : 'OFF',
+        liqExit: CFG.LE_ENABLED ?  `>${CFG.LE_PCT}%`  : 'OFF',
+        jito: CFG.JITO_ENABLED ?  `${CFG.JITO_TIP_SOL} SOL`  : 'OFF',
       },
     };
   }
@@ -1988,7 +2012,6 @@ class BotLoop {
 // ─────────────────────────────────────────────────────────────────────────────
 // §14  TOKEN SCANNER
 // ─────────────────────────────────────────────────────────────────────────────
-
 class TokenScanner {
   constructor(bot) {
     this.bot        = bot;
@@ -2014,9 +2037,9 @@ class TokenScanner {
       : 'wss://api.mainnet-beta.solana.com';
   }
 
+  // [P10] removeAllListeners() + close() avant reconnexion
   _connectWs() {
     if (!this.running) return;
-    // Fermer l'ancienne connexion avant d'en créer une nouvelle
     if (this.ws) {
       try { this.ws.removeAllListeners(); this.ws.close(); } catch {}
       this.ws = null;
@@ -2054,6 +2077,7 @@ class TokenScanner {
     setTimeout(() => this._connectWs(), Math.min(10000 * this.reconnects, 60000));
   }
 
+  // [P13] Blacklist Memo v1/v2, Metaplex, Jupiter v6, Whirlpool, Serum
   _isValidMint(addr) {
     if (!addr || addr.length < 32 || addr.length > 44) return false;
     if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(addr)) return false;
@@ -2118,10 +2142,12 @@ class TokenScanner {
       const now   = Date.now();
       const ready = this.queue.filter(e => e.ts <= now);
       this.queue  = this.queue.filter(e => e.ts > now);
+
       // [P14a] Précharger tous les prix en une seule requête DexScreener batch
       if (ready.length > 0) {
         await prefetchPrices(ready.map(e => e.mint)).catch(() => {});
       }
+
       for (const entry of ready) {
         try { await this._evaluate(entry.mint, entry.reason); }
         catch (err) { this.stats.errors++; log('warn', `Scanner eval error: ${err.message}`); }
@@ -2138,20 +2164,19 @@ class TokenScanner {
     const rwTs = this._recentWs.get(mint) || 0;
     if (Date.now() - rwTs < 2000) return;
     this._recentWs.set(mint, Date.now());
-    if (this._recentWs.size > 500) { // nettoyage mémoire
+    if (this._recentWs.size > 500) {
       const old = Date.now() - 10_000;
       for (const [m, t] of this._recentWs) if (t < old) this._recentWs.delete(m);
     }
     this.seen.add(mint); this.pending.add(mint); this.stats.detected++;
     log('info', `Scanner détecté: ${mint.slice(0, 8)}... (${reason})`);
-    // [P6] délai 45s pour indexation DexScreener
+    // [P6] délai 120s pour indexation DexScreener
     this.queue.push({ mint, reason, ts: Date.now() + CFG.SCANNER_DELAY_MS });
   }
 
   async _evaluate(mint, reason) {
     this.cooldowns.set(mint, Date.now());
     this.pending.delete(mint);
-
     const already = this.bot.portfolio.find(t => t.mintFull === mint);
     if (already) { this.stats.rejected++; return; }
 
@@ -2161,17 +2186,16 @@ class TokenScanner {
 
     if (this.bot.isDailyLossPaused()) { this.stats.rejected++; return; }
 
-    // Prix déjà préchargé en batch dans _loop (P14a) — refetch seulement si absent
+    // Prix déjà préchargé en batch dans _loop (P14a)
     let pd = getPrice(mint);
     if (!pd) await prefetchPrices([mint]).catch(() => {});
     pd = getPrice(mint);
 
-    // [P7b] Si DexScreener n'a pas encore indexé le token (pd null ou liq=0),
-    // essayer PumpFun directement — disponible dès le bloc 0
+    // [P7b] Si DexScreener n'a pas encore indexé le token, essayer PumpFun directement
     if (!pd || !pd.price || pd.price <= 0 || (pd.liquidity || 0) === 0) {
       const pf = await _fetchPumpFun(mint);
       if (pf?.price > 0) {
-        priceCache.set(mint, { data: pf, ts: Date.now() });
+        priceCache.set(mint, {  pf, ts: Date.now() });
         pd = pf;
         log('debug', `Scanner PumpFun direct — liq $${(pf.liquidity||0).toFixed(0)}`, { mint: mint.slice(0,8) });
       }
@@ -2195,7 +2219,7 @@ class TokenScanner {
     }
 
     const solAmount = this.bot.calcSmartSize(score) || CFG.SCANNER_SOL_AMOUNT;
-    log('info', `Scanner BUY — score:${score} liq:$${liq.toFixed(0)} sol:${solAmount}`, { mint: mint.slice(0,8), reason });
+    log('info',  `Scanner BUY — score:${score} liq:$${liq.toFixed(0)} sol:${solAmount}`, { mint: mint.slice(0,8), reason });
 
     const ok = await this.bot._autoBuy(mint, solAmount, `SCANNER_${reason}`, pd, {
       webhookTitle:  'Scanner — Nouveau token',
@@ -2208,16 +2232,16 @@ class TokenScanner {
         { name: 'Liquidité', value: `$${liq.toFixed(0)}`, inline: true },
       ],
     });
-    if (ok) { this.stats.bought++; log('success', `Scanner acheté ${pd.symbol || mint.slice(0,8)} (${score}/100)`); }
+    if (ok) { this.stats.bought++; log('success',  `Scanner acheté ${pd.symbol || mint.slice(0,8)} (${score}/100)`); }
     else {
-      // Si échec réseau (pas solde insuffisant), re-queuer dans 30s pour retenter
+      // [P11] Si échec réseau (pas solde insuffisant), re-queuer dans 30s pour retenter
       const lastErr = this.bot.swap._lastBuyErr || '';
       const isNetwork = lastErr.includes('ENOTFOUND') || lastErr.includes('fetch failed') || lastErr.includes('ETIMEDOUT');
       if (isNetwork) {
         this.seen.delete(mint);
         this.cooldowns.delete(mint);
         this.queue.push({ mint, reason, ts: Date.now() + 30_000 });
-        log('warn', `Scanner buy réseau raté — requeue dans 30s`, { mint: mint.slice(0,8) });
+        log('warn', `Scanner buy réseau raté — requeue dans 30s`, { mint:  mint.slice(0,8) });
       }
       this.stats.errors++;
     }
@@ -2239,7 +2263,6 @@ class TokenScanner {
 // ─────────────────────────────────────────────────────────────────────────────
 // §15  API EXPRESS
 // ─────────────────────────────────────────────────────────────────────────────
-
 function startApi(bot, wallet, scanner) {
   const app = express();
   app.use(express.json({ limit: '256kb' }));
@@ -2292,7 +2315,7 @@ function startApi(bot, wallet, scanner) {
   app.get('/api/analytics', (_, res) => res.json(bot.analytics.toApi(bot.history)));
   app.get('/api/sol-balance', async (_, res) => {
     const [sol, usdc] = await Promise.all([bot.swap.getSolBalance(), bot.swap.getUsdcBalance()]);
-    res.json({ balance: sol, formatted: sol != null ? sol.toFixed(6) + ' SOL' : null, usdc, sellToUsdc: CFG.SELL_TO_USDC });
+    res.json({ balance: sol, formatted: sol != null ? sol.toFixed(6) + ' SOL' : null,  usdc, sellToUsdc: CFG.SELL_TO_USDC });
   });
   app.get('/api/take-profit', (_, res) => res.json({
     enabled: CFG.TP_ENABLED, tiers: bot.positions.tiers.map((t, i) => ({ index: i+1, pnl: t.pnl, sell: t.sell })),
@@ -2329,7 +2352,7 @@ function startApi(bot, wallet, scanner) {
     if (b.takeProfitEnabled !== undefined)  CFG.TP_ENABLED = !!b.takeProfitEnabled;
     if (b.breakEvenEnabled  !== undefined)  CFG.BE_ENABLED = !!b.breakEvenEnabled;
     if (b.stopLossEnabled   !== undefined)  CFG.SL_ENABLED = !!b.stopLossEnabled;
-    if (b.trailingEnabled   !== undefined)  CFG.TS_ENABLED = !!b.trailingEnabled;
+    if (b.trailingEnabled   !== undefined)  CFG.TS_ENABLED =  !!b.trailingEnabled;
     if (b.antiRugEnabled    !== undefined)  CFG.AR_ENABLED = !!b.antiRugEnabled;
     if (b.liqExitEnabled    !== undefined)  CFG.LE_ENABLED = !!b.liqExitEnabled;
     if (b.timeStopEnabled   !== undefined)  CFG.TT_ENABLED = !!b.timeStopEnabled;
@@ -2371,8 +2394,8 @@ function startApi(bot, wallet, scanner) {
     applyNum('scannerMaxLiq',     0,  1e8,   n => CFG.SCANNER_MAX_LIQ    = n);
     applyNum('scannerSolAmount', 0.001,10,   n => CFG.SCANNER_SOL_AMOUNT  = n);
     applyNum('dailyLossLimit',  -100,  0,    n => CFG.DAILY_LOSS_LIMIT    = n);
-    if (scanner && b.scannerEnabled === true  && !scanner.running) scanner.start();
-    if (scanner && b.scannerEnabled === false && scanner.running)  scanner.stop();
+    if (scanner && b.scannerEnabled === true   && !scanner.running) scanner.start();
+    if (scanner && b.scannerEnabled === false  && scanner.running)  scanner.stop();
     log('info', 'Config mise à jour');
     res.json({ success: true });
   });
@@ -2390,7 +2413,7 @@ function startApi(bot, wallet, scanner) {
     await prefetchPrices([req.params.mint]);
     const pd = getPrice(req.params.mint);
     if (!pd) return res.status(404).json({ error: 'Token introuvable' });
-    res.json({ mint: req.params.mint, score: bot.scorer.score(pd), trend: bot.momentum.getTrend(req.params.mint), data: pd });
+    res.json({ mint: req.params.mint, score: bot.scorer.score(pd), trend: bot.momentum.getTrend(req.params.mint),  pd });
   });
 
   app.post('/api/buy', async (req, res) => {
@@ -2409,10 +2432,10 @@ function startApi(bot, wallet, scanner) {
         const solUsd = getPrice(SOL_MINT)?.price || 0;
         const ep = pd?.price > 0 ? pd.price
           : (result.outAmount > 0 && solUsd > 0 ? (sol / result.outAmount) * solUsd
-          : (result.outAmount > 0 ? sol / result.outAmount : 0));
+            : (result.outAmount > 0 ? sol / result.outAmount : 0));
         bot.positions.trackEntry(mint, ep, result.outAmount, ep);
         bot.recordBuy(mint, sol, result.outAmount || 0);
-        bot.recordTrade({ type: 'buy', mint, symbol: pd?.symbol || mint.slice(0,8),
+        bot.recordTrade({ type: 'buy', mint,  symbol: pd?.symbol || mint.slice(0,8),
           solSpent: sol, outAmount: result.outAmount, entryPrice: ep, txId: result.sig, txUrl: result.txUrl });
         bot.persist();
         setTimeout(() => bot.tick().catch(() => {}), 4000);
@@ -2480,7 +2503,7 @@ function startApi(bot, wallet, scanner) {
     if (!mint) return res.status(400).json({ error: 'mint requis' });
     if (!bot.positions.entries.has(mint)) return res.status(404).json({ error: 'Position non trouvée' });
     for (const map of [bot.positions.entries, bot.positions.triggered, bot.positions.sold,
-                       bot.positions.peak, bot.costBasis]) map.delete(mint);
+      bot.positions.peak, bot.costBasis]) map.delete(mint);
     bot.positions.slHit.delete(mint); bot.positions.slPending.delete(mint); bot.positions.breakEven.delete(mint);
     bot.persist(); res.json({ success: true, mint });
   });
@@ -2536,7 +2559,7 @@ function startApi(bot, wallet, scanner) {
       if (tok?.value > 0.50) { skipped.push(mint.slice(0,8)); continue; }
       if (!dryRun) {
         for (const m of [bot.positions.entries, bot.positions.triggered, bot.positions.sold,
-                         bot.positions.peak, bot.costBasis, priceCache]) m.delete(mint);
+          bot.positions.peak, bot.costBasis, priceCache]) m.delete(mint);
         bot.positions.slHit.delete(mint); bot.positions.slPending.delete(mint);
         _failCount.delete(mint); _negCache.delete(mint);
       }
@@ -2588,7 +2611,7 @@ function startApi(bot, wallet, scanner) {
       const delayDone = exitTs ? (Date.now() - exitTs) >= CFG.REENTRY_DELAY_MIN * 60_000 : false;
       rows.push({ mint, symbol: pd?.symbol || mint.slice(0,8),
         exitTs: exitTs ? new Date(exitTs).toISOString() : null,
-        exitPrice, currentPrice: price, reboundPct: rebound !== null ? +rebound.toFixed(2) : null,
+        exitPrice, currentPrice:  price, reboundPct: rebound !== null ? +rebound.toFixed(2) : null,
         delayDone, score: bot.scorer.score(pd),
         eligible: delayDone && bot.scorer.score(pd) >= CFG.REENTRY_MIN_SCORE && rebound !== null && rebound >= CFG.REENTRY_MIN_GAIN,
       });
@@ -2631,12 +2654,14 @@ function startApi(bot, wallet, scanner) {
     today: bot.dailyLoss.date, realizedSol: +bot.dailyLoss.realizedSol.toFixed(6),
     paused: bot.dailyLoss.paused,
   }));
+
   app.post('/api/daily-loss/config', (req, res) => {
     const b = req.body || {};
     if (b.enabled !== undefined) CFG.DAILY_LOSS_ENABLED = !!b.enabled;
     const n = parseFloat(b.limit); if (!isNaN(n) && n <= 0 && n >= -100) CFG.DAILY_LOSS_LIMIT = n;
     res.json({ success: true });
   });
+
   app.post('/api/daily-loss/reset', (_, res) => {
     bot.dailyLoss.paused = false; bot.dailyLoss.realizedSol = 0; bot.dailyLoss.date = bot._today();
     log('info', 'Daily Loss reset'); res.json({ success: true });
@@ -2680,10 +2705,8 @@ function startApi(bot, wallet, scanner) {
 // ─────────────────────────────────────────────────────────────────────────────
 // §16  MAIN
 // ─────────────────────────────────────────────────────────────────────────────
-
 async function main() {
   log('info', `SolBot v${VERSION} — Démarrage`, { env: CFG.NODE_ENV });
-
   const wallet  = loadWallet();
   const rpc     = createRpc();
   const state   = loadState();
