@@ -83,96 +83,339 @@ function createRpc() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §11  SWAP ENGINE  ← LOGS VENTE REFONUS
+// §11  SWAP ENGINE — Jupiter + Fallbacks
 // ─────────────────────────────────────────────────────────────────────────────
+const QUOTE_EPS = [
+  'https://lite-api.jup.ag/swap/v1/quote',
+  'https://api.jup.ag/swap/v1/quote',
+  'https://quote-api.jup.ag/v6/quote',
+];
+const SWAP_EPS = [
+  'https://lite-api.jup.ag/swap/v1/swap',
+  'https://api.jup.ag/swap/v1/swap',
+  'https://quote-api.jup.ag/v6/swap',
+];
+
 class SwapEngine {
-  // ... (tout le reste de la classe reste identique jusqu’à la méthode sell)
+  constructor(wallet, rpc) {
+    this.wallet = wallet;
+    this.rpc = rpc;
+    this.mutex = new Mutex();
+    this.sellFailures = 0;
+    this._cbTrippedAt = null;
+    this.lastBuyTs = 0;
+  }
+
+  async getQuote({ inputMint, outputMint, amountRaw, slippageBps }) {
+    const qs = `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
+    let lastError;
+    
+    for (const ep of QUOTE_EPS) {
+      try {
+        const r = await fetch(`${ep}?${qs}`, {
+          headers: { 'User-Agent': `SolBot/${VERSION}`, Accept: 'application/json' },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!r.ok) { lastError = new Error(`Quote HTTP ${r.status}`); continue; }
+        const q = await r.json();
+        if (q.error || !q.outAmount) { lastError = new Error(q.error || 'No outAmount'); continue; }
+        return q;
+      } catch (err) { lastError = err; }
+    }
+    throw lastError || new Error('Tous les endpoints Jupiter quote ont échoué');
+  }
+
+  async _buildAndSendTx({ inputMint, outputMint, amountRaw, slippageBps, priorityMode = 'auto' }) {
+    return withRetry(async () => {
+      const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
+      
+      const priLamports = priorityMode === 'turbo' ? 500000
+        : priorityMode === 'high' ? 200000
+        : priorityMode === 'medium' ? 100000
+        : 'auto';
+      
+      const body = JSON.stringify({
+        quoteResponse: quote,
+        userPublicKey: this.wallet.publicKey.toString(),
+        wrapAndUnwrapSol: true,
+        dynamicComputeUnitLimit: true,
+        prioritizationFeeLamports: priLamports,
+      });
+
+      let swapData = null;
+      let swapErr = null;
+      
+      for (const ep of SWAP_EPS) {
+        try {
+          const r = await fetch(ep, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
+            body,
+            signal: AbortSignal.timeout(30000),
+          });
+          if (!r.ok) { swapErr = new Error(`Swap HTTP ${r.status}`); continue; }
+          const d = await r.json();
+          if (d?.swapTransaction) { swapData = d; break; }
+          swapErr = new Error('swapTransaction absent');
+        } catch (err) { swapErr = err; }
+      }
+      
+      if (!swapData) throw swapErr || new Error('Tous les endpoints swap ont échoué');
+      
+      const tx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
+      const lbh = await this.rpc.conn.getLatestBlockhash('confirmed');
+      tx.sign([this.wallet]);
+      
+      const sig = await this.rpc.conn.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+        preflightCommitment: 'confirmed',
+      });
+      
+      const conf = await this.rpc.conn.confirmTransaction({
+        signature: sig,
+        blockhash: lbh.blockhash,
+        lastValidBlockHeight: lbh.lastValidBlockHeight,
+      }, 'confirmed');
+      
+      if (conf.value.err) throw new Error(`Tx rejetée: ${JSON.stringify(conf.value.err)}`);
+      
+      return { sig, txUrl: `https://solscan.io/tx/${sig}`, quote };
+    }, { tries: 3, baseMs: 800, label: `swap(${inputMint.slice(0, 8)})` });
+  }
+
+  async _buildAndSendJito({ inputMint, outputMint, amountRaw, slippageBps }) {
+    if (!CFG.JITO_ENABLED) {
+      return this._buildAndSendTx({ inputMint, outputMint, amountRaw, slippageBps, priorityMode: 'turbo' });
+    }
+    
+    try {
+      const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
+      const body = JSON.stringify({
+        quoteResponse: quote,
+        userPublicKey: this.wallet.publicKey.toString(),
+        wrapAndUnwrapSol: true,
+        dynamicComputeUnitLimit: true,
+        prioritizationFeeLamports: 500000,
+      });
+      
+      let swapData = null;
+      for (const ep of SWAP_EPS) {
+        try {
+          const r = await fetch(ep, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+            signal: AbortSignal.timeout(30000),
+          });
+          if (r.ok) {
+            const d = await r.json();
+            if (d?.swapTransaction) { swapData = d; break; }
+          }
+        } catch (err) { /* continue */ }
+      }
+      
+      if (!swapData) throw new Error('Swap data manquante');
+      
+      const lbh = await this.rpc.conn.getLatestBlockhash('confirmed');
+      const swapTx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
+      
+      const tipTx = new VersionedTransaction(
+        new TransactionMessage({
+          payerKey: this.wallet.publicKey,
+          recentBlockhash: lbh.blockhash,
+          instructions: [
+            SystemProgram.transfer({
+              fromPubkey: this.wallet.publicKey,
+              toPubkey: new PublicKey(JITO_TIP_WALLET),
+              lamports: Math.floor(CFG.JITO_TIP_SOL * LAMPORTS_PER_SOL),
+            }),
+          ],
+        }).compileToV0Message()
+      );
+      
+      swapTx.sign([this.wallet]);
+      tipTx.sign([this.wallet]);
+      
+      await fetch(CFG.JITO_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'sendBundle',
+          params: [[
+            Buffer.from(swapTx.serialize()).toString('base64'),
+            Buffer.from(tipTx.serialize()).toString('base64'),
+          ]],
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      
+      const sig = await this.rpc.conn.sendRawTransaction(swapTx.serialize(), {
+        skipPreflight: true,
+        maxRetries: 2,
+      });
+      
+      const conf = await this.rpc.conn.confirmTransaction({
+        signature: sig,
+        blockhash: lbh.blockhash,
+        lastValidBlockHeight: lbh.lastValidBlockHeight,
+      }, 'confirmed');
+      
+      if (conf.value.err) throw new Error('Tx Jito rejetée');
+      
+      log('info', 'Jito bundle confirmé', { sig: sig.slice(0, 16) });
+      return { sig, txUrl: `https://solscan.io/tx/${sig}`, quote };
+      
+    } catch (err) {
+      log('warn', 'Jito échoué — fallback Jupiter', { err: err.message });
+      return this._buildAndSendTx({ inputMint, outputMint, amountRaw, slippageBps, priorityMode: 'turbo' });
+    }
+  }
+
+  async buy(mint, solAmount, slippageBps = CFG.DEFAULT_SLIPPAGE) {
+    const elapsed = Date.now() - this.lastBuyTs;
+    if (elapsed < CFG.BUY_COOLDOWN_MS) {
+      throw new Error(`Cooldown: ${((CFG.BUY_COOLDOWN_MS - elapsed) / 1000).toFixed(1)}s restantes`);
+    }
+    
+    const bal = await this.getSolBalance();
+    if (bal !== null && bal < solAmount + CFG.MIN_SOL_RESERVE) {
+      throw new Error(`Solde insuffisant: ${bal.toFixed(4)} SOL`);
+    }
+    
+    const raw = BigInt(Math.floor(solAmount * 1e9));
+    const { sig, txUrl, quote } = await this._buildAndSendTx({
+      inputMint: SOL_MINT,
+      outputMint: mint,
+      amountRaw: raw,
+      slippageBps,
+    });
+    
+    const dec = await getDecimals(mint, this.rpc.conn);
+    const outAmount = Number(quote.outAmount) / (10 ** dec);
+    this.lastBuyTs = Date.now();
+    
+    log('success', 'Achat confirmé', { mint: mint.slice(0, 8), tokens: outAmount.toFixed(4), sig });
+    return { success: true, sig, txUrl, outAmount, solSpent: solAmount };
+  }
+
+  async buyDCA(mint, totalSol, chunks, intervalSec, slippageBps = CFG.DEFAULT_SLIPPAGE) {
+    const chunkSol = totalSol / chunks;
+    const results = [];
+    
+    log('info', 'DCA démarré', { mint: mint.slice(0, 8), totalSol, chunks, intervalSec });
+    
+    for (let i = 0; i < chunks; i++) {
+      try {
+        const r = await this.buy(mint, chunkSol, slippageBps);
+        results.push({ chunk: i + 1, ...r });
+      } catch (err) {
+        results.push({ chunk: i + 1, success: false, error: err.message });
+      }
+      if (i < chunks - 1) await sleep(intervalSec * 1000);
+    }
+    
+    return { results, succeeded: results.filter(r => r.success).length, total: chunks };
+  }
 
   async sell(mint, amount, reason = 'MANUAL', slippageBps = CFG.DEFAULT_SLIPPAGE, useJito = false) {
-    const CB_RESET_MS = 5 * 60_000;
+    const CB_RESET_MS = 5 * 60000;
+    
     if (this.sellFailures >= CFG.MAX_SELL_RETRIES) {
       const age = Date.now() - (this._cbTrippedAt || 0);
       if (age >= CB_RESET_MS) {
-        this.sellFailures = 0; this._cbTrippedAt = null;
-        log('info', 'Circuit-breaker auto-reset');
+        log('info', `Circuit-breaker auto-reset (${Math.round(age / 60000)}min)`);
+        this.sellFailures = 0;
+        this._cbTrippedAt = null;
       } else {
-        log('error', `Circuit-breaker actif — reset dans ${Math.round((CB_RESET_MS - age)/1000)}s`);
-        return { success: false, error: 'CB actif', cbBlocked: true };
+        const msg = `Circuit-breaker actif — reset dans ${Math.round((CB_RESET_MS - age) / 1000)}s`;
+        log('error', msg);
+        return { success: false, error: msg, cbBlocked: true };
       }
     }
-
+    
     const release = await this.mutex.lock();
-    const start = Date.now();
-    const symbol = getPrice(mint)?.symbol || mint.slice(0,8);
-
+    
     try {
       const dec = await getDecimals(mint, this.rpc.conn);
-      const raw = BigInt(Math.floor(amount * 10 ** dec));
+      const raw = BigInt(Math.floor(amount * (10 ** dec)));
       const outMint = CFG.SELL_TO_USDC ? USDC_MINT : SOL_MINT;
-
-      log('info', `🚀 VENTE DÉCLENCHÉE`, {
-        mint: mint.slice(0,8),
-        symbol,
-        amount: amount.toFixed(4),
-        reason,
-        slippage: slippageBps + 'bps',
-        jito: useJito ? '✅' : 'OFF'
-      });
-
+      
       const res = useJito
         ? await this._buildAndSendJito({ inputMint: mint, outputMint: outMint, amountRaw: raw, slippageBps })
         : await this._buildAndSendTx({ inputMint: mint, outputMint: outMint, amountRaw: raw, slippageBps, priorityMode: 'high' });
-
-      let received = 0;
+      
+      let solOut = null;
+      let usdcOut = null;
+      
       if (CFG.SELL_TO_USDC) {
-        received = Number(res.quote.outAmount) / 1e6;
-        log('success', `✅ VENTE USDC TERMINÉE — ${reason}`, {
-          mint: mint.slice(0,8),
-          symbol,
-          vendu: amount.toFixed(4),
-          reçu: received.toFixed(4) + ' USDC',
-          tx: `https://solscan.io/tx/${res.sig}`,
-          durée: `${Date.now() - start}ms`
-        });
+        usdcOut = Number(res.quote.outAmount) / 1e6;
+        const solPriceUSD = getPrice(SOL_MINT)?.price || null;
+        solOut = solPriceUSD ? usdcOut / solPriceUSD : usdcOut / 150;
+        log('success', 'Vente USDC confirmée', { mint: mint.slice(0, 8), usdcOut: usdcOut.toFixed(4), reason });
       } else {
-        received = Number(res.quote.outAmount) / 1e9;
-        log('success', `✅ VENTE SOL TERMINÉE — ${reason}`, {
-          mint: mint.slice(0,8),
-          symbol,
-          vendu: amount.toFixed(4),
-          reçu: received.toFixed(6) + ' SOL',
-          tx: `https://solscan.io/tx/${res.sig}`,
-          durée: `${Date.now() - start}ms`
-        });
+        solOut = Number(res.quote.outAmount) / 1e9;
+        log('success', 'Vente SOL confirmée', { mint: mint.slice(0, 8), solOut: solOut.toFixed(6), reason });
       }
-
+      
       this.sellFailures = 0;
-      return { success: true, sig: res.sig, txUrl: res.txUrl, solOut: received, usdcOut: CFG.SELL_TO_USDC ? received : null, amountSold: amount };
+      return { success: true, sig: res.sig, txUrl: res.txUrl, solOut, usdcOut, amountSold: amount };
+      
     } catch (err) {
-      const isNetwork = err.message?.includes('fetch') || err.message?.includes('ENOTFOUND') ||
-                        err.message?.includes('ETIMEDOUT') || err.message?.includes('429') ||
-                        err.message?.includes('ECONN');
-
+      this._lastBuyErr = err.message || '';
+      
+      const isNetwork = (
+        err.message?.includes('fetch failed') ||
+        err.message?.includes('ENOTFOUND') ||
+        err.message?.includes('ETIMEDOUT') ||
+        err.message?.includes('ECONNRESET') ||
+        err.message?.includes('ECONNREFUSED') ||
+        err.message?.includes('429') ||
+        err.message?.includes('Too Many Requests') ||
+        err.message?.includes('socket hang up')
+      );
+      
       if (isNetwork) {
-        log('warn', `⚠️ ERREUR RÉSEAU (NON comptée dans CB) — ${reason}`, {
-          mint: mint.slice(0,8),
-          error: err.message.slice(0, 100)
-        });
-        try { this.rpc.failover(); } catch {}
+        log('warn', `Vente réseau erreur (non comptée CB): ${err.message.slice(0, 80)}`);
+        try { this.rpc.failover(); } catch (e) { /* ignore */ }
       } else {
         this.sellFailures++;
         if (this.sellFailures >= CFG.MAX_SELL_RETRIES && !this._cbTrippedAt) {
           this._cbTrippedAt = Date.now();
-          log('error', '🚨 Circuit-breaker déclenché');
+          log('warn', 'Circuit-breaker déclenché — auto-reset dans 5min');
         }
-        log('error', `❌ VENTE ÉCHOUÉE — ${reason}`, { mint: mint.slice(0,8), error: err.message });
+        log('error', 'Vente échouée', { err: err.message, failures: this.sellFailures, reason });
       }
       return { success: false, error: err.message };
+      
     } finally {
       release();
     }
   }
-}
+
+  async getSolBalance() {
+    try {
+      return await this.rpc.conn.getBalance(this.wallet.publicKey) / 1e9;
+    } catch {
+      return null;
+    }
+  }
+
+  async getUsdcBalance() {
+    try {
+      const accounts = await this.rpc.conn.getParsedTokenAccountsByOwner(
+        this.wallet.publicKey,
+        { mint: new PublicKey(USDC_MINT) }
+      );
+      if (!accounts.value.length) return 0;
+      return parseFloat(accounts.value[0].account.data.parsed.info.tokenAmount.uiAmount ?? '0');
+    } catch {
+      return null;
+    }
+  }
+                                                               
 
 // ─────────────────────────────────────────────────────────────────────────────
 // §13  BOT LOOP  ← _sell() mis à jour pour cohérence
