@@ -1,6 +1,13 @@
 /**
- * SolBot v6.0 — Production Build
- * Bot de trading Solana avec Jupiter, stratégies auto, scanner
+ * SolBot v6.2 — Production Build (Jupiter + Meteor Fallback)
+ * 
+ * FEATURES:
+ * • Jupiter: lite-api → api → quote-api avec rotation
+ * • Meteor AGG: fallback automatique si Jupiter down
+ * • Circuit-breaker dédié avec auto-reset 5min
+ * • Health check périodique des endpoints
+ * • Retry intelligent avec backoff adaptatif
+ * • Logs détaillés pour debugging réseau
  */
 'use strict';
 
@@ -131,6 +138,12 @@ const CFG = {
 
   // History
   HISTORY_MAX_POINTS: parseInt(process.env.HISTORY_MAX_POINTS || '288'),
+
+  // Jupiter + Meteor Fallbacks
+  METEOR_ENABLED: process.env.METEOR_ENABLED === 'true',
+  METEOR_ENDPOINT: process.env.METEOR_ENDPOINT || 'https://aggregator.meteoragg.com/v1',
+  JUPITER_CIRCUIT_BREAKER_MS: parseInt(process.env.JUPITER_CIRCUIT_BREAKER_MS || '300000'),
+  JUPITER_HEALTH_CHECK_SEC: parseInt(process.env.JUPITER_HEALTH_CHECK_SEC || '60'),
 };
 
 if (!CFG.PRIVATE_KEY) { console.error('❌ PRIVATE_KEY manquante'); process.exit(1); }
@@ -153,7 +166,7 @@ const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SPL_TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const SPL_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 const JITO_TIP_WALLET = 'Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY';
-const VERSION = '6.0.0';
+const VERSION = '6.2.0';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // §3 UTILS
@@ -178,9 +191,20 @@ async function withRetry(fn, { tries = 3, baseMs = 600, label = '' } = {}) {
       last = err;
       if (i < tries - 1) {
         const is429 = err.message?.includes('429') || err.message?.includes('Too Many Requests');
-        const w = is429 ? Math.max(baseMs * 2 ** i, 3000) : baseMs * 2 ** i;
-        if (is429) log('warn', `${label} rate-limited (429) — attente ${w}ms`);
-        else log('warn', `${label} retry ${i + 1}/${tries - 1} in ${w}ms — ${err.message}`);
+        const isDNS = err.message?.includes('ENOTFOUND') || err.message?.includes('getaddrinfo');
+        const isNet = err.message?.includes('fetch failed') || err.message?.includes('ETIMEDOUT');
+        
+        let w;
+        if (isDNS || isNet) {
+          w = Math.min(baseMs * 2 ** i, 10000);
+          log('warn', `${label} erreur réseau (retry ${i+1}/${tries}) — attente ${w}ms`, { err: err.message?.slice(0,60) });
+        } else if (is429) {
+          w = Math.max(baseMs * 2 ** i, 3000);
+          log('warn', `${label} rate-limited 429 (retry ${i+1}/${tries}) — attente ${w}ms`);
+        } else {
+          w = baseMs * 2 ** i;
+          log('warn', `${label} retry ${i+1}/${tries} in ${w}ms — ${err.message}`);
+        }
         await sleep(w);
       }
     }
@@ -1078,18 +1102,24 @@ class PositionManager {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §11 SWAP ENGINE
+// §11 SWAP ENGINE — Jupiter + Meteor Fallback
 // ─────────────────────────────────────────────────────────────────────────────
-const QUOTE_EPS = [
+
+// Jupiter endpoints (ordre de priorité)
+const JUPITER_QUOTE_EPS = [
   'https://lite-api.jup.ag/swap/v1/quote',
   'https://api.jup.ag/swap/v1/quote',
   'https://quote-api.jup.ag/v6/quote',
 ];
-const SWAP_EPS = [
+const JUPITER_SWAP_EPS = [
   'https://lite-api.jup.ag/swap/v1/swap',
   'https://api.jup.ag/swap/v1/swap',
   'https://quote-api.jup.ag/v6/swap',
 ];
+
+// Meteor AGG endpoints (fallback)
+const METEOR_QUOTE = `${CFG.METEOR_ENDPOINT}/quote`;
+const METEOR_SWAP = `${CFG.METEOR_ENDPOINT}/swap`;
 
 class SwapEngine {
   constructor(wallet, rpc) {
@@ -1099,45 +1129,179 @@ class SwapEngine {
     this.sellFailures = 0;
     this._cbTrippedAt = null;
     this.lastBuyTs = 0;
+    
+    // Jupiter circuit breaker state
+    this._jupiterCbTripped = false;
+    this._jupiterCbTrippedAt = null;
+    this._jupiterFailures = 0;
+    this._jupiterLastHealthCheck = 0;
+    this._jupiterHealthyEndpoints = new Set(JUPITER_QUOTE_EPS);
   }
 
-  async getQuote({ inputMint, outputMint, amountRaw, slippageBps }) {
+  // Health check Jupiter périodique
+  async _checkJupiterHealth() {
+    const now = Date.now();
+    if (now - this._jupiterLastHealthCheck < CFG.JUPITER_HEALTH_CHECK_SEC * 1000) {
+      return !this._jupiterCbTripped;
+    }
+    this._jupiterLastHealthCheck = now;
+
+    for (const ep of JUPITER_QUOTE_EPS) {
+      try {
+        const r = await fetch(`${ep}?inputMint=${SOL_MINT}&outputMint=${USDC_MINT}&amount=1000000&slippageBps=50`, {
+          headers: { 'User-Agent': `SolBot/${VERSION}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (r.ok || r.status === 400) {
+          this._jupiterHealthyEndpoints.add(ep);
+          if (this._jupiterCbTripped && this._jupiterHealthyEndpoints.size >= 2) {
+            this._jupiterCbTripped = false;
+            this._jupiterCbTrippedAt = null;
+            log('info', 'Jupiter circuit breaker reset — endpoints sains');
+          }
+          return true;
+        }
+      } catch {
+        this._jupiterHealthyEndpoints.delete(ep);
+      }
+    }
+
+    if (this._jupiterHealthyEndpoints.size < 2 && !this._jupiterCbTripped) {
+      this._jupiterCbTripped = true;
+      this._jupiterCbTrippedAt = now;
+      log('warn', `Jupiter circuit breaker activé — ${this._jupiterHealthyEndpoints.size}/3 endpoints sains`);
+    }
+
+    return this._jupiterHealthyEndpoints.size > 0;
+  }
+
+  // Vérifier si on doit utiliser les fallbacks
+  _shouldUseFallbacks() {
+    if (this._jupiterCbTripped) {
+      const age = Date.now() - (this._jupiterCbTrippedAt || 0);
+      if (age >= CFG.JUPITER_CIRCUIT_BREAKER_MS) {
+        this._jupiterCbTripped = false;
+        this._jupiterCbTrippedAt = null;
+        this._jupiterHealthyEndpoints = new Set(JUPITER_QUOTE_EPS);
+        log('info', 'Jupiter circuit breaker auto-reset');
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Quote Jupiter
+  async _getQuoteJupiter({ inputMint, outputMint, amountRaw, slippageBps }) {
     const qs = `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${slippageBps}&maxAccounts=20`;
-    let last;
-    for (const ep of QUOTE_EPS) {
+    const endpoints = Array.from(this._jupiterHealthyEndpoints);
+    
+    for (const ep of endpoints) {
       try {
         const r = await fetch(`${ep}?${qs}`, {
           headers: { 'User-Agent': `SolBot/${VERSION}`, Accept: 'application/json' },
-          signal: AbortSignal.timeout(15_000),
+          signal: AbortSignal.timeout(12000),
         });
-        if (!r.ok) { last = new Error(`Quote HTTP ${r.status}`); continue; }
+        if (!r.ok) {
+          this._jupiterHealthyEndpoints.delete(ep);
+          continue;
+        }
         const q = await r.json();
-        if (q.error || !q.outAmount) { last = new Error(q.error || 'No outAmount'); continue; }
-        return q;
-      } catch (err) { last = err; }
+        if (q.error || !q.outAmount) {
+          if (q.error?.includes('expired')) continue;
+          continue;
+        }
+        return { ...q, source: 'jupiter', endpoint: ep };
+      } catch (err) {
+        this._jupiterHealthyEndpoints.delete(ep);
+        this._jupiterFailures++;
+        if (this._jupiterFailures >= 5 && !this._jupiterCbTripped) {
+          this._jupiterCbTripped = true;
+          this._jupiterCbTrippedAt = Date.now();
+          log('warn', 'Jupiter circuit breaker — trop d\'échecs consécutifs');
+        }
+        continue;
+      }
     }
-    throw last || new Error('Tous les endpoints Jupiter quote ont échoué');
+    throw new Error('Tous les endpoints Jupiter quote ont échoué');
   }
 
-  async _buildAndSendTx({ inputMint, outputMint, amountRaw, slippageBps, priorityMode = 'auto' }) {
+  // Quote Meteor AGG (fallback)
+  async _getQuoteMeteor({ inputMint, outputMint, amountRaw, slippageBps }) {
+    if (!CFG.METEOR_ENABLED) throw new Error('Meteor disabled');
+    try {
+      const r = await fetch(METEOR_QUOTE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
+        body: JSON.stringify({
+          inputMint, outputMint,
+          amount: amountRaw.toString(),
+          slippageBps,
+          maxAccounts: 20,
+        }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!r.ok) throw new Error(`Meteor HTTP ${r.status}`);
+      const q = await r.json();
+      if (!q.quoteResponse?.outAmount) throw new Error('Meteor: no outAmount');
+      return { ...q.quoteResponse, source: 'meteor' };
+    } catch (err) {
+      log('debug', 'Meteor quote failed', { err: err.message?.slice(0,60) });
+      throw err;
+    }
+  }
+
+  // getQuote avec fallback
+  async getQuote({ inputMint, outputMint, amountRaw, slippageBps }) {
+    await this._checkJupiterHealth();
+
+    if (!this._shouldUseFallbacks()) {
+      try {
+        return await this._getQuoteJupiter({ inputMint, outputMint, amountRaw, slippageBps });
+      } catch (jupErr) {
+        log('warn', 'Jupiter quote failed — trying Meteor fallback', { err: jupErr.message?.slice(0,60) });
+      }
+    }
+
+    // Fallback Meteor
+    if (CFG.METEOR_ENABLED) {
+      try {
+        return await this._getQuoteMeteor({ inputMint, outputMint, amountRaw, slippageBps });
+      } catch (metErr) {
+        log('warn', 'Meteor quote failed', { err: metErr.message?.slice(0,60) });
+      }
+    }
+
+    throw new Error('Tous les endpoints quote (Jupiter + Meteor) ont échoué');
+  }
+
+  // Build & Send TX
+  async _buildAndSendTx({ inputMint, outputMint, amountRaw, slippageBps, priorityMode = 'auto', quoteSource = 'jupiter' }) {
     return withRetry(async () => {
       const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
-      const priLamports = priorityMode === 'turbo' ? 500_000
-        : priorityMode === 'high' ? 200_000
-        : priorityMode === 'medium' ? 100_000
+      
+      const priLamports = priorityMode === 'turbo' ? 500000
+        : priorityMode === 'high' ? 200000
+        : priorityMode === 'medium' ? 100000
         : 'auto';
+      
       const body = JSON.stringify({
         quoteResponse: quote,
         userPublicKey: this.wallet.publicKey.toString(),
-        wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true,
+        wrapAndUnwrapSol: true,
+        dynamicComputeUnitLimit: true,
         prioritizationFeeLamports: priLamports,
       });
+
+      const swapEps = quoteSource === 'meteor' ? [METEOR_SWAP] : JUPITER_SWAP_EPS;
       let swapData = null, swapErr;
-      for (const ep of SWAP_EPS) {
+      
+      for (const ep of swapEps) {
         try {
           const r = await fetch(ep, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
-            body, signal: AbortSignal.timeout(30_000),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'User-Agent': `SolBot/${VERSION}` },
+            body, signal: AbortSignal.timeout(30000),
           });
           if (!r.ok) { swapErr = new Error(`Swap HTTP ${r.status}`); continue; }
           const d = await r.json();
@@ -1145,36 +1309,52 @@ class SwapEngine {
           swapErr = new Error('swapTransaction absent');
         } catch (err) { swapErr = err; }
       }
+      
       if (!swapData) throw swapErr || new Error('Tous les endpoints swap ont échoué');
+      
       const tx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
       const lbh = await this.rpc.conn.getLatestBlockhash('confirmed');
       tx.sign([this.wallet]);
-      const sig = await this.rpc.conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3, preflightCommitment: 'confirmed' });
-      const conf = await this.rpc.conn.confirmTransaction({ signature: sig, blockhash: lbh.blockhash, lastValidBlockHeight: lbh.lastValidBlockHeight }, 'confirmed');
+      
+      const sig = await this.rpc.conn.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false, maxRetries: 3, preflightCommitment: 'confirmed',
+      });
+      const conf = await this.rpc.conn.confirmTransaction({
+        signature: sig, blockhash: lbh.blockhash, lastValidBlockHeight: lbh.lastValidBlockHeight,
+      }, 'confirmed');
+      
       if (conf.value.err) throw new Error(`Tx rejetée: ${JSON.stringify(conf.value.err)}`);
       return { sig, txUrl: `https://solscan.io/tx/${sig}`, quote };
     }, { tries: 3, baseMs: 800, label: `swap(${inputMint.slice(0, 8)})` });
   }
 
+  // Jito bundle
   async _buildAndSendJito({ inputMint, outputMint, amountRaw, slippageBps }) {
-    if (!CFG.JITO_ENABLED)
+    if (!CFG.JITO_ENABLED) {
       return this._buildAndSendTx({ inputMint, outputMint, amountRaw, slippageBps, priorityMode: 'turbo' });
+    }
     try {
       const quote = await this.getQuote({ inputMint, outputMint, amountRaw, slippageBps });
       const body = JSON.stringify({
-        quoteResponse: quote, userPublicKey: this.wallet.publicKey.toString(),
-        wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: 500_000,
+        quoteResponse: quote,
+        userPublicKey: this.wallet.publicKey.toString(),
+        wrapAndUnwrapSol: true,
+        dynamicComputeUnitLimit: true,
+        prioritizationFeeLamports: 500000,
       });
+      
       let swapData = null;
-      for (const ep of SWAP_EPS) {
+      for (const ep of JUPITER_SWAP_EPS) {
         try {
-          const r = await fetch(ep, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(30_000) });
+          const r = await fetch(ep, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(30000) });
           if (r.ok) { const d = await r.json(); if (d?.swapTransaction) { swapData = d; break; } }
         } catch {}
       }
       if (!swapData) throw new Error('Swap data manquante');
+      
       const lbh = await this.rpc.conn.getLatestBlockhash('confirmed');
       const swapTx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
+      
       const tipTx = new VersionedTransaction(new TransactionMessage({
         payerKey: this.wallet.publicKey, recentBlockhash: lbh.blockhash,
         instructions: [SystemProgram.transfer({
@@ -1183,17 +1363,21 @@ class SwapEngine {
           lamports: Math.floor(CFG.JITO_TIP_SOL * LAMPORTS_PER_SOL),
         })],
       }).compileToV0Message());
+      
       swapTx.sign([this.wallet]); tipTx.sign([this.wallet]);
+      
       await fetch(CFG.JITO_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'sendBundle', params: [
           [Buffer.from(swapTx.serialize()).toString('base64'), Buffer.from(tipTx.serialize()).toString('base64')],
         ]}),
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(20000),
       });
+      
       const sig = await this.rpc.conn.sendRawTransaction(swapTx.serialize(), { skipPreflight: true, maxRetries: 2 });
       const conf = await this.rpc.conn.confirmTransaction({ signature: sig, blockhash: lbh.blockhash, lastValidBlockHeight: lbh.lastValidBlockHeight }, 'confirmed');
       if (conf.value.err) throw new Error('Tx Jito rejetée');
+      
       log('info', 'Jito bundle confirmé', { sig: sig.slice(0, 16) });
       return { sig, txUrl: `https://solscan.io/tx/${sig}`, quote };
     } catch (err) {
@@ -1202,26 +1386,33 @@ class SwapEngine {
     }
   }
 
+  // Buy
   async buy(mint, solAmount, slippageBps = CFG.DEFAULT_SLIPPAGE) {
     const elapsed = Date.now() - this.lastBuyTs;
     if (elapsed < CFG.BUY_COOLDOWN_MS)
       throw new Error(`Cooldown: ${((CFG.BUY_COOLDOWN_MS - elapsed) / 1000).toFixed(1)}s restantes`);
+    
     const bal = await this.getSolBalance();
     if (bal !== null && bal < solAmount + CFG.MIN_SOL_RESERVE)
       throw new Error(`Solde insuffisant: ${bal.toFixed(4)} SOL`);
+    
     const raw = BigInt(Math.floor(solAmount * 1e9));
     const { sig, txUrl, quote } = await this._buildAndSendTx({ inputMint: SOL_MINT, outputMint: mint, amountRaw: raw, slippageBps });
+    
     const dec = await getDecimals(mint, this.rpc.conn);
     const outAmount = Number(quote.outAmount) / 10 ** dec;
     this.lastBuyTs = Date.now();
+    
     log('success', 'Achat confirmé', { mint: mint.slice(0, 8), tokens: outAmount.toFixed(4), sig });
     return { success: true, sig, txUrl, outAmount, solSpent: solAmount };
   }
 
+  // Buy DCA
   async buyDCA(mint, totalSol, chunks, intervalSec, slippageBps = CFG.DEFAULT_SLIPPAGE) {
     const chunkSol = totalSol / chunks;
     const results = [];
     log('info', 'DCA démarré', { mint: mint.slice(0, 8), totalSol, chunks, intervalSec });
+    
     for (let i = 0; i < chunks; i++) {
       try {
         const r = await this.buy(mint, chunkSol, slippageBps);
@@ -1232,8 +1423,10 @@ class SwapEngine {
     return { results, succeeded: results.filter(r => r.success).length, total: chunks };
   }
 
+  // Sell
   async sell(mint, amount, reason = 'MANUAL', slippageBps = CFG.DEFAULT_SLIPPAGE, useJito = false) {
-    const CB_RESET_MS = 5 * 60_000;
+    const CB_RESET_MS = 5 * 60000;
+    
     if (this.sellFailures >= CFG.MAX_SELL_RETRIES) {
       const age = Date.now() - (this._cbTrippedAt || 0);
       if (age >= CB_RESET_MS) {
@@ -1245,15 +1438,18 @@ class SwapEngine {
         return { success: false, error: msg, cbBlocked: true };
       }
     }
+    
     const release = await this.mutex.lock();
     try {
       const dec = await getDecimals(mint, this.rpc.conn);
       const raw = BigInt(Math.floor(amount * 10 ** dec));
       const outMint = CFG.SELL_TO_USDC ? USDC_MINT : SOL_MINT;
+      
       const res = useJito
         ? await this._buildAndSendJito({ inputMint: mint, outputMint: outMint, amountRaw: raw, slippageBps })
         : await this._buildAndSendTx({ inputMint: mint, outputMint: outMint, amountRaw: raw, slippageBps, priorityMode: 'high' });
-      let solOut, usdcOut = null;
+      
+      let solOut = null, usdcOut = null;
       if (CFG.SELL_TO_USDC) {
         usdcOut = Number(res.quote.outAmount) / 1e6;
         const solPriceUSD = getPrice(SOL_MINT)?.price || null;
@@ -1263,6 +1459,7 @@ class SwapEngine {
         solOut = Number(res.quote.outAmount) / 1e9;
         log('success', 'Vente SOL confirmée', { mint: mint.slice(0, 8), solOut: solOut.toFixed(6), reason });
       }
+      
       this.sellFailures = 0;
       return { success: true, sig: res.sig, txUrl: res.txUrl, solOut, usdcOut, amountSold: amount };
     } catch (err) {
@@ -1277,6 +1474,7 @@ class SwapEngine {
         err.message?.includes('Too Many Requests') ||
         err.message?.includes('socket hang up')
       );
+      
       if (isNetwork) {
         log('warn', `Vente réseau erreur (non comptée CB): ${err.message.slice(0, 80)}`);
         try { this.rpc.failover(); } catch {}
@@ -1945,6 +2143,12 @@ class BotLoop {
       sellCircuitBreaker: this.swap.sellFailures,
       cbTrippedAt: this.swap._cbTrippedAt ? new Date(this.swap._cbTrippedAt).toISOString() : null,
       cbAutoResetIn: this.swap._cbTrippedAt ? Math.max(0, Math.round((5*60000 - (Date.now() - this.swap._cbTrippedAt)) / 1000)) : null,
+      jupiterStatus: {
+        circuitBreaker: this.swap._jupiterCbTripped,
+        healthyEndpoints: this.swap._jupiterHealthyEndpoints.size,
+        lastHealthCheck: this.swap._jupiterLastHealthCheck,
+        meteorEnabled: CFG.METEOR_ENABLED,
+      },
       lastUpdate: new Date().toISOString(),
       dailyLoss: {
         enabled: CFG.DAILY_LOSS_ENABLED, limit: CFG.DAILY_LOSS_LIMIT,
@@ -2292,6 +2496,11 @@ function startApi(bot, wallet, scanner) {
     scannerMinLiq: CFG.SCANNER_MIN_LIQ, scannerMaxLiq: CFG.SCANNER_MAX_LIQ,
     scannerSolAmount: CFG.SCANNER_SOL_AMOUNT, scannerDelayMs: CFG.SCANNER_DELAY_MS,
     dailyLossEnabled: CFG.DAILY_LOSS_ENABLED, dailyLossLimit: CFG.DAILY_LOSS_LIMIT,
+    // Jupiter/Meteor fallbacks
+    meteorEnabled: CFG.METEOR_ENABLED,
+    meteorEndpoint: CFG.METEOR_ENDPOINT,
+    jupiterCircuitBreakerMs: CFG.JUPITER_CIRCUIT_BREAKER_MS,
+    jupiterHealthCheckSec: CFG.JUPITER_HEALTH_CHECK_SEC,
   }));
 
   app.post('/api/config', (req, res) => {
@@ -2313,6 +2522,7 @@ function startApi(bot, wallet, scanner) {
     if (b.sellToUsdc !== undefined) CFG.SELL_TO_USDC = !!b.sellToUsdc;
     if (b.scannerEnabled !== undefined) CFG.SCANNER_ENABLED = !!b.scannerEnabled;
     if (b.dailyLossEnabled !== undefined) CFG.DAILY_LOSS_ENABLED = !!b.dailyLossEnabled;
+    if (b.meteorEnabled !== undefined) CFG.METEOR_ENABLED = !!b.meteorEnabled;
     if (Array.isArray(b.takeProfitTiers) && b.takeProfitTiers.length) {
       const clean = b.takeProfitTiers.map(t => ({ pnl: parseFloat(t.pnl), sell: parseFloat(t.sell) }))
         .filter(t => t.pnl > 0 && t.sell > 0 && t.sell <= 100).sort((a, c) => a.pnl - c.pnl);
@@ -2353,7 +2563,7 @@ function startApi(bot, wallet, scanner) {
     if (!inputMint || !outputMint || !amount) return res.status(400).json({ error: 'inputMint, outputMint, amount requis' });
     try {
       const q = await bot.swap.getQuote({ inputMint, outputMint, amountRaw: BigInt(Math.floor(Number(amount))), slippageBps: parseInt(slippageBps) });
-      res.json({ success: true, quote: q });
+      res.json({ success: true, quote: q, source: q.source });
     } catch (err) { res.status(400).json({ success: false, error: err.message }); }
   });
 
@@ -2527,7 +2737,10 @@ function startApi(bot, wallet, scanner) {
 
   app.post('/api/reset-circuit-breaker', (_, res) => {
     bot.swap.sellFailures = 0; bot.swap._cbTrippedAt = null;
-    log('info', 'Circuit-breaker reset');
+    bot.swap._jupiterCbTripped = false;
+    bot.swap._jupiterCbTrippedAt = null;
+    bot.swap._jupiterHealthyEndpoints = new Set(JUPITER_QUOTE_EPS);
+    log('info', 'Circuit-breakers reset');
     res.json({ success: true });
   });
 
@@ -2644,6 +2857,33 @@ function startApi(bot, wallet, scanner) {
     res.json({ tokens: rows, summary: { totalRealizedSol: +rows.reduce((s,r)=>s+r.pnlSol,0).toFixed(6), uniqueTokens: rows.length }});
   });
 
+  // ─── Jupiter/Meteor Debug ─────────────────────────────────────────────────
+  app.get('/api/jupiter/status', (_, res) => {
+    res.json({
+      circuitBreaker: bot.swap._jupiterCbTripped,
+      trippedAt: bot.swap._jupiterCbTrippedAt ? new Date(bot.swap._jupiterCbTrippedAt).toISOString() : null,
+      healthyEndpoints: Array.from(bot.swap._jupiterHealthyEndpoints),
+      failures: bot.swap._jupiterFailures,
+      lastHealthCheck: bot.swap._jupiterLastHealthCheck,
+      config: {
+        jupiterEndpoints: JUPITER_QUOTE_EPS,
+        meteorEnabled: CFG.METEOR_ENABLED,
+        meteorEndpoint: CFG.METEOR_ENDPOINT,
+        circuitBreakerMs: CFG.JUPITER_CIRCUIT_BREAKER_MS,
+        healthCheckSec: CFG.JUPITER_HEALTH_CHECK_SEC,
+      },
+    });
+  });
+
+  app.post('/api/jupiter/reset', (_, res) => {
+    bot.swap._jupiterCbTripped = false;
+    bot.swap._jupiterCbTrippedAt = null;
+    bot.swap._jupiterHealthyEndpoints = new Set(JUPITER_QUOTE_EPS);
+    bot.swap._jupiterFailures = 0;
+    log('info', 'Jupiter circuit breaker reset manuellement');
+    res.json({ success: true });
+  });
+
   app.use((_, res) => res.status(404).json({ error: 'Not found' }));
 
   app.listen(CFG.PORT, '0.0.0.0', () => log('info', `API démarrée sur :${CFG.PORT}`, { version: VERSION }));
@@ -2664,15 +2904,35 @@ async function main() {
 
   log('info', 'Vérification réseau avant premier tick...');
   let networkReady = false;
-  for (let attempt = 1; attempt <= 6; attempt++) {
+  
+  // Tester Jupiter d'abord
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const r = await fetch('https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000&slippageBps=50', { signal: AbortSignal.timeout(5000) });
-      if (r.ok || r.status === 400) { networkReady = true; log('info', `Réseau OK (tentative ${attempt})`); break; }
+      const r = await fetch('https://lite-api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000&slippageBps=50', { signal: AbortSignal.timeout(5000) });
+      if (r.ok || r.status === 400) { networkReady = true; log('info', `Jupiter OK (tentative ${attempt})`); break; }
     } catch {}
-    log('warn', `Réseau non prêt (tentative ${attempt}/6) — attente 5s...`);
+    log('warn', `Jupiter non prêt (tentative ${attempt}/3) — attente 5s...`);
     await sleep(5000);
   }
-  if (!networkReady) log('warn', 'Jupiter inaccessible — démarrage quand même');
+  
+  // Si Jupiter down, tester Meteor
+  if (!networkReady && CFG.METEOR_ENABLED) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const r = await fetch(`${CFG.METEOR_ENDPOINT}/quote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inputMint: SOL_MINT, outputMint: USDC_MINT, amount: '1000000', slippageBps: 50 }),
+          signal: AbortSignal.timeout(5000),
+        });
+        if (r.ok) { networkReady = true; log('info', `Meteor fallback OK (tentative ${attempt})`); break; }
+      } catch {}
+      log('warn', `Meteor non prêt (tentative ${attempt}/2) — attente 5s...`);
+      await sleep(5000);
+    }
+  }
+  
+  if (!networkReady) log('warn', 'Aucun aggregator disponible — démarrage en mode dégradé');
 
   await bot.tick();
   setInterval(() => bot.tick().catch(err => log('error', 'Loop error', { err: err.message })), CFG.INTERVAL_SEC * 1000);
@@ -2682,6 +2942,7 @@ async function main() {
     address: wallet.publicKey.toString().slice(0, 8) + '...',
     interval: CFG.INTERVAL_SEC + 's',
     scanner: CFG.SCANNER_ENABLED ? `ON (delay:${CFG.SCANNER_DELAY_MS/1000}s)` : 'OFF',
+    aggregator: networkReady ? 'Jupiter/Meteor OK' : 'Aucun aggregator disponible',
   });
 
   const exit = () => { bot.persist(); log('info', 'Arrêt propre'); process.exit(0); };
