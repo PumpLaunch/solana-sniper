@@ -17,6 +17,7 @@
  *  [P13] _isValidMint — blacklist Memo v1/v2, Metaplex, Jupiter v6, Whirlpool, Serum
  *  [P14] _loop — batch prefetch prix avant évaluation + dedup WS 2s (_recentWs)
  *  [P15] sell() — Jupiter/quote failures classées réseau → circuit-breaker non déclenché
+ *  [P16] createRpc — disableRetryOnRateLimit:true + readConn public pour tick() (préserve Helius pour swaps)
  */
 'use strict';
 
@@ -239,19 +240,31 @@ function loadWallet() {
 }
 
 function createRpc() {
+  // [P16a] Helius pour swaps (confirmTransaction rapide) — public RPCs pour lecture
+  // disableRetryOnRateLimit:true évite le backoff web3.js (500→4000ms) sur 429 Helius
+  // On gère le failover manuellement dans tick() et sell()
   const eps = [
     CFG.HELIUS_KEY ? `https://mainnet.helius-rpc.com/?api-key=${CFG.HELIUS_KEY}` : null,
     'https://api.mainnet-beta.solana.com',
     'https://solana-mainnet.public.blastapi.io',
+    'https://rpc.ankr.com/solana',
   ].filter(Boolean);
   const conns = eps.map(e => new Connection(e, {
-    commitment: 'confirmed', disableRetryOnRateLimit: false,
+    commitment: 'confirmed', disableRetryOnRateLimit: true,  // [P16a] pas de retry auto 429
     confirmTransactionInitialTimeout: 60000,
     httpHeaders: { 'Content-Type': 'application/json' },
   }));
   let idx = 0;
+  // [P16a] RPC dédié lecture (round-robin sur public RPCs, évite de taper Helius)
+  // Utilisé pour getParsedTokenAccountsByOwner dans tick()
+  const readIdx = () => {
+    // Préférer index 1+ (public) pour la lecture, Helius réservé aux swaps
+    if (conns.length <= 1) return 0;
+    return Math.floor(Date.now() / 30000) % (conns.length - 1) + 1;
+  };
   return {
     get conn()     { return conns[idx]; },
+    get readConn() { return conns[readIdx()]; }, // [P16a] lecture sur RPC public
     get endpoint() { return eps[idx]; },
     async healthCheck() {
       for (let i = 0; i < conns.length; i++) {
@@ -1622,19 +1635,20 @@ class BotLoop {
       if (this.cycle % 10 === 0) await this.rpc.healthCheck();
       this.cycle++;
 
-      // [P5] Lecture comptes token — 429/fetch-failed → sleep 5s, pas de backoff 300s
+      // [P16b] Lecture comptes token sur readConn (RPC public) pour préserver Helius pour les swaps
       let r1, r2;
       try {
+        const rc = this.rpc.readConn; // public RPC, pas Helius
         [r1, r2] = await Promise.all([
-          this.rpc.conn.getParsedTokenAccountsByOwner(this.wallet.publicKey, { programId: new PublicKey(SPL_TOKEN) }),
-          this.rpc.conn.getParsedTokenAccountsByOwner(this.wallet.publicKey, { programId: new PublicKey(SPL_2022)  }),
+          rc.getParsedTokenAccountsByOwner(this.wallet.publicKey, { programId: new PublicKey(SPL_TOKEN) }),
+          rc.getParsedTokenAccountsByOwner(this.wallet.publicKey, { programId: new PublicKey(SPL_2022)  }),
         ]);
       } catch (rpcErr) {
         const is429 = rpcErr.message?.includes('429') || rpcErr.message?.includes('Too Many Requests');
         const isNet = rpcErr.message?.includes('fetch failed') || rpcErr.message?.includes('ENOTFOUND') || rpcErr.message?.includes('ETIMEDOUT');
         log('warn', `Tick RPC ${is429 ? '429' : isNet ? 'network' : 'error'} — failover + skip cycle`, { err: rpcErr.message?.slice(0, 80) });
         this.rpc.failover();
-        await sleep(5000); // 5s max, pas de backoff progressif
+        await sleep(5000);
         return;
       }
 
@@ -2728,4 +2742,3 @@ async function main() {
 }
 
 main().catch(err => { console.error('Démarrage échoué:', err.message); process.exit(1); });
-
